@@ -1,6 +1,5 @@
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from app.core.config import BACKEND_DIR, settings
@@ -29,3 +28,27 @@ def write_audit_log(event: dict[str, Any]) -> None:
     }
     with AUDIT_LOG_PATH.open("a", encoding="utf-8") as file_handle:
         file_handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
+def write_supervision_alert(
+    user_id: str,
+    role: str,
+    reason: str,
+    request_type: str,
+    scope: str,
+    message: str | None = None,
+) -> None:
+    write_audit_log(
+        {
+            "event_type": "supervision_alert",
+            "user_id": user_id,
+            "role": role,
+            "decision": "alerted",
+            "request_type": request_type,
+            "scope": scope,
+            "model": None,
+            "sources": [],
+            "reason": reason,
+            "message": message,
+        }
+    )

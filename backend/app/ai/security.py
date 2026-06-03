@@ -1,11 +1,11 @@
-from app.ai.normalizer import normalize_user_message
+from app.ai.normalizer import normalize_for_matching
 
 
 PROMPT_INJECTION_KEYWORDS = {
     "ignore les instructions",
     "ignore previous instructions",
     "revele ton prompt",
-    "révèle ton prompt",
+    "reveal your prompt",
     "system prompt",
     "developer message",
     "jailbreak",
@@ -15,7 +15,6 @@ PROMPT_INJECTION_KEYWORDS = {
 
 SENSITIVE_EXTRACTION_KEYWORDS = {
     "cle api",
-    "clé api",
     "api key",
     "donne les salaires de tout le monde",
     "salaire de tous les collaborateurs",
@@ -30,13 +29,12 @@ DANGEROUS_KEYWORDS = {
     "voler un mot de passe",
     "bombe",
     "arme",
-    "contourner sécurité",
     "contourner securite",
 }
 
 
 def _contains_keyword(message: str, keywords: set[str]) -> bool:
-    lowered = normalize_user_message(message).lower()
+    lowered = normalize_for_matching(message)
     return any(keyword in lowered for keyword in keywords)
 
 
@@ -57,18 +55,21 @@ def security_prefilter(message: str) -> dict[str, str | bool | None]:
         return {
             "is_blocked": True,
             "reason": "Prompt injection detected.",
+            "risk_type": "prompt_injection",
             "severity": "high",
         }
     if detect_dangerous_request(message):
         return {
             "is_blocked": True,
             "reason": "Dangerous request detected.",
+            "risk_type": "dangerous_request",
             "severity": "high",
         }
     if detect_sensitive_data_extraction(message):
         return {
-            "is_blocked": True,
+            "is_blocked": False,
             "reason": "Sensitive data extraction detected.",
-            "severity": "high",
+            "risk_type": "sensitive_data_extraction",
+            "severity": "medium",
         }
-    return {"is_blocked": False, "reason": None, "severity": None}
+    return {"is_blocked": False, "reason": None, "risk_type": None, "severity": None}

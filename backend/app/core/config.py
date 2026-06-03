@@ -22,9 +22,9 @@ class Settings(BaseSettings):
 
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    OPENROUTER_MODEL_RH: str = "mistralai/mistral-7b-instruct"
-    OPENROUTER_MODEL_GENERAL: str = "mistralai/mistral-7b-instruct"
-    OPENROUTER_MODEL_CLASSIFIER: str = "mistralai/mistral-7b-instruct"
+    OPENROUTER_MODEL_RH: str = "mistralai/mistral-small-24b-instruct-2501"
+    OPENROUTER_MODEL_GENERAL: str = "mistralai/mistral-small-24b-instruct-2501"
+    OPENROUTER_MODEL_CLASSIFIER: str = "mistralai/mistral-small-24b-instruct-2501"
     OPENROUTER_SITE_URL: str = "http://localhost:3000"
     OPENROUTER_APP_NAME: str = "YDAYS IA RH"
 
