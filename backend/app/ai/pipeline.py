@@ -1,9 +1,13 @@
-from app.ai.audit import write_audit_log
+from app.ai.audit import write_audit_log, write_supervision_alert
 from app.ai.classifier import classify_rh_request_type, classify_scope, is_general_knowledge_allowed
 from app.ai.normalizer import normalize_user_message
 from app.ai.prompts import GENERAL_SYSTEM_PROMPT, RH_SYSTEM_PROMPT, build_general_prompt, build_rh_prompt
 from app.ai.providers.factory import get_llm_provider
-from app.ai.rag.retriever import build_documents_context, retrieve_authorized_documents
+from app.ai.rag.retriever import (
+    build_documents_context,
+    filter_documents_by_confidence,
+    retrieve_authorized_documents,
+)
 from app.ai.rbac import ROLE_PERMISSIONS, is_authorized
 from app.ai.response_filter import post_filter_answer
 from app.ai.schemas import ChatRequest, ChatResponse, Source
@@ -12,13 +16,17 @@ from app.core.config import settings
 
 
 OFF_TOPIC_ANSWER = (
-    "Je peux vous aider principalement sur les sujets RH ou les questions générales autorisées. "
+    "Je peux vous aider principalement sur les sujets RH ou les questions generales autorisees. "
     "Reformulez votre demande si besoin."
 )
-SECURITY_REFUSAL = "Je ne peux pas traiter cette demande pour des raisons de sécurité."
+SECURITY_REFUSAL = "Je ne peux pas traiter cette demande pour des raisons de securite."
 AUTHORIZATION_REFUSAL = (
-    "Je ne peux pas répondre à cette demande avec votre niveau d'autorisation. "
-    "Merci de vous rapprocher d'un référent RH."
+    "Je ne peux pas repondre a cette demande avec votre niveau d'autorisation. "
+    "Merci de vous rapprocher d'un referent RH."
+)
+INSUFFICIENT_CONTEXT_REFUSAL = (
+    "Je ne dispose pas de suffisamment de documents RH fiables pour repondre correctement a cette demande. "
+    "Merci de vous rapprocher d'un referent RH."
 )
 
 
@@ -64,14 +72,44 @@ def _log_event(
     )
 
 
+def _emit_supervision_alert(
+    request: ChatRequest,
+    reason: str,
+    request_type: str,
+    scope: str,
+) -> None:
+    write_supervision_alert(
+        user_id=request.user_context.user_id,
+        role=request.user_context.role,
+        reason=reason,
+        request_type=request_type,
+        scope=scope,
+        message=request.message,
+    )
+
+
+def _append_source_references(answer: str, sources: list[Source]) -> str:
+    if not sources or "Sources:" in answer:
+        return answer
+    references = ", ".join(f"{source.title} ({source.document_id})" for source in sources[:3])
+    return f"{answer}\n\nSources: {references}"
+
+
 def run_chat_pipeline(request: ChatRequest) -> ChatResponse:
     normalized_message = normalize_user_message(request.message)
     if not normalized_message:
         raise ValueError("The message cannot be empty.")
 
+    security_result = {"is_blocked": False, "reason": None, "risk_type": None, "severity": None}
     if settings.ENABLE_SECURITY_FILTER:
         security_result = security_prefilter(normalized_message)
         if security_result["is_blocked"]:
+            _emit_supervision_alert(
+                request,
+                reason=str(security_result["reason"]),
+                request_type="security_block",
+                scope="dangerous",
+            )
             _log_event(
                 request,
                 decision="blocked",
@@ -90,6 +128,12 @@ def run_chat_pipeline(request: ChatRequest) -> ChatResponse:
 
     scope = classify_scope(normalized_message)
     if scope == "dangerous":
+        _emit_supervision_alert(
+            request,
+            reason="Dangerous scope detected.",
+            request_type="dangerous",
+            scope=scope,
+        )
         _log_event(
             request,
             decision="blocked",
@@ -145,6 +189,12 @@ def run_chat_pipeline(request: ChatRequest) -> ChatResponse:
                 routed_to_human=False,
             )
         if not is_general_knowledge_allowed(normalized_message):
+            _emit_supervision_alert(
+                request,
+                reason="General knowledge request rejected after classification.",
+                request_type="general_knowledge",
+                scope=scope,
+            )
             _log_event(
                 request,
                 decision="denied",
@@ -167,6 +217,13 @@ def run_chat_pipeline(request: ChatRequest) -> ChatResponse:
             model=settings.OPENROUTER_MODEL_GENERAL,
         )
         filtered = post_filter_answer(answer, scope=scope, request_type="general_knowledge")
+        if not filtered["is_valid"]:
+            _emit_supervision_alert(
+                request,
+                reason="Post-filter blocked general answer.",
+                request_type="general_knowledge",
+                scope=scope,
+            )
         _log_event(
             request,
             decision="allowed" if filtered["is_valid"] else "blocked",
@@ -185,6 +242,12 @@ def run_chat_pipeline(request: ChatRequest) -> ChatResponse:
 
     request_type = classify_rh_request_type(normalized_message)
     if settings.ENABLE_RBAC and not is_authorized(request.user_context, request_type):
+        _emit_supervision_alert(
+            request,
+            reason="RBAC denied request.",
+            request_type=request_type,
+            scope=scope,
+        )
         _log_event(
             request,
             decision="denied",
@@ -202,17 +265,57 @@ def run_chat_pipeline(request: ChatRequest) -> ChatResponse:
         )
 
     documents = retrieve_authorized_documents(normalized_message, request.user_context, settings.RAG_TOP_K)
-    documents_context = build_documents_context(documents)
+    trusted_documents = filter_documents_by_confidence(documents, settings.RAG_MIN_CONFIDENCE)
+    if not trusted_documents:
+        _emit_supervision_alert(
+            request,
+            reason="No trusted HR documents matched the request.",
+            request_type=request_type,
+            scope=scope,
+        )
+        _log_event(
+            request,
+            decision="redirected",
+            scope=scope,
+            request_type=request_type,
+            reason="No trusted HR documents matched the request.",
+        )
+        return ChatResponse(
+            answer=INSUFFICIENT_CONTEXT_REFUSAL,
+            scope=scope,
+            request_type=request_type,
+            decision="redirected",
+            warnings=["No trusted HR source matched the request."],
+            routed_to_human=True,
+        )
+
+    documents_context = build_documents_context(trusted_documents)
     answer = provider.generate(
         system_prompt=RH_SYSTEM_PROMPT,
         user_prompt=build_rh_prompt(normalized_message, request.user_context, documents_context),
         model=settings.OPENROUTER_MODEL_RH,
     )
     filtered = post_filter_answer(answer, scope=scope, request_type=request_type)
-    sources = _build_sources(documents)
+    sources = _build_sources(trusted_documents)
     warnings = list(filtered["warnings"])
-    if scope == "rh" and not sources:
-        warnings.append("No HR source matched the request. Response may require human review.")
+
+    if security_result.get("risk_type") == "sensitive_data_extraction":
+        warnings.append("Sensitive request detected: response constrained by permissions.")
+        _emit_supervision_alert(
+            request,
+            reason="Sensitive HR request detected.",
+            request_type=request_type,
+            scope=scope,
+        )
+
+    final_answer = _append_source_references(str(filtered["answer"]), sources)
+    if not filtered["is_valid"]:
+        _emit_supervision_alert(
+            request,
+            reason="Post-filter blocked HR answer.",
+            request_type=request_type,
+            scope=scope,
+        )
 
     _log_event(
         request,
@@ -223,7 +326,7 @@ def run_chat_pipeline(request: ChatRequest) -> ChatResponse:
         sources=sources,
     )
     return ChatResponse(
-        answer=str(filtered["answer"]),
+        answer=final_answer,
         scope=scope,
         request_type=request_type,
         decision="allowed" if filtered["is_valid"] else "blocked",

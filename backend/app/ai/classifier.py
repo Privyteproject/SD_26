@@ -1,4 +1,4 @@
-from app.ai.normalizer import normalize_user_message
+from app.ai.normalizer import normalize_for_matching
 
 
 DANGEROUS_KEYWORDS = {
@@ -8,14 +8,12 @@ DANGEROUS_KEYWORDS = {
     "bombe",
     "arme",
     "voler un mot de passe",
-    "contourner sécurité",
     "contourner securite",
 }
 
 RH_KEYWORDS = {
-    "congé",
+    "conge",
     "conges",
-    "congés",
     "absence",
     "paie",
     "salaire",
@@ -28,28 +26,21 @@ RH_KEYWORDS = {
     "manager",
     "collaborateur",
     "formation",
-    "mobilité",
     "mobilite",
-    "démission",
     "demission",
     "turnover",
-    "absentéisme",
     "absenteisme",
     "document rh",
     "politique rh",
-    "procédure",
     "procedure",
     "avantage social",
-    "télétravail",
     "teletravail",
 }
 
 GENERAL_KEYWORDS = {
     "histoire",
-    "géographie",
     "geographie",
     "science",
-    "définition",
     "definition",
     "expliquer",
     "c'est quoi",
@@ -57,9 +48,7 @@ GENERAL_KEYWORDS = {
     "quand",
     "pourquoi",
     "comment fonctionne",
-    "culture générale",
     "culture generale",
-    "informatique générale",
     "informatique generale",
     "ia",
     "machine learning",
@@ -69,24 +58,22 @@ OFF_TOPIC_KEYWORDS = {
     "blague",
     "jeu",
     "chanson",
-    "poème",
     "poeme",
     "recette",
-    "cinéma",
     "cinema",
     "foot",
     "voyage",
 }
 
-DOCUMENT_GENERATION_KEYWORDS = {"génère", "genere", "attestation", "document", "certificat"}
-ONBOARDING_KEYWORDS = {"onboarding", "intégration", "integration", "arrivée", "arrivee"}
-OFFBOARDING_KEYWORDS = {"offboarding", "départ", "depart", "sortie"}
+DOCUMENT_GENERATION_KEYWORDS = {"genere", "attestation", "document", "certificat"}
+ONBOARDING_KEYWORDS = {"onboarding", "integration", "arrivee"}
+OFFBOARDING_KEYWORDS = {"offboarding", "depart", "sortie"}
 SENSITIVE_KEYWORDS = {"salaire", "dossier personnel", "sanction", "confidentiel", "confidentielle"}
-PREDICTIVE_KEYWORDS = {"prévision", "prevision", "prédictif", "predictif", "turnover", "kpi"}
+PREDICTIVE_KEYWORDS = {"prevision", "predictif", "turnover", "kpi"}
 
 
 def _contains_any(message: str, keywords: set[str]) -> bool:
-    lowered = normalize_user_message(message).lower()
+    lowered = normalize_for_matching(message)
     return any(keyword in lowered for keyword in keywords)
 
 
