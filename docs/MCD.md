@@ -23,6 +23,9 @@ erDiagram
         string first_name
         string last_name
         string position
+        float salary
+        string address
+        string cin UK "Carte d'Identité Nationale"
         date hire_date
         string status "active, inactive, onboarding, offboarding"
     }

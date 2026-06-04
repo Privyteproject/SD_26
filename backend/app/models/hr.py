@@ -23,6 +23,11 @@ class Employee(Base):
     position: Mapped[str] = mapped_column(String, nullable=False)
     hire_date: Mapped[Date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String, default="active") # active, inactive, onboarding, offboarding
+    
+    # Nouvelles colonnes RH
+    salary: Mapped[float | None] = mapped_column(nullable=True)
+    address: Mapped[str | None] = mapped_column(String, nullable=True)
+    cin: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
 
     # Relationships
     user = relationship("User", back_populates="employee")
