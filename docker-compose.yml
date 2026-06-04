@@ -1,6 +1,17 @@
 version: '3.8'
 
 services:
+  frontend:
+    build: ./frontend
+    container_name: ydays_frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
   backend:
     build: ./backend
     container_name: ydays_backend
@@ -51,7 +62,7 @@ services:
       - IS_PERSISTENT=TRUE
       - ALLOW_RESET=TRUE
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - chromadb_data:/chroma/chroma
 
