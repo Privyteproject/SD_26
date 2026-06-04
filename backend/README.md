@@ -31,12 +31,15 @@ Modeles OpenRouter recommandes pour ce MVP :
 
 - `mistralai/mistral-small-24b-instruct-2501`
 
-## Seed ChromaDB
+## Ingestion des documents RH
 
 ```bash
 cd backend
-python -m app.ai.rag.seed_documents
+python -m app.ai.rag.ingest_documents
 ```
+
+Les documents sources a indexer doivent etre places dans `backend/data/rh_docs`.
+Formats supportes : `json`, `jsonl`, `md`, `txt`.
 
 ## Lancement du backend
 

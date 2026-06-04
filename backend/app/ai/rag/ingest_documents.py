@@ -2,8 +2,11 @@ from app.ai.rag.document_ingestion import collect_documents, get_rh_documents_pa
 from app.ai.rag.vector_store import VectorStore
 
 
-def seed_documents() -> None:
+def ingest_documents(reset: bool = True) -> int:
     vector_store = VectorStore()
+    if reset:
+        vector_store.reset_storage()
+
     documents = collect_documents()
     for document in documents:
         vector_store.add_document(
@@ -11,11 +14,12 @@ def seed_documents() -> None:
             text=document.text,
             metadata=document.metadata,
         )
-    print(
-        f"Seeded {len(documents)} HR document chunks into ChromaDB "
-        f"from {get_rh_documents_path()}."
-    )
+    return len(documents)
 
 
 if __name__ == "__main__":
-    seed_documents()
+    count = ingest_documents(reset=True)
+    print(
+        f"Ingested {count} HR document chunks into ChromaDB "
+        f"from {get_rh_documents_path()}."
+    )
