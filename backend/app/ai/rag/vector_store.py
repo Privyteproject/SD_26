@@ -71,6 +71,19 @@ class VectorStore:
             embeddings=[self.embed(text)],
         )
 
+    def reset_storage(self) -> None:
+        self._reset_persist_directory()
+        self.client = chromadb.PersistentClient(
+            path=str(self.persist_path),
+            settings=chromadb.Settings(
+                anonymized_telemetry=False,
+                allow_reset=True,
+                chroma_product_telemetry_impl="app.ai.rag.chroma_noop_telemetry.NoOpProductTelemetryClient",
+                chroma_telemetry_impl="app.ai.rag.chroma_noop_telemetry.NoOpProductTelemetryClient",
+            ),
+        )
+        self.collection = self.client.get_or_create_collection(settings.CHROMA_COLLECTION_NAME)
+
     def search(
         self,
         query: str,

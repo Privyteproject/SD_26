@@ -1,7 +1,7 @@
 from app.ai.audit import write_audit_log, write_supervision_alert
 from app.ai.classifier import classify_rh_request_type, classify_scope, is_general_knowledge_allowed
 from app.ai.normalizer import normalize_user_message
-from app.ai.prompts import GENERAL_SYSTEM_PROMPT, RH_SYSTEM_PROMPT, build_general_prompt, build_rh_prompt
+from app.ai.prompts import build_general_prompt_bundle, build_rh_prompt_bundle
 from app.ai.providers.factory import get_llm_provider
 from app.ai.rag.retriever import (
     build_documents_context,
@@ -211,9 +211,10 @@ def run_chat_pipeline(request: ChatRequest) -> ChatResponse:
                 routed_to_human=False,
             )
 
-        answer = provider.generate(
-            system_prompt=GENERAL_SYSTEM_PROMPT,
-            user_prompt=build_general_prompt(normalized_message),
+        prompt_bundle = build_general_prompt_bundle(normalized_message)
+        answer = provider.generate_text(
+            system_prompt=prompt_bundle.system_prompt,
+            user_prompt=prompt_bundle.user_prompt,
             model=settings.OPENROUTER_MODEL_GENERAL,
         )
         filtered = post_filter_answer(answer, scope=scope, request_type="general_knowledge")
@@ -290,9 +291,14 @@ def run_chat_pipeline(request: ChatRequest) -> ChatResponse:
         )
 
     documents_context = build_documents_context(trusted_documents)
-    answer = provider.generate(
-        system_prompt=RH_SYSTEM_PROMPT,
-        user_prompt=build_rh_prompt(normalized_message, request.user_context, documents_context),
+    prompt_bundle = build_rh_prompt_bundle(
+        normalized_message,
+        request.user_context,
+        documents_context,
+    )
+    answer = provider.generate_text(
+        system_prompt=prompt_bundle.system_prompt,
+        user_prompt=prompt_bundle.user_prompt,
         model=settings.OPENROUTER_MODEL_RH,
     )
     filtered = post_filter_answer(answer, scope=scope, request_type=request_type)

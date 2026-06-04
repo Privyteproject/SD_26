@@ -1,5 +1,6 @@
 # Environments
 .env
+.env.local
 .venv
 env/
 venv/
@@ -53,3 +54,8 @@ Thumbs.db
 *.docx
 *.pdf
 *.md.backup
+
+# Runtime data
+backend/data/chroma/
+backend/data/chroma_recovered/
+backend/logs/*.jsonl

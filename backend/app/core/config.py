@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 
     RAG_TOP_K: int = 5
-    RAG_MIN_CONFIDENCE: float = Field(default=0.60, ge=0.0, le=1.0)
+    RAG_MIN_CONFIDENCE: float = Field(default=0.50, ge=0.0, le=1.0)
 
     # Feature Flags
     ENABLE_AUDIT_LOGS: bool = True

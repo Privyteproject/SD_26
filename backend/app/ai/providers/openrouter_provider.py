@@ -1,22 +1,18 @@
 import requests
 
-from app.ai.providers.base import LLMProvider
+from app.ai.providers.base import LLMProvider, LLMRequest, LLMResponse
 from app.core.config import settings
 
 
 class OpenRouterProvider(LLMProvider):
-    def generate(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        model: str | None = None,
-        temperature: float = 0.2,
-        max_tokens: int = 1000,
-    ) -> str:
+    def generate(self, request: LLMRequest) -> LLMResponse:
         if not settings.OPENROUTER_API_KEY:
             raise RuntimeError("OPENROUTER_API_KEY is missing. Configure it in your .env file.")
 
-        resolved_model = model or settings.OPENROUTER_MODEL_GENERAL
+        if not request.messages:
+            raise ValueError("LLMRequest.messages cannot be empty.")
+
+        resolved_model = request.options.model or settings.OPENROUTER_MODEL_GENERAL
         response = requests.post(
             f"{settings.OPENROUTER_BASE_URL.rstrip('/')}/chat/completions",
             headers={
@@ -28,11 +24,11 @@ class OpenRouterProvider(LLMProvider):
             json={
                 "model": resolved_model,
                 "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
+                    {"role": message.role, "content": message.content}
+                    for message in request.messages
                 ],
-                "temperature": temperature,
-                "max_tokens": max_tokens,
+                "temperature": request.options.temperature,
+                "max_tokens": request.options.max_tokens,
             },
             timeout=60,
         )
@@ -45,6 +41,8 @@ class OpenRouterProvider(LLMProvider):
 
         payload = response.json()
         try:
-            return payload["choices"][0]["message"]["content"].strip()
+            content = payload["choices"][0]["message"]["content"].strip()
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError("OpenRouter returned an unexpected response payload.") from exc
+
+        return LLMResponse(content=content, model=resolved_model, raw=payload)

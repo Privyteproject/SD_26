@@ -5,7 +5,7 @@ from app.api.v1.router import api_router
 from app.api.routes_ai import router as ai_router
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
+    title=settings.APP_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 

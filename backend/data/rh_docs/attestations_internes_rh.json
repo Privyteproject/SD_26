@@ -1,0 +1,32 @@
+[
+  {
+    "id": "rh_attestation_travail_001",
+    "title": "Procedure interne - Attestation de travail",
+    "type": "procedure",
+    "allowed_roles": "all,collaborateur,rh",
+    "department": "all",
+    "confidentiality": "internal",
+    "version": "1.0",
+    "text": "Pour obtenir une attestation de travail, le collaborateur doit faire une demande depuis le portail RH. L'attestation de travail standard est generee a partir des informations administratives du collaborateur puis mise a disposition en telechargement apres verification automatique. Si des informations specifiques doivent apparaitre sur l'attestation de travail, la demande est transmise a l'equipe RH pour validation manuelle."
+  },
+  {
+    "id": "rh_attestation_employeur_001",
+    "title": "Procedure interne - Attestation employeur et justificatifs",
+    "type": "procedure",
+    "allowed_roles": "all,collaborateur,rh",
+    "department": "all",
+    "confidentiality": "internal",
+    "version": "1.0",
+    "text": "Les attestations employeur, attestations de travail et justificatifs administratifs standards peuvent etre demandes dans l'espace documentaire RH. Le collaborateur selectionne le type de document souhaite, confirme son identite et suit l'etat de traitement de la demande. Les documents sensibles ou personnalises necessitent une validation RH avant emission."
+  },
+  {
+    "id": "rh_demande_document_001",
+    "title": "Guide RH - Demande de documents administratifs",
+    "type": "guide",
+    "allowed_roles": "all,collaborateur,manager,rh",
+    "department": "all",
+    "confidentiality": "internal",
+    "version": "1.0",
+    "text": "Le module RH de generation documentaire permet de demander une attestation de travail, une attestation employeur, une attestation standard ou un justificatif administratif. Pour une attestation de travail, le collaborateur accede au portail RH, ouvre la rubrique Documents, choisit Attestation de travail puis valide la demande. Le document est ensuite genere automatiquement si aucune validation complementaire n'est requise."
+  }
+]
