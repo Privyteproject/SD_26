@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.router import api_router
 from app.api.routes_ai import router as ai_router
-
+from app.api.middleware import JSONLoggingMiddleware
 app = FastAPI(
     title=settings.APP_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
@@ -17,6 +17,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(JSONLoggingMiddleware)
+
+from app.core.logging import logger
+logger.info("FastAPI Application Starting", extra={"extra_info": {"event": "startup"}})
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(ai_router)
