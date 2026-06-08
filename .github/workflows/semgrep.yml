@@ -1,0 +1,33 @@
+name: Semgrep Security Scan
+
+on:
+  push:
+    branches: [ main, develop, dev-ai ]
+  pull_request:
+    branches: [ main, develop, dev-ai ]
+
+jobs:
+  semgrep:
+    name: Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Run Semgrep
+        run: |
+          semgrep --config p/python \
+                  --config p/owasp-top-ten \
+                  --config p/sql-injection \
+                  --config p/secrets \
+                  --json > semgrep-results.json || true
+
+      - name: Upload results
+        uses: actions/upload-artifact@v3
+        with:
+          name: semgrep-results
+          path: semgrep-results.json
