@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 import { MessageSquare, FileText, Rocket, LogOut, ArrowRight, Check } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
@@ -10,6 +11,7 @@ import {
   ENGAGEMENT_TREND, LEAVE, PENDING_REQUESTS,
   ONBOARDING_TASKS, OFFBOARDING_TASKS,
 } from "../../../mock/mockData";
+import { getEngagementTrend } from "../../../app/api/services";
 
 function LifecycleCard({ tone, icon: Icon, title, sub, progress, cta, tasks, lang }) {
   return (
@@ -48,6 +50,21 @@ export default function DashboardPerso() {
   const { t, lang } = useI18n();
   const { status } = useSession();
 
+  const [engagementData, setEngagementData] = useState(ENGAGEMENT_TREND);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getEngagementTrend()
+      .then((res) => {
+        if (!cancelled && res.data) setEngagementData(res.data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   const onbDone = ONBOARDING_TASKS.filter((x) => x.done).length;
   const onbProgress = Math.round((onbDone / ONBOARDING_TASKS.length) * 100);
   const offDone = OFFBOARDING_TASKS.filter((x) => x.done).length;
@@ -58,7 +75,13 @@ export default function DashboardPerso() {
       <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: "0 0 4px" }}>
         {t("dash.welcome")}, Yannick
       </h1>
-      <p style={{ fontSize: 14, color: "var(--muted)", margin: 0 }}>{t("dash.welcomeSub")}</p>
+      <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 16px" }}>{t("dash.welcomeSub")}</p>
+
+      {error && (
+        <div style={{ padding: "10px 14px", borderRadius: 8, background: "var(--gold-tint)", color: "var(--gold-deep)", fontSize: 13, marginBottom: 14 }}>
+          ⚠ API unavailable — showing mock data. ({error})
+        </div>
+      )}
 
       {/* Carte onboarding — visible uniquement pour un nouvel arrivant */}
       {status === STATUS.NEW && (
@@ -89,7 +112,7 @@ export default function DashboardPerso() {
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 10 }}>{t("dash.engagement")}</div>
           <div style={{ height: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={ENGAGEMENT_TREND} margin={{ top: 6, right: 8, left: -20, bottom: 0 }}>
+              <LineChart data={engagementData} margin={{ top: 6, right: 8, left: -20, bottom: 0 }}>
                 <XAxis dataKey="m" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} domain={[60, 90]} />
                 <Tooltip />

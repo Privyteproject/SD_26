@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { Mail, Phone, MapPin, Briefcase, Building2, User, Clock, FileText, Settings, ShieldCheck } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import Card from "../../../components/Card";
 import { PROFILE } from "../../../mock/mockData";
+import { getCurrentUser } from "../../../app/api/services";
 
 function Row({ icon: Icon, label, value }) {
   return (
@@ -15,10 +17,39 @@ function Row({ icon: Icon, label, value }) {
 
 export default function Profile() {
   const { t, lang } = useI18n();
-  const p = PROFILE;
+  const [p, setP] = useState(PROFILE);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUser()
+      .then((res) => {
+        if (cancelled) return;
+        const u = res.data;
+        if (u) {
+          setP({
+            ...PROFILE,
+            name: u.email?.split("@")[0] || PROFILE.name,
+            email: u.email || PROFILE.email,
+            role: { fr: u.role, en: u.role },
+          });
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div>
       <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: "0 0 18px" }}>{t("profile.title")}</h1>
+
+      {error && (
+        <div style={{ padding: "10px 14px", borderRadius: 8, background: "var(--gold-tint)", color: "var(--gold-deep)", fontSize: 13, marginBottom: 14 }}>
+          ⚠ API unavailable — showing mock data. ({error})
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <Card>

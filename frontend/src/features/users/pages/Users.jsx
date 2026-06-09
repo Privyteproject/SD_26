@@ -1,9 +1,11 @@
+import { useState, useEffect } from "react";
 import { Check, Minus, Plus } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { ROLE_LABELS } from "../../../lib/constants";
 import Card from "../../../components/Card";
 import Badge from "../../../components/Badge";
 import { ADMIN_USERS, PERM_MODULES, PERM_GRID, ROLE_SHORT } from "../../../mock/mockData";
+import { getUsers } from "../../../app/api/services";
 
 const ROLE_ORDER = ["COLLABORATEUR", "MANAGER", "RH", "DIRECTION", "ADMIN", "MEDECINE"];
 
@@ -15,6 +17,23 @@ function Cell({ v }) {
 
 export default function Users() {
   const { t, lang } = useI18n();
+
+  const [usersData, setUsersData] = useState(ADMIN_USERS);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getUsers()
+      .then((res) => {
+        // Since it's a stub returning [], we keep the mock data for now to show UI 
+        // if (!cancelled && res.data && res.data.length > 0) setUsersData(res.data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
@@ -24,19 +43,25 @@ export default function Users() {
         </button>
       </div>
 
+      {error && (
+        <div style={{ padding: "10px 14px", borderRadius: 8, background: "var(--gold-tint)", color: "var(--gold-deep)", fontSize: 13, marginBottom: 14, marginTop: 14 }}>
+          ⚠ API unavailable — showing mock data. ({error})
+        </div>
+      )}
+
       {/* Liste utilisateurs */}
       <Card style={{ marginTop: 18, padding: 0 }}>
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1.2fr", gap: 12, padding: "12px 18px", borderBottom: "1px solid var(--line)", fontSize: 12, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
           <span>{t("usr.user")}</span><span>{t("emp.role")}</span><span>{t("usr.last")}</span>
         </div>
-        {ADMIN_USERS.map((u, i) => (
+        {usersData.map((u, i) => (
           <div key={u.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1.2fr", gap: 12, alignItems: "center", padding: "13px 18px", borderTop: i ? "1px solid var(--line)" : "none" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>
               <span style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 13 }}>{u.name.charAt(0)}</span>
               {u.name}
             </span>
-            <span><Badge tone="gold">{ROLE_LABELS[u.role][lang]}</Badge></span>
-            <span style={{ fontSize: 12.5, color: "var(--muted)", fontFamily: "monospace" }}>{u.last}</span>
+            <span><Badge tone="gold">{ROLE_LABELS[u.role] ? ROLE_LABELS[u.role][lang] : u.role}</Badge></span>
+            <span style={{ fontSize: 12.5, color: "var(--muted)", fontFamily: "monospace" }}>{u.last || "-"}</span>
           </div>
         ))}
       </Card>

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useSession } from "../../../app/providers/SessionProvider";
@@ -6,6 +7,7 @@ import Card from "../../../components/Card";
 import KpiCard from "../../../components/KpiCard";
 import Badge from "../../../components/Badge";
 import { TURNOVER_TREND, HEADCOUNT_BY_DEPT, TEAM_ABSENCE_WEEK } from "../../../mock/mockData";
+import { getTurnoverTrend, getHeadcount, getTeamAbsences } from "../../../app/api/services";
 
 export default function DashboardRh() {
   const { t } = useI18n();
@@ -14,12 +16,50 @@ export default function DashboardRh() {
   const isExec = role === ROLES.RH || role === ROLES.DIRECTION;
   const isMed = role === ROLES.MEDECINE;
 
+  const [turnoverData, setTurnoverData] = useState(TURNOVER_TREND);
+  const [headcountData, setHeadcountData] = useState(HEADCOUNT_BY_DEPT);
+  const [teamAbsenceData, setTeamAbsenceData] = useState(TEAM_ABSENCE_WEEK);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchAll = async () => {
+      try {
+        if (isManager) {
+          const resAbsence = await getTeamAbsences();
+          if (!cancelled && resAbsence.data) setTeamAbsenceData(resAbsence.data);
+        } else if (isExec) {
+          const [resTurnover, resHeadcount] = await Promise.all([
+            getTurnoverTrend(),
+            getHeadcount(),
+          ]);
+          if (!cancelled) {
+            if (resTurnover.data) setTurnoverData(resTurnover.data);
+            if (resHeadcount.data) setHeadcountData(resHeadcount.data);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      }
+    };
+
+    fetchAll();
+    return () => { cancelled = true; };
+  }, [isManager, isExec]);
+
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
         <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{t("nav.dashboard")}</h1>
         <Badge tone="gold">{isManager ? t("scope.team") : t("scope.org")}</Badge>
       </div>
+
+      {error && (
+        <div style={{ padding: "10px 14px", borderRadius: 8, background: "var(--gold-tint)", color: "var(--gold-deep)", fontSize: 13, marginBottom: 14 }}>
+          ⚠ API unavailable — showing mock data. ({error})
+        </div>
+      )}
 
       {/* KPI adaptés au rôle */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginTop: 20 }}>
@@ -50,14 +90,14 @@ export default function DashboardRh() {
           <div style={{ height: 220 }}>
             <ResponsiveContainer width="100%" height="100%">
               {isManager ? (
-                <BarChart data={TEAM_ABSENCE_WEEK} margin={{ top: 6, right: 8, left: -22, bottom: 0 }}>
+                <BarChart data={teamAbsenceData} margin={{ top: 6, right: 8, left: -22, bottom: 0 }}>
                   <XAxis dataKey="d" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip />
                   <Bar dataKey="v" fill="var(--gold)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               ) : (
-                <LineChart data={TURNOVER_TREND} margin={{ top: 6, right: 8, left: -22, bottom: 0 }}>
+                <LineChart data={turnoverData} margin={{ top: 6, right: 8, left: -22, bottom: 0 }}>
                   <XAxis dataKey="m" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} domain={[6, 10]} />
                   <Tooltip />
@@ -76,7 +116,7 @@ export default function DashboardRh() {
           {(isExec || isMed) ? (
             <div style={{ height: 220 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={HEADCOUNT_BY_DEPT} layout="vertical" margin={{ top: 0, right: 12, left: 8, bottom: 0 }}>
+                <BarChart data={headcountData} layout="vertical" margin={{ top: 0, right: 12, left: 8, bottom: 0 }}>
                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="d" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} width={60} />
                   <Tooltip />
