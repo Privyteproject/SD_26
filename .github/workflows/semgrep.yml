@@ -2,9 +2,9 @@ name: Semgrep Security Scan
 
 on:
   push:
-    branches: [ main, develop, dev-ai ]
+    branches: [ main, develop, dev-ai , frontend ]
   pull_request:
-    branches: [ main, develop, dev-ai ] 
+    branches: [ main, develop, dev-ai , frontend ] 
 
 jobs:
   semgrep:
