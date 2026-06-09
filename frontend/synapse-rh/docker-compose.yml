@@ -1,0 +1,77 @@
+version: "3.9"
+
+services:
+  # ── Frontend React ────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+        VITE_KC_URL: ${VITE_KC_URL:-http://localhost:8180}
+        VITE_KC_REALM: ${VITE_KC_REALM:-synapse}
+        VITE_KC_CLIENT: ${VITE_KC_CLIENT:-synapse-frontend}
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - synapse-net
+
+  # ── Backend (à compléter par l'équipe backend) ────────────────────────────
+  backend:
+    image: synapse-backend:latest   # image à builder par l'équipe Mohamed/Ilyann
+    ports:
+      - "8080:8080"
+    environment:
+      - KC_URL=${VITE_KC_URL:-http://keycloak:8180}
+      - KC_REALM=${VITE_KC_REALM:-synapse}
+      - DB_URL=${DB_URL:-jdbc:postgresql://db:5432/synapse}
+      - DB_USER=${DB_USER:-synapse}
+      - DB_PASS=${DB_PASS:-synapse}
+    depends_on:
+      - db
+      - keycloak
+    restart: unless-stopped
+    networks:
+      - synapse-net
+
+  # ── Base de données ────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: synapse
+      POSTGRES_USER: synapse
+      POSTGRES_PASSWORD: synapse
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - synapse-net
+
+  # ── Keycloak ───────────────────────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/synapse
+      KC_DB_USERNAME: synapse
+      KC_DB_PASSWORD: synapse
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8180:8080"
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - synapse-net
+
+volumes:
+  pgdata:
+
+networks:
+  synapse-net:
+    driver: bridge

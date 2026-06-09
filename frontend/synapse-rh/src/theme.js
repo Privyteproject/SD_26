@@ -1,0 +1,38 @@
+export const getColors = (dark) =>
+  dark
+    ? {
+        bg: "#140D06", surface: "#241A10", surfaceAlt: "#1E1508",
+        ink: "#F1E7D6", muted: "#AE9778", line: "#3A2C1C",
+        gold: "#D7A954", goldDeep: "#E7C57F", onGold: "#191108",
+        field: "#1A1109",
+        shadow: "0 8px 32px rgba(0,0,0,.6)",
+        shadowCard: "0 4px 20px rgba(0,0,0,.4)",
+        glow: "rgba(215,169,84,.10)",
+        badge: "#2A1E0E", badgeText: "#E7C57F",
+        success: "#1A3020", successText: "#7EC87A",
+        warn: "#302510", warnText: "#E7C57F",
+        danger: "#301010", dangerText: "#E07A7A",
+        critical: "#3A0A0A", criticalText: "#FF6B6B",
+        info: "#0F1E30", infoText: "#6BB5E0",
+        mission: "#20182A", missionText: "#B89EE0",
+        inputBg: "#1A1109",
+        tag: "#241A10",
+      }
+    : {
+        bg: "#EFE4CF", surface: "#FBF6EC", surfaceAlt: "#F5EDD8",
+        ink: "#2D2114", muted: "#6E5C46", line: "#E6D8BF",
+        gold: "#B8893E", goldDeep: "#946B2A", onGold: "#FFFFFF",
+        field: "#FFFFFF",
+        shadow: "0 8px 32px rgba(120,86,30,.2)",
+        shadowCard: "0 4px 20px rgba(120,86,30,.12)",
+        glow: "rgba(184,137,62,.16)",
+        badge: "#F0E3C8", badgeText: "#946B2A",
+        success: "#E8F5E5", successText: "#2E7D32",
+        warn: "#FFF8E0", warnText: "#8A6500",
+        danger: "#FDE8E8", dangerText: "#C62828",
+        critical: "#FFE5E5", criticalText: "#B71C1C",
+        info: "#E5F3FF", infoText: "#1565C0",
+        mission: "#F0EAFF", missionText: "#7B1FA2",
+        inputBg: "#FFFFFF",
+        tag: "#F0E3C8",
+      };
