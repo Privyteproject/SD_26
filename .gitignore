@@ -59,3 +59,7 @@ Thumbs.db
 backend/data/chroma/
 backend/data/chroma_recovered/
 backend/logs/*.jsonl
+
+node_modules/
+frontend/node_modules/
+package-lock.json
