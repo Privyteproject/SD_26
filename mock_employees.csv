@@ -1,0 +1,51 @@
+first_name,last_name,position,hire_date,status,salary,address,cin
+Mehdi,Alaoui,Analyste,2025-01-30,active,15596,"Casablanca, Maroc",AB100001
+Hassan,Lahlou,Développeur,2021-08-02,active,8274,"Casablanca, Maroc",AB100002
+Youssef,Chraibi,Consultant,2022-09-20,active,8040,"Casablanca, Maroc",AB100003
+Hassan,Chraibi,Manager,2025-11-24,active,15089,"Casablanca, Maroc",AB100004
+Mohamed,Guessous,Analyste,2022-01-28,active,10369,"Casablanca, Maroc",AB100005
+Mohamed,Bennani,Développeur,2021-09-28,active,12230,"Casablanca, Maroc",AB100006
+Amina,El Fassi,Consultant,2025-07-19,active,25213,"Casablanca, Maroc",AB100007
+Hassan,Chraibi,Développeur,2023-12-28,active,28166,"Casablanca, Maroc",AB100008
+Sarah,Ramisami,Manager,2025-08-05,active,24747,"Casablanca, Maroc",AB100009
+Mehdi,Lahlou,Consultant,2021-08-12,active,12949,"Casablanca, Maroc",AB100010
+Mehdi,Bennis,Manager,2022-07-22,active,20570,"Casablanca, Maroc",AB100011
+Nawal,Bennani,Manager,2025-09-23,active,16971,"Casablanca, Maroc",AB100012
+Khadija,Alaoui,Manager,2022-04-24,active,10619,"Casablanca, Maroc",AB100013
+Arush,Bennani,Analyste,2025-09-13,active,9474,"Casablanca, Maroc",AB100014
+Khadija,Bennani,Directeur,2024-08-14,active,17004,"Casablanca, Maroc",AB100015
+Fatima,Bennis,Directeur,2021-12-14,active,12471,"Casablanca, Maroc",AB100016
+Imane,Tazi,Analyste,2024-07-02,active,21316,"Casablanca, Maroc",AB100017
+Youssef,El Fassi,Directeur,2026-02-12,active,9515,"Casablanca, Maroc",AB100018
+Nawal,El Fassi,Analyste,2023-12-24,active,17141,"Casablanca, Maroc",AB100019
+Arush,Ramisami,Consultant,2022-06-15,active,20421,"Casablanca, Maroc",AB100020
+Nawal,El Amrani,Consultant,2023-11-10,active,15007,"Casablanca, Maroc",AB100021
+Amine,El Fassi,Développeur,2024-03-27,active,20192,"Casablanca, Maroc",AB100022
+Imane,Lahlou,Développeur,2020-12-21,active,9477,"Casablanca, Maroc",AB100023
+Omar,Lahlou,Analyste,2022-07-18,active,26913,"Casablanca, Maroc",AB100024
+Youssef,Guessous,Développeur,2024-08-17,active,14119,"Casablanca, Maroc",AB100025
+Khadija,Bennis,Développeur,2025-11-25,active,25999,"Casablanca, Maroc",AB100026
+Amine,El Amrani,Développeur,2026-02-11,active,17985,"Casablanca, Maroc",AB100027
+Imane,Guessous,Développeur,2023-04-24,active,19782,"Casablanca, Maroc",AB100028
+Mehdi,El Amrani,Manager,2021-03-03,active,18942,"Casablanca, Maroc",AB100029
+Amine,Tazi,Manager,2022-04-17,active,24164,"Casablanca, Maroc",AB100030
+Omar,Ramisami,Manager,2022-09-27,active,25462,"Casablanca, Maroc",AB100031
+Amine,Tazi,Développeur,2022-10-06,active,21813,"Casablanca, Maroc",AB100032
+Arush,Lahlou,Consultant,2021-08-31,active,19678,"Casablanca, Maroc",AB100033
+Mehdi,Chraibi,Manager,2022-06-14,active,17465,"Casablanca, Maroc",AB100034
+Arush,Ramisami,Développeur,2023-12-14,active,19436,"Casablanca, Maroc",AB100035
+Fatima,Guessous,Consultant,2022-09-09,active,24788,"Casablanca, Maroc",AB100036
+Sarah,Tazi,Directeur,2021-01-14,active,15510,"Casablanca, Maroc",AB100037
+Omar,Chraibi,Développeur,2022-04-28,active,21505,"Casablanca, Maroc",AB100038
+Sarah,Ramisami,Directeur,2025-12-28,active,20862,"Casablanca, Maroc",AB100039
+Youssef,El Fassi,Analyste,2023-09-23,active,9510,"Casablanca, Maroc",AB100040
+Mehdi,Lahlou,Développeur,2023-11-09,active,16199,"Casablanca, Maroc",AB100041
+Imane,Lahlou,Manager,2021-12-17,active,21908,"Casablanca, Maroc",AB100042
+Khadija,Lahlou,Manager,2023-05-17,active,19927,"Casablanca, Maroc",AB100043
+Amina,Tazi,Développeur,2024-10-24,active,16105,"Casablanca, Maroc",AB100044
+Nawal,Tazi,Directeur,2021-12-07,active,10229,"Casablanca, Maroc",AB100045
+Amine,Bennis,Développeur,2023-01-20,active,28729,"Casablanca, Maroc",AB100046
+Omar,Chraibi,Analyste,2022-08-22,active,29320,"Casablanca, Maroc",AB100047
+Khadija,Tazi,Directeur,2023-09-09,active,8616,"Casablanca, Maroc",AB100048
+Amina,Bennani,Manager,2023-01-25,active,10349,"Casablanca, Maroc",AB100049
+Amina,Ramisami,Manager,2025-06-09,active,13202,"Casablanca, Maroc",AB100050

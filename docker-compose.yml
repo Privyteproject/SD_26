@@ -19,6 +19,10 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - POSTGRES_HOST=db
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ydays_admin}:${POSTGRES_PASSWORD:-ydays_secret_pass}@db:5432/${POSTGRES_DB:-ydays_db}
+      - MINIO_ENDPOINT=minio:9000
     volumes:
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
@@ -39,7 +43,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-ydays_admin} -d $${POSTGRES_DB:-ydays_db}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-ydays_admin} -d $${POSTGRES_DB:-ydays_db}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -80,7 +84,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 30s
       timeout: 20s
       retries: 3
