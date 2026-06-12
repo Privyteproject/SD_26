@@ -51,7 +51,7 @@ services:
       - IS_PERSISTENT=TRUE
       - ALLOW_RESET=TRUE
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - chromadb_data:/chroma/chroma
 
