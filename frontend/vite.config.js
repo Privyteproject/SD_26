@@ -2,21 +2,16 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+// Proxy : les appels /api/* du front sont redirigés vers le backend FastAPI.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
         changeOrigin: true,
-        secure: false,
       },
-      '/ai': {
-        target: 'http://backend:8000',
-        changeOrigin: true,
-        secure: false,
-      }
-    }
-  }
+    },
+  },
 })

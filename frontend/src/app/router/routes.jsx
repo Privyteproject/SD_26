@@ -26,6 +26,7 @@ import OnboardingRh from "../../features/onboarding/pages/OnboardingRh";
 import Offboarding from "../../features/offboarding/pages/Offboarding";
 import Employees from "../../features/misc/pages/Employees";
 import Reports from "../../features/misc/pages/Reports";
+import RequestsReview from "../../features/requests/pages/RequestsReview";
 
 // Espace admin
 import Supervision from "../../features/supervision/pages/Supervision";
@@ -33,7 +34,6 @@ import Users from "../../features/users/pages/Users";
 import SupervisionIA from "../../features/supervision/pages/SupervisionIA";
 import Alerts from "../../features/alerts/pages/Alerts";
 import Audit from "../../features/misc/pages/Audit";
-import DataHR from "../../features/misc/pages/DataHR";
 import Config from "../../features/misc/pages/Config";
 
 export default function AppRoutes() {
@@ -63,6 +63,7 @@ export default function AppRoutes() {
         <Route path="/rh/offboarding" element={<RoleGuard roles={RH_SPACE_ROLES}><Offboarding /></RoleGuard>} />
         <Route path="/rh/collaborateurs" element={<RoleGuard roles={RH_SPACE_ROLES}><Employees /></RoleGuard>} />
         <Route path="/rh/rapports" element={<RoleGuard roles={RH_SPACE_ROLES}><Reports /></RoleGuard>} />
+        <Route path="/rh/demandes" element={<RoleGuard roles={[ROLES.MANAGER, ROLES.RH, ROLES.DIRECTION]}><RequestsReview /></RoleGuard>} />
 
         {/* Espace admin */}
         <Route path="/admin" element={<RoleGuard roles={[ROLES.ADMIN]}><Supervision /></RoleGuard>} />
@@ -70,7 +71,6 @@ export default function AppRoutes() {
         <Route path="/admin/supervision-ia" element={<RoleGuard roles={[ROLES.ADMIN]}><SupervisionIA /></RoleGuard>} />
         <Route path="/admin/alertes" element={<RoleGuard roles={[ROLES.ADMIN]}><Alerts /></RoleGuard>} />
         <Route path="/admin/audit" element={<RoleGuard roles={[ROLES.ADMIN]}><Audit /></RoleGuard>} />
-        <Route path="/admin/donnees" element={<RoleGuard roles={[ROLES.ADMIN]}><DataHR /></RoleGuard>} />
         <Route path="/admin/configuration" element={<RoleGuard roles={[ROLES.ADMIN]}><Config /></RoleGuard>} />
       </Route>
 

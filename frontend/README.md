@@ -1,41 +1,53 @@
-# Synapse Digital — Frontend (application complète)
+# Synapse Digital — Frontend fonctionnel (sans backend)
 
-Maquette front de la plateforme RH augmentée par l'IA. **Front uniquement** :
-navigation, thème, langue, graphiques et logique conditionnelle/RBAC fonctionnent ;
-aucune authentification, base de données ou IA réelle (données 100% fictives).
+Application front **opérationnelle** : authentification réelle (locale), sessions
+persistées, accès filtrés par rôle, gestion de comptes par l'admin. **Sans base de
+données ni IA** pour l'instant — tout est stocké dans le navigateur (localStorage).
 
 ## Lancer
 ```bash
 npm install
 npm run dev
 ```
-Ouvrir l'adresse affichée (http://localhost:5173).
+Ouvrir http://localhost:5173
 
-## Mode démo (header)
-Le sélecteur "Mode démo" pilote toute l'adaptation de l'interface :
-- **Rôle** : Collaborateur / Manager / RH / Direction / Admin / Médecine du travail
-  → l'espace, la sidebar, les données et les accès changent.
-- **Statut** : Nouvel arrivant / Actif / En départ
-  → fait apparaître/disparaître les sections Onboarding / Offboarding.
+## Connexion
+Aucune inscription : les comptes sont créés par l'administrateur. Comptes de
+démonstration (bouton « Comptes de démonstration » sur l'écran de connexion) —
+**mot de passe commun : `demo1234`**
 
-## Contenu (4 lots)
-- **Collaborateur** : tableau de bord (cartes onboarding/offboarding conditionnelles),
-  assistant IA (UI vide), documents (génération + historique), onboarding 30 jours,
-  mes demandes, profil.
-- **RH / Manager / Direction** : tableau de bord adaptatif (Manager vs DRH),
-  analytique (turnover, masse salariale [restreinte], absentéisme), désengagement
-  (anonymisé pour la médecine du travail), offboarding agentique, collaborateurs,
-  équipe, rapports, suivi des intégrations.
-- **Admin / Supervision** : supervision sécurité, supervision IA (logs en
-  métadonnées), alertes par gravité, utilisateurs & matrice rôles × permissions,
-  journal d'audit, données RH, configuration (sources + garde-fous).
+| Rôle | E-mail | Statut |
+|------|--------|--------|
+| Administrateur | admin@synapse.io | — |
+| Ressources Humaines | rh@synapse.io | — |
+| Manager | manager@synapse.io | — |
+| Direction | direction@synapse.io | — |
+| Médecine du travail | medecine@synapse.io | — |
+| Collaborateur (nouvel arrivant) | yannick@synapse.io | onboarding visible |
+| Collaborateur (actif) | lina@synapse.io | — |
+| Collaborateur (en départ) | sami@synapse.io | offboarding visible |
 
-## Stack
-React + Vite + Tailwind v4 + React Router + Recharts + lucide-react.
-Organisation par feature dans `src/features/*` ; couches transverses dans
-`src/app`, `src/components`, `src/hooks`, `src/services`, `src/lib`.
+## Ce qui fonctionne réellement
+- **Connexion** par e-mail + mot de passe (vérification locale, message d'erreur).
+- **Session persistée** : un rafraîchissement (F5) ne déconnecte plus.
+- **Rôles appliqués** : l'espace, la navigation et les accès dépendent du compte connecté.
+- **Admin = gestion des comptes** : créer / supprimer des utilisateurs (rôle + statut).
+  L'admin **n'a pas accès aux données RH** (page retirée de son espace).
+- **Gestion de compte complète (admin)** : créer, **modifier** et supprimer des comptes (rôle, statut, mot de passe).
+- **Mes demandes** : le collaborateur soumet une demande (congé, attestation…) — réellement enregistrée.
+- **Validation des demandes (RH / Manager / Direction)** : page « Demandes » pour **approuver / refuser** ; le statut se met à jour côté collaborateur.
+- **Génération de documents** : le document soumis s'ajoute à l'historique avec son statut.
+- **Profil** : affiche le compte connecté et permet de **changer son mot de passe**.
+- **Déconnexion** depuis le menu profil (en haut à droite).
+- Thème clair/sombre et bilingue FR/EN, persistés.
 
-## Important
-Maquette : si vous rechargez la page (F5), la session simulée se réinitialise et
-renvoie au login (pas de token persistant). En usage normal (navigation par les
-liens), tout reste fluide. Le câblage réel (Keycloak, API FastAPI, RAG) reste à faire.
+## Volontairement hors périmètre (pour l'instant)
+- **IA** : l'assistant reste une interface vide (pas d'intégration).
+- **Base de données / backend** : remplacés par du stockage navigateur.
+- Le SSO **Keycloak** est affiché mais désactivé (à brancher plus tard ; il remplacera
+  alors l'authentification locale).
+
+## Note de sécurité
+L'authentification locale (mots de passe en clair dans le navigateur) sert uniquement
+à la maquette fonctionnelle. En production, l'authentification passera par Keycloak et
+les données par le backend.

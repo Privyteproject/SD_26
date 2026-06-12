@@ -6,6 +6,8 @@ services:
     container_name: ydays_frontend
     ports:
       - "5173:5173"
+    environment:
+      - VITE_PROXY_TARGET=http://backend:8000
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -22,10 +24,16 @@ services:
     environment:
       - POSTGRES_HOST=db
       - DATABASE_URL=postgresql://${POSTGRES_USER:-ydays_admin}:${POSTGRES_PASSWORD:-ydays_secret_pass}@db:5432/${POSTGRES_DB:-ydays_db}
+      - KEYCLOAK_URL=http://keycloak:8080
+      - CHROMA_HOST=chromadb
+      - REDIS_URL=redis://redis:6379/0
       - MINIO_ENDPOINT=minio:9000
     volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
+    command: sh -c "pip install python-keycloak && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       db:
         condition: service_healthy
@@ -100,8 +108,6 @@ services:
       KC_DB_USERNAME: ${POSTGRES_USER:-ydays_admin}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-ydays_secret_pass}
       KC_DB_SCHEMA: public
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
     command: start-dev

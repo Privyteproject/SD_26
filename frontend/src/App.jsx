@@ -3,6 +3,7 @@ import { ThemeProvider } from "./app/providers/ThemeProvider";
 import { I18nProvider } from "./app/providers/I18nProvider";
 import { SessionProvider } from "./app/providers/SessionProvider";
 import AppRoutes from "./app/router/routes";
+import Toast from "./components/Toast";
 
 export default function App() {
   return (
@@ -11,6 +12,7 @@ export default function App() {
         <SessionProvider>
           <BrowserRouter>
             <AppRoutes />
+            <Toast />
           </BrowserRouter>
         </SessionProvider>
       </I18nProvider>

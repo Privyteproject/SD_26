@@ -1,78 +1,70 @@
-from functools import lru_cache
-from pathlib import Path
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+"""Configuration de l'application, lue depuis l'environnement."""
 
-BACKEND_DIR = Path(__file__).resolve().parents[2]
-ROOT_ENV_FILE = BACKEND_DIR.parent / ".env"
-BACKEND_ENV_FILE = BACKEND_DIR / ".env"
+import os
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=(str(BACKEND_ENV_FILE), str(ROOT_ENV_FILE)),
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
 
-    PROJECT_NAME: str = "YDAYS 2026 HR AI Platform"
-    APP_NAME: str = "YDAYS_IA_RH"
-    APP_ENV: str = "dev"
-    API_V1_STR: str = "/api/v1"
-    DEBUG: bool = True
+def _csv(value: str) -> list[str]:
+    return [v.strip() for v in value.split(",") if v.strip()]
 
-    # PostgreSQL
-    POSTGRES_USER: str = "ydays_admin"
-    POSTGRES_PASSWORD: str = "ydays_secret_pass"
-    POSTGRES_DB: str = "ydays_db"
-    POSTGRES_HOST: str = "db"
-    POSTGRES_PORT: str = "5432"
-    DATABASE_URL: str = ""
 
-    # Keycloak
-    KEYCLOAK_URL: str = "http://localhost:8080"
-    KEYCLOAK_REALM: str = "ydays-realm"
-    KEYCLOAK_CLIENT_ID: str = "ydays-backend-client"
-    JWT_ALGORITHM: str = "RS256"
-    JWT_AUDIENCE: str = "account"
+class Settings:
+    PROJECT_NAME: str = "Synapse Digital API"
+    VERSION: str = "1.0.0"
+    API_V1_PREFIX: str = "/api/v1"
 
-    # OpenRouter
-    OPENROUTER_API_KEY: str = ""
-    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
-    OPENROUTER_MODEL_RH: str = "mistralai/mistral-small-24b-instruct-2501"
-    OPENROUTER_MODEL_GENERAL: str = "mistralai/mistral-small-24b-instruct-2501"
-    OPENROUTER_MODEL_CLASSIFIER: str = "mistralai/mistral-small-24b-instruct-2501"
-    OPENROUTER_SITE_URL: str = "http://localhost:3000"
-    OPENROUTER_APP_NAME: str = "YDAYS IA RH"
+    # --- Base de données ---
+    # SQLite par défaut (zéro install) ; passer une URL Postgres en prod, ex.
+    # postgresql+psycopg://user:pass@localhost:5432/synapse
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./synapse.db")
+    # Sème des données de démo au démarrage si la base est vide.
+    DB_SEED: bool = os.getenv("DB_SEED", "true").lower() == "true"
 
-    # ChromaDB (Local overrides)
-    CHROMA_PERSIST_DIR: str = "./data/chroma"
-    CHROMA_COLLECTION_NAME: str = "rh_documents"
-    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-
-    RAG_TOP_K: int = 5
-    RAG_MIN_CONFIDENCE: float = Field(default=0.50, ge=0.0, le=1.0)
-
-    # Feature Flags
-    ENABLE_AUDIT_LOGS: bool = True
-    ENABLE_SECURITY_FILTER: bool = True
-    ENABLE_RBAC: bool = True
+    # --- Keycloak ---
+    KEYCLOAK_URL: str = os.getenv("KEYCLOAK_URL", "http://localhost:8080")
+    KEYCLOAK_REALM: str = os.getenv("KEYCLOAK_REALM", "ydays")
+    KEYCLOAK_CLIENT_ID: str = os.getenv("KEYCLOAK_CLIENT_ID", "frontend-app")
+    KEYCLOAK_ADMIN_USER: str = os.getenv("KEYCLOAK_ADMIN_USER", "superuser")
+    KEYCLOAK_ADMIN_PASSWORD: str = os.getenv("KEYCLOAK_ADMIN_PASSWORD", "superuser")
+    AUTH_VERIFY_SIGNATURE: bool = os.getenv("AUTH_VERIFY_SIGNATURE", "false").lower() == "true"
 
     @property
-    def chroma_persist_path(self) -> Path:
-        path = Path(self.CHROMA_PERSIST_DIR)
-        if path.is_absolute():
-            return path
-        return BACKEND_DIR / path
+    def JWKS_URL(self) -> str:
+        return f"{self.KEYCLOAK_URL}/realms/{self.KEYCLOAK_REALM}/protocol/openid-connect/certs"
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        if not self.DATABASE_URL:
-            self.DATABASE_URL = f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    @property
+    def ISSUER(self) -> str:
+        return f"{self.KEYCLOAK_URL}/realms/{self.KEYCLOAK_REALM}"
+
+    # --- Assistant IA (OpenRouter, API compatible OpenAI) ---
+    OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+    OPENROUTER_BASE_URL: str = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    # Modèle de réponse de l'agent et modèle « juge » (LLM-as-judge).
+    AGENT_MODEL: str = os.getenv("AGENT_MODEL", "google/gemma-4-31b-it")
+    JUDGE_MODEL: str = os.getenv("JUDGE_MODEL", "qwen/qwen3.6-27b")
+    AI_MAX_TOKENS: int = int(os.getenv("AI_MAX_TOKENS", "1024"))
+    # En-têtes optionnels d'attribution (recommandés par OpenRouter)
+    OPENROUTER_SITE_URL: str = os.getenv("OPENROUTER_SITE_URL", "http://localhost:5173")
+    OPENROUTER_APP_NAME: str = os.getenv("OPENROUTER_APP_NAME", "Synapse Digital")
+
+    # --- Pipeline conversationnelle (RAG + garde-fous) ---
+    FALLBACK_MODEL: str = os.getenv("FALLBACK_MODEL", "google/gemma-4-26b-a4b-it")
+    RAG_ENABLED: bool = os.getenv("RAG_ENABLED", "true").lower() == "true"
+    RAG_TOP_K: int = int(os.getenv("RAG_TOP_K", "4"))
+    RAG_MIN_SCORE: float = float(os.getenv("RAG_MIN_SCORE", "0.05"))  # hash≈0.05 ; ST≈0.30
+    # Backends RAG : auto -> ChromaDB/sentence-transformers si dispo, sinon mémoire/hash.
+    RAG_VECTOR_BACKEND: str = os.getenv("RAG_VECTOR_BACKEND", "auto")   # auto|chroma|memory
+    RAG_EMBED_BACKEND: str = os.getenv("RAG_EMBED_BACKEND", "auto")     # auto|st|openrouter|hash
+    CHROMA_PATH: str = os.getenv("CHROMA_PATH", "./chroma")
+    EMBED_MODEL_ST: str = os.getenv("EMBED_MODEL_ST", "sentence-transformers/all-MiniLM-L6-v2")
+    EMBED_MODEL_OR: str = os.getenv("EMBED_MODEL_OR", "openai/text-embedding-3-small")
+    EMBED_DIM_HASH: int = int(os.getenv("EMBED_DIM_HASH", "512"))
+    PII_MASKING: bool = os.getenv("PII_MASKING", "true").lower() == "true"
+    AUTO_JUDGE: bool = os.getenv("AUTO_JUDGE", "true").lower() == "true"
+    JUDGE_MIN_NOTE: int = int(os.getenv("JUDGE_MIN_NOTE", "3"))
+    RATE_LIMIT_PER_MIN: int = int(os.getenv("RATE_LIMIT_PER_MIN", "20"))
+
+    # --- CORS (serveur Vite) ---
+    CORS_ORIGINS: list[str] = _csv(os.getenv("CORS_ORIGINS", "http://localhost:5173"))
 
 
-@lru_cache(maxsize=1)
-def get_settings() -> Settings:
-    return Settings()
-
-settings = get_settings()
+settings = Settings()
