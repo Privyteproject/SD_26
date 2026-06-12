@@ -58,7 +58,7 @@ erDiagram
         string statut "NEW, ACTIVE, LEAVING"
         int id_departement FK
         string matricule_manager FK
-        int id_utilisateur FK UK
+        int id_utilisateur FK, UK
     }
 
     dossier_confidentiel {
@@ -126,8 +126,8 @@ erDiagram
     }
 
     source_ia {
-        int id_interaction PK FK
-        int id_document PK FK
+        int id_interaction PK, FK
+        int id_document PK, FK
     }
 
     %% ───────────────────────── Pilotage / Audit ─────────────────────────
