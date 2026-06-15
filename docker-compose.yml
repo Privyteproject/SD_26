@@ -1,0 +1,125 @@
+services:
+  frontend:
+    build: ./frontend
+    container_name: ydays_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_PROXY_TARGET=http://backend:8000
+      - VITE_USE_MOCK=false
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  backend:
+    build: ./backend
+    container_name: ydays_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=db
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-ydays_admin}:${POSTGRES_PASSWORD:-ydays_secret_pass}@db:5432/${POSTGRES_DB:-ydays_db}
+      - KEYCLOAK_URL=http://keycloak:8080
+      - CHROMA_HOST=chromadb
+      - REDIS_URL=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+    command: sh -c "pip install python-keycloak && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: ydays_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ydays_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ydays_secret_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-ydays_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-ydays_admin} -d $${POSTGRES_DB:-ydays_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ydays_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ydays_chromadb
+    restart: always
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ALLOW_RESET=TRUE
+    ports:
+      - "8001:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+
+  minio:
+    image: minio/minio
+    container_name: ydays_minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Web Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: ydays_keycloak
+    restart: always
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: db
+      KC_DB_URL_DATABASE: ${POSTGRES_DB:-ydays_db}
+      KC_DB_USERNAME: ${POSTGRES_USER:-ydays_admin}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-ydays_secret_pass}
+      KC_DB_SCHEMA: public
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+    command: start-dev --import-realm
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/data/ydays-realm.json:/opt/keycloak/data/import/ydays-realm.json:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  chromadb_data:
+  minio_data:
