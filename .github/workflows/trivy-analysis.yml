@@ -1,0 +1,35 @@
+name: Trivy Dependency Scan
+
+on:
+  push:
+    branches:
+      - main
+      - dev-ai
+      - frontend
+      - develop
+      - backend_completion
+
+jobs:
+  trivy:
+    name: Scan Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy fs scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
+          output: trivy-results.txt
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results
+          path: trivy-results.txt
