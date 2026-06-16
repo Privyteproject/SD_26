@@ -10,26 +10,38 @@ on:
       - backend_completion
 
 jobs:
-  trivy:
-    name: Scan Dependencies
+  trivy-backend:
+    name: Scan Backend Dependencies
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Trivy fs scan
+      - name: Run Trivy on backend
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
-          scan-ref: '.'
+          scan-ref: './backend'
           format: 'table'
           severity: 'HIGH,CRITICAL'
           ignore-unfixed: true
-          output: trivy-results.txt
+          output: trivy-backend.txt
+
+      - name: Run Trivy on frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './frontend'
+          format: 'table'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
+          output: trivy-frontend.txt
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: trivy-results
-          path: trivy-results.txt
+          path: |
+            trivy-backend.txt
+            trivy-frontend.txt
