@@ -8,6 +8,7 @@ on:
       - frontend
       - develop
       - backend_completion
+  workflow_dispatch:
 
 jobs:
   trivy-backend:
@@ -22,26 +23,14 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
-          scan-ref: './backend'
+          scan-ref: '.'
           format: 'table'
           severity: 'HIGH,CRITICAL'
           ignore-unfixed: true
-          output: trivy-backend.txt
-
-      - name: Run Trivy on frontend
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './frontend'
-          format: 'table'
-          severity: 'HIGH,CRITICAL'
-          ignore-unfixed: true
-          output: trivy-frontend.txt
+          output: trivy-results.txt
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: trivy-results
-          path: |
-            trivy-backend.txt
-            trivy-frontend.txt
+          path: trivy-results.txt
