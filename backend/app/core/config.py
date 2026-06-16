@@ -61,6 +61,9 @@ class Settings:
     EMBED_DIM_HASH: int = int(os.getenv("EMBED_DIM_HASH", "512"))
     PII_MASKING: bool = os.getenv("PII_MASKING", "true").lower() == "true"
     AUTO_JUDGE: bool = os.getenv("AUTO_JUDGE", "true").lower() == "true"
+    # Classification du périmètre par LLM (catégorie + confiance). Repli mots-clés sinon.
+    CLS_LLM_ENABLED: bool = os.getenv("CLS_LLM_ENABLED", "true").lower() == "true"
+    CLS_MIN_CONFIDENCE: float = float(os.getenv("CLS_MIN_CONFIDENCE", "0.55"))
     JUDGE_MIN_NOTE: int = int(os.getenv("JUDGE_MIN_NOTE", "3"))
     RATE_LIMIT_PER_MIN: int = int(os.getenv("RATE_LIMIT_PER_MIN", "20"))
 

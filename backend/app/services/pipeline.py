@@ -11,25 +11,34 @@ Chaque brique lourde (embeddings/ChromaDB, NER PII, classifieur LLM) est isolée
 dans son module `app/services/*` et remplaçable sans toucher à cet orchestrateur.
 """
 
+from typing import Literal
+
 from app.core.config import settings
 from app.core.security import CurrentUser
 from app.db import repository as repo
 from app.services import ai as ai_service
-from app.services import cache, classifier, pii, rate_limit, retrieval, security_filter
+from app.services import cache, classifier, pii, rate_limit, retrieval, rh_engines, security_filter
 
 # RBAC/ABAC : types RH nécessitant un rôle de l'espace RH
 _ELEVATED = {"ADMIN", "RH", "DIRECTION", "MANAGER", "MEDECINE"}
 _RESTRICTED_TYPES = {"sensible", "predictive"}
 
-GENERAL_SYSTEM = (
-    "Tu es un assistant de culture générale, sobre et factuel, en français. "
-    "Tu n'as accès à AUCUNE donnée RH interne. Reste neutre et prudent."
-)
-RH_SYSTEM = (
+# Mode de génération : pilote le branchement RAG / culture générale / refus court.
+Mode = Literal["rag", "general", "refusal"]
+
+# ── Deux system prompts distincts (un par branche de routage) ──
+SYSTEM_PROMPT_RH = (
     "Tu es l'assistant RH de « Synapse Digital ». Réponds en français, de façon "
-    "concise et professionnelle, en t'appuyant UNIQUEMENT sur les sources fournies. "
-    "Si l'information n'est pas dans les sources, dis-le sans inventer. Pas de conseil "
-    "juridique ou médical. Cite les titres des sources utilisées."
+    "concise et professionnelle, UNIQUEMENT à partir des documents fournis ci-dessous. "
+    "Si l'information n'est pas dans les documents, dis-le explicitement et propose de "
+    "contacter un responsable RH. Ne génère jamais d'information non sourcée. "
+    "Pas de conseil juridique ou médical. Cite les titres des sources utilisées."
+)
+SYSTEM_PROMPT_GENERAL = (
+    "Tu es un assistant polyvalent dans le cadre d'une plateforme RH. Réponds en français. "
+    "Tu peux répondre aux questions de culture générale, d'actualité non sensible et aux "
+    "questions pratiques du quotidien. Tu ne mentionnes JAMAIS de données RH et tu ne fais "
+    "aucune référence aux documents internes. Reste concis et factuel."
 )
 
 
@@ -81,44 +90,88 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
         out = {**cached, "meta": {**cached["meta"], "cache_hit": True}}
         return out
 
-    # 5) Routage périmètre
+    # 5) Routage périmètre -> mode de génération
     P = classifier
     if cls["perimetre"] == P.PERIMETRE_DANGEREUX:
-        res = _refusal("Désolé, je ne peux pas traiter ce sujet (refus de sécurité).", meta)
-        _audit(db, user, message, res); return res
+        return generate(db, user, message, history, mode="refusal", meta=meta,
+                        want_judge=want_judge, ck=ck,
+                        refusal_text="Désolé, je ne peux pas traiter ce sujet (refus de sécurité).")
 
     if cls["perimetre"] == P.PERIMETRE_HORS_SUJET:
-        res = {"reply": "Je suis l'assistant RH de Synapse. Posez-moi une question RH "
-               "(congés, documents, onboarding…).", "model": "policy", "degraded": False,
-               "usage": {}, "judge": None, "meta": meta}
-        _audit(db, user, message, res); return res
+        return generate(db, user, message, history, mode="refusal", meta=meta,
+                        want_judge=want_judge, ck=ck,
+                        refusal_text="Je suis l'assistant de Synapse. Posez-moi une question RH "
+                        "(congés, documents, onboarding…) ou une question d'ordre général.")
 
     if cls["perimetre"] == P.PERIMETRE_CULTURE:
-        # Branche culture générale : pas d'accès RH, prompt encadré
-        masked, mapping = (pii.mask(message) if settings.PII_MASKING else (message, {}))
-        meta["pii_masked"] = bool(mapping)
-        out = ai_service.complete(GENERAL_SYSTEM, masked, history)
-        return _finalize(db, user, message, out, meta, want_judge, ck, GENERAL_SYSTEM)
+        return generate(db, user, message, history, mode="general", meta=meta,
+                        want_judge=want_judge, ck=ck)
 
-    # ── Branche RH sécurisée ──
-    # RBAC/ABAC
+    # ── Branche RH : RBAC/ABAC avant le RAG ──
     authorized = not (cls["type_rh"] in _RESTRICTED_TYPES and user.role not in _ELEVATED)
     meta["authorized"] = authorized
     if not authorized:
-        res = _refusal("Cette demande relève des RH. Je vous oriente vers votre "
-                       "référent RH (accès non autorisé pour ce type d'information).", meta)
-        _audit(db, user, message, res); return res
+        return generate(db, user, message, history, mode="refusal", meta=meta,
+                        want_judge=want_judge, ck=ck,
+                        refusal_text="Cette demande relève des RH. Je vous oriente vers votre "
+                        "référent RH (accès non autorisé pour ce type d'information).")
 
-    # RAG : récupération filtrée par rôle + reranking
+    return generate(db, user, message, history, mode="rag", meta=meta,
+                    want_judge=want_judge, ck=ck, type_rh=cls["type_rh"])
+
+
+def generate(db, user: CurrentUser, message: str, history: list, *, mode: Mode,
+             meta: dict, want_judge: bool, ck: str,
+             refusal_text: str | None = None, type_rh: str | None = None) -> dict:
+    """Fonction de génération unique, pilotée par `mode`.
+
+    - mode == "refusal" : réponse courte SANS appel LLM (refus / hors-sujet).
+    - mode == "general" : saute RET → EMB → VDB → DOCS → RERANK ; prompt direct
+      (contexte utilisateur + historique), sans aucun document RH.
+    - mode == "rag"     : pipeline complet (récupération ChromaDB + reranking + sources).
+    """
+    meta["mode"] = mode
+
+    # ── Refus court : aucun appel au modèle ──
+    if mode == "refusal":
+        res = _refusal(refusal_text or "Désolé, je ne peux pas répondre à cette demande.", meta)
+        _audit(db, user, message, res)
+        return res
+
+    # ── Culture générale : on contourne entièrement le RAG ──
+    if mode == "general":
+        masked, mapping = (pii.mask(message) if settings.PII_MASKING else (message, {}))
+        meta["pii_masked"] = bool(mapping)
+        out = ai_service.complete(SYSTEM_PROMPT_GENERAL, masked, history)
+        return _finalize(db, user, message, out, meta, want_judge, ck, SYSTEM_PROMPT_GENERAL)
+
+    # ── Branche 4A : routage vers le bon moteur RH selon le type de demande ──
+    # E2 génération documentaire / E3 onboarding-offboarding / E4 prédictif analytics
+    # s'appuient sur les VRAIES données applicatives (pas de recherche vectorielle).
+    engine_id = rh_engines.select(type_rh)
+    if engine_id:
+        eng = rh_engines.build(db, user, message, type_rh)
+        meta["engine"] = eng["engine"]
+        meta["sources"] = eng["sources"]
+        enriched = (f"Contexte utilisateur : rôle={user.role}.\n"
+                    f"Données internes autorisées :\n{eng['context']}\n\n"
+                    f"Question : {message}")
+        masked, mapping = (pii.mask(enriched) if settings.PII_MASKING else (enriched, {}))
+        meta["pii_masked"] = bool(mapping)
+        out = ai_service.complete(eng["system"], masked, history)
+        return _finalize(db, user, message, out, meta, want_judge, ck, eng["system"])
+
+    # ── E1 · RAG documentaire : récupération filtrée par rôle + reranking (ChromaDB) ──
+    meta["engine"] = "E1"
     docs = retrieval.retrieve(message, user.role) if settings.RAG_ENABLED else []
     meta["sources"] = [{"id": d["id"], "title": d["title"], "score": d["score"]} for d in docs]
 
-    # Garde anti-hallucination : seulement pour les questions informationnelles
-    # (les actions génération/parcours/prédictif/sensible ne dépendent pas du RAG).
-    if settings.RAG_ENABLED and not docs and cls["type_rh"] == "simple":
+    # Garde anti-hallucination : seulement pour les questions RH informationnelles simples.
+    if settings.RAG_ENABLED and not docs and type_rh == "simple":
         res = _refusal("Je n'ai pas trouvé d'information autorisée pour répondre "
                        "précisément. Contactez votre référent RH.", {**meta, "no_doc": True})
-        _audit(db, user, message, res); return res
+        _audit(db, user, message, res)
+        return res
 
     # Construction du prompt enrichi (contexte + sources)
     sources_txt = "\n".join(f"- {d['title']} : {d['text']}" for d in docs) or "(aucune)"
@@ -130,8 +183,8 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
     masked, mapping = (pii.mask(enriched) if settings.PII_MASKING else (enriched, {}))
     meta["pii_masked"] = bool(mapping)
 
-    out = ai_service.complete(RH_SYSTEM, masked, history)
-    return _finalize(db, user, message, out, meta, want_judge, ck, RH_SYSTEM)
+    out = ai_service.complete(SYSTEM_PROMPT_RH, masked, history)
+    return _finalize(db, user, message, out, meta, want_judge, ck, SYSTEM_PROMPT_RH)
 
 
 def _finalize(db, user, message, out, meta, want_judge, ck, system_prompt) -> dict:

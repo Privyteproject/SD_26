@@ -1,0 +1,130 @@
+%% Synapse Digital — Architecture conversationnelle (pipeline RAG) v2 — palette rose
+%% Tous les noeuds en rose. Les AJOUTS implementes sont en pointilles (stroke-dasharray).
+flowchart TD
+  classDef base fill:#e8607a,stroke:#7f1d2e,color:#ffffff;
+  classDef add fill:#e8607a,stroke:#7f1d2e,color:#ffffff,stroke-width:2px,stroke-dasharray:6 4;
+  classDef dec fill:#d94f6a,stroke:#7f1d2e,color:#ffffff;
+
+  %% ===================== 1. Entree & contexte =====================
+  subgraph S1["1 · Entree & contexte utilisateur"]
+    U["Utilisateur"]
+    UI["Interface Chat RH<br/>Next.js / React"]
+    API["API FastAPI<br/>POST /ai/chat"]
+    RL["Rate limiting / quota<br/>par utilisateur"]:::add
+    NORM["Normalisation requete<br/>nettoyage · langue · taille"]
+    CTX["Extraction contexte utilisateur<br/>user_id · role · departement · permissions · sensibilite"]
+    MEM["Memoire conversation<br/>N derniers tours"]:::add
+    U --> UI --> API --> RL --> NORM --> CTX --> MEM
+  end
+
+  %% ===================== 2. Securite entree =====================
+  subgraph S2["2 · Securite entree"]
+    PRE["Pre-filtrage securite"]
+    INJ{"Prompt injection<br/>ou attaque ?"}:::dec
+    BLK["Blocage securite"]
+    AUD0["Logs d'audit<br/>+ alerte supervision"]
+    CLS["Classification de la requete"]
+    PRE --> INJ
+    INJ -->|Oui| BLK --> AUD0
+    INJ -->|Non| CLS
+  end
+
+  %% ===================== 3. Routage perimetre =====================
+  subgraph S3["3 · Routage selon le perimetre"]
+    PER{"Type de perimetre ?"}:::dec
+    RH["RH / administratif"]
+    CG["Culture generale autorisee"]
+    HS["Hors sujet non utile"]
+    HSR["Reponse courte / redirection"]
+    DG["Sujet dangereux ou interdit"]
+    DGR["Refus securite controle"]
+    PER -->|RH| RH
+    PER -->|Culture generale| CG
+    PER -->|Hors sujet| HS --> HSR
+    PER -->|Dangereux| DG --> DGR
+  end
+
+  %% ===================== 4A. Branche RH securisee =====================
+  subgraph S4A["4A · Branche RH securisee — RAG / agents / predictif"]
+    TRH{"Type de demande RH ?"}:::dec
+    Q1["Question RH simple"]
+    Q2["Generation documentaire"]
+    Q3["Onboarding / Offboarding"]
+    Q4["Demande sensible"]
+    Q5["Demande predictive"]
+    RBAC["Controle RBAC / ABAC<br/>role · permissions · departement · moindre privilege"]
+    AUTH{"Autorise ?"}:::dec
+    REF["Refus controle<br/>+ redirection RH"]
+    ROUTE["Routage vers le bon moteur RH"]
+    E1["RAG documentaire"]
+    E2["Agent generation documentaire"]
+    E3["Agent onboarding / offboarding"]
+    E4["Module predictif analytics"]
+    TRH --> Q1 & Q2 & Q3 & Q4 & Q5 --> RBAC --> AUTH
+    AUTH -->|Non| REF
+    AUTH -->|Oui| ROUTE
+    ROUTE --> E1 & E2 & E3 & E4
+  end
+
+  %% ===================== 4B. Culture generale =====================
+  subgraph S4B["4B · Branche culture generale autorisee"]
+    VSG["Verification securite generale<br/>pas de sujet dangereux / interdit"]
+    PG["Prompt general encadre<br/>SANS acces aux donnees RH"]
+    MCG["Mode culture generale"]
+    VSG --> PG --> MCG
+  end
+
+  %% ===================== 5. RAG, LLM, evaluation, audit =====================
+  subgraph S5["5 · RAG, LLM, evaluation & audit"]
+    RET["Recherche documentaire<br/>filtree par permissions"]
+    EMB["Embeddings"]
+    VDB["ChromaDB / Vector DB<br/>+ metadonnees d'acces"]
+    DOCS["Documents RH autorises uniquement"]
+    RERANK["Reranking (cross-encoder)<br/>top-k reellement pertinent"]:::add
+    NODOC{"Docs pertinents ?"}:::dec
+    NOINFO["Pas d'invention<br/>refus / escalade RH"]:::add
+    PROMPT["Construction prompt RH enrichi<br/>contexte + docs + regles de refus + sources"]
+    PII["Masquage PII / anonymisation<br/>RGPD · loi 09-08 · avant LLM externe"]:::add
+    LLM["LLMProvider (interface unique)"]
+    ORP["OpenRouterProvider<br/>cle API + data_collection / ZDR"]:::add
+    AGENT["Agent : Gemma 4<br/>google/gemma-4-31b-it"]:::add
+    FB["Fallback modele<br/>si erreur / timeout"]:::add
+    POST["Post-filtrage reponse<br/>confidentialite · ton · coherence"]
+    VAL["Validation sources / limites<br/>+ score de confiance si RAG"]
+    JUDGE["Evaluation LLM-as-judge : Qwen<br/>qwen/qwen3.6-27b — note + criteres"]:::add
+    CONF{"Reponse conforme ?"}:::dec
+    REFO["Reponse reformulee<br/>ou refus controle"]
+    FIN["Reponse finale<br/>avec sources si RAG"]
+    LOG["Logs d'audit<br/>question · decision · sources · refus · modele · tokens"]
+    SUP["Supervision IA / Alertes<br/>tables interaction_ia + alerte"]
+
+    RET --> EMB --> VDB --> DOCS --> RERANK --> NODOC
+    NODOC -->|Non| NOINFO
+    NODOC -->|Oui| PROMPT
+    PROMPT --> PII --> LLM --> ORP --> AGENT --> FB --> POST --> VAL --> JUDGE --> CONF
+    CONF -->|Non| REFO
+    CONF -->|Oui| FIN
+    LOG --> SUP
+  end
+
+  %% ===================== Liens inter-etapes =====================
+  MEM --> PRE
+  CLS --> CACHE{"Cache semantique ?<br/>question deja vue"}:::dec
+  CACHE -->|Hit| FIN
+  CACHE -->|Miss| PER
+  RH --> TRH
+  CG --> VSG
+  E1 --> RET
+  E2 --> PROMPT
+  E3 --> PROMPT
+  E4 --> PROMPT
+  MCG --> PII
+  REFO --> LOG
+  FIN --> LOG
+  HSR --> LOG
+  DGR --> LOG
+  REF --> LOG
+  NOINFO --> LOG
+  AUD0 --> SUP
+
+  class U,UI,API,NORM,CTX,PRE,BLK,AUD0,CLS,RH,CG,HS,HSR,DG,DGR,Q1,Q2,Q3,Q4,Q5,RBAC,REF,ROUTE,E1,E2,E3,E4,VSG,PG,MCG,RET,EMB,VDB,DOCS,PROMPT,LLM,POST,VAL,REFO,FIN,LOG,SUP base;
