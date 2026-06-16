@@ -303,6 +303,35 @@ def ia_interactions_stats(db) -> dict:
     return {"count": int(total), "total_tokens": int(tokens), "sensibles": int(sensibles)}
 
 
+# ───────────── Journal d'audit ─────────────
+def list_audit(db, *, limit: int = 200, action: str | None = None, type_entite: str | None = None) -> list[dict]:
+    """Journal d'audit : mutations tracées automatiquement (cf. db/audit.py)."""
+    stmt = (
+        select(JournalAudit, Utilisateur)
+        .join(Utilisateur, JournalAudit.id_utilisateur == Utilisateur.id_utilisateur, isouter=True)
+        .order_by(JournalAudit.date_creation.desc(), JournalAudit.id_log.desc())
+    )
+    if action:
+        stmt = stmt.where(JournalAudit.action == action)
+    if type_entite:
+        stmt = stmt.where(JournalAudit.type_entite == type_entite)
+    rows = db.execute(stmt.limit(limit)).all()
+    out = []
+    for a, u in rows:
+        out.append({
+            "id": a.id_log,
+            "date": a.date_creation.isoformat() if a.date_creation else None,
+            "action": a.action,
+            "entite": a.type_entite,
+            "id_entite": a.id_entite,
+            "changements": a.changements,
+            "ip": a.adresse_ip,
+            "actor": u.email if u else None,
+            "role": u.code_role if u else None,
+        })
+    return out
+
+
 # ───────────── Demandes génériques (tous types) ─────────────
 def list_type_demande(db):
     from app.db.models import TypeDemande

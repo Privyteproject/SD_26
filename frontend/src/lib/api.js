@@ -94,6 +94,10 @@ export const sendChatMessage = (message, history = [], judge = false) =>
 // Journaux d'audit IA (supervision ADMIN) : { data: [...], meta: { count, total_tokens, sensibles } }
 export const getAiLogs = (params) => request("/ai/logs", { params });
 
+// ---- Journal d'audit (ADMIN) ----
+// Mutations tracées automatiquement : { data: [{ date, action, entite, actor, ip, changements }], meta: { total } }
+export const getAuditLogs = (params) => request("/audit", { params });
+
 // ---- Documents ----
 export const getDocuments = (params) => request("/documents", { params });
 export const getDocumentModeles = () => request("/documents/modeles");

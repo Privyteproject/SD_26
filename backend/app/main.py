@@ -6,17 +6,20 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.db.audit import register_audit_listeners, set_request_context
 from app.db.base import init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()  # create_all + seed si vide
+    # Branché APRÈS le seed pour ne pas auditer les données de démo initiales.
+    register_audit_listeners()
     yield
 
 
@@ -29,6 +32,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def _audit_context(request: Request, call_next):
+    # Mémorise l'IP du client pour l'audit (l'utilisateur est posé par get_current_user).
+    client = request.client
+    set_request_context(ip=client.host if client else None)
+    return await call_next(request)
+
 
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 

@@ -19,11 +19,16 @@ from app.core.security import (
     get_current_user,
     require_roles,
 )
+from app.core.config import settings
 from app.db import repository as repo
 from app.db.base import get_db
 from app.schemas.common import envelope
+from app.services import redis_cache
 
 router = APIRouter()
+
+# Clé de cache des agrégats KPI (identiques pour tous les rôles ; le rôle est ajouté après coup).
+_KPIS_CACHE_KEY = "dashboard:kpis"
 
 # QVT / bien-être : RH, médecine du travail, direction, admin (+ manager pour le RH global)
 _RH_VIEW = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER, ROLE_MEDECINE)
@@ -33,15 +38,19 @@ _WELLBEING = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MEDECINE)
 
 @router.get("/kpis")
 def dashboard_kpis(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    data = repo.dashboard_counts(db)
-    ind = repo.latest_indicateurs(db)
-    data.update({
-        "turnover_rate": (ind.get("turnover") or {}).get("valeur"),
-        "absenteeism_rate": (ind.get("absenteisme") or {}).get("valeur"),
-        "engagement": (ind.get("engagement") or {}).get("valeur"),
-        "role": user.role,
-    })
-    return envelope(data)
+    # Cache Redis (TTL 5 min) : on évite de réinterroger la BDD à chaque rafraîchissement.
+    data = redis_cache.get(_KPIS_CACHE_KEY)
+    if data is None:
+        data = repo.dashboard_counts(db)
+        ind = repo.latest_indicateurs(db)
+        data.update({
+            "turnover_rate": (ind.get("turnover") or {}).get("valeur"),
+            "absenteeism_rate": (ind.get("absenteisme") or {}).get("valeur"),
+            "engagement": (ind.get("engagement") or {}).get("valeur"),
+        })
+        redis_cache.set(_KPIS_CACHE_KEY, data, ttl=settings.DASHBOARD_CACHE_TTL)
+    # Le rôle dépend de l'appelant : il est ajouté hors cache.
+    return envelope({**data, "role": user.role})
 
 
 @router.get("/rh")

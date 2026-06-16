@@ -122,7 +122,15 @@ async def get_current_user(
             detail="Jeton invalide ou expiré",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
-    return _build_user(claims)
+    user = _build_user(claims)
+    # Renseigne l'acteur courant pour la journalisation d'audit (cf. db/audit.py).
+    try:
+        from app.db.audit import set_request_context
+
+        set_request_context(sub=user.sub or None, email=user.email or None)
+    except Exception:
+        pass
+    return user
 
 
 def require_roles(*roles: str):

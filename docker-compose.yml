@@ -32,10 +32,12 @@ services:
       - ./backend/alembic:/app/alembic
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
-    command: sh -c "pip install python-keycloak && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "pip install python-keycloak redis && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
 
   db:
     image: postgres:16-alpine

@@ -64,6 +64,16 @@ class Settings:
     JUDGE_MIN_NOTE: int = int(os.getenv("JUDGE_MIN_NOTE", "3"))
     RATE_LIMIT_PER_MIN: int = int(os.getenv("RATE_LIMIT_PER_MIN", "20"))
 
+    # --- Redis (cache) ---
+    # Cache du tableau de bord. Si Redis est injoignable, repli automatique en mémoire.
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    CACHE_ENABLED: bool = os.getenv("CACHE_ENABLED", "true").lower() == "true"
+    DASHBOARD_CACHE_TTL: int = int(os.getenv("DASHBOARD_CACHE_TTL", "300"))  # 5 min
+
+    # --- Audit ---
+    # Journalisation automatique des mutations (INSERT/UPDATE/DELETE) dans journal_audit.
+    AUDIT_ENABLED: bool = os.getenv("AUDIT_ENABLED", "true").lower() == "true"
+
     # --- CORS (serveur Vite) ---
     CORS_ORIGINS: list[str] = _csv(os.getenv("CORS_ORIGINS", "http://localhost:5173"))
 
