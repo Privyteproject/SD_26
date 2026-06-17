@@ -77,6 +77,24 @@ class Settings:
     # Journalisation automatique des mutations (INSERT/UPDATE/DELETE) dans journal_audit.
     AUDIT_ENABLED: bool = os.getenv("AUDIT_ENABLED", "true").lower() == "true"
 
+    # --- MinIO (stockage objet des documents) ---
+    MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")          # interne (upload)
+    # Endpoint PUBLIC utilisé pour signer les URL (doit être joignable par le navigateur).
+    MINIO_PUBLIC_ENDPOINT: str = os.getenv("MINIO_PUBLIC_ENDPOINT", "localhost:9000")
+    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ROOT_USER", "minioadmin")
+    MINIO_SECRET_KEY: str = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
+    MINIO_BUCKET: str = os.getenv("MINIO_BUCKET_NAME", "ydays-hr-documents")
+    MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "false").lower() == "true"
+
+    # --- Identité entreprise (en-tête des documents) ---
+    COMPANY_NAME: str = os.getenv("COMPANY_NAME", "Synapse Digital")
+    COMPANY_ADDRESS: str = os.getenv("COMPANY_ADDRESS", "12 avenue de l'Innovation, Casablanca")
+
+    # --- Génération documentaire (workflow preview -> submit) ---
+    DOC_PREVIEW_SECRET: str = os.getenv("DOC_PREVIEW_SECRET", "dev-doc-preview-secret")
+    DOC_PREVIEW_TTL: int = int(os.getenv("DOC_PREVIEW_TTL", "600"))  # 10 min
+    DOC_DOWNLOAD_TTL: int = int(os.getenv("DOC_DOWNLOAD_TTL", "86400"))  # 24 h
+
     # --- CORS (serveur Vite) ---
     CORS_ORIGINS: list[str] = _csv(os.getenv("CORS_ORIGINS", "http://localhost:5173"))
 

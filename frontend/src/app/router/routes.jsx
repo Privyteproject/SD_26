@@ -18,6 +18,7 @@ import Profile from "../../features/misc/pages/Profile";
 
 // Espace RH / Manager / Direction
 import DashboardRh from "../../features/dashboard/pages/DashboardRh";
+import AssistantRh from "../../features/assistant/pages/AssistantRh";
 import Team from "../../features/misc/pages/Team";
 import Turnover from "../../features/analytics/pages/Turnover";
 import Payroll from "../../features/analytics/pages/Payroll";
@@ -58,6 +59,7 @@ export default function AppRoutes() {
         {/* Espace RH / Manager / Direction / Médecine */}
         <Route path="/rh" element={<RoleGuard roles={RH_SPACE_ROLES}><DashboardRh /></RoleGuard>} />
         <Route path="/rh/equipe" element={<RoleGuard roles={RH_SPACE_ROLES}><Team /></RoleGuard>} />
+        <Route path="/rh/assistant" element={<RoleGuard roles={RH_SPACE_ROLES}><AssistantRh /></RoleGuard>} />
         <Route path="/rh/analytique/turnover" element={<RoleGuard roles={RH_SPACE_ROLES}><Turnover /></RoleGuard>} />
         <Route path="/rh/analytique/masse-salariale" element={<RoleGuard roles={RH_SPACE_ROLES}><Payroll /></RoleGuard>} />
         <Route path="/rh/analytique/absenteisme" element={<RoleGuard roles={RH_SPACE_ROLES}><Absenteeism /></RoleGuard>} />

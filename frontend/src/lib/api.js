@@ -87,12 +87,22 @@ export const updateModele = (code, data) => request(`/parcours/modeles/${code}`,
 export const deleteModele = (code) => request(`/parcours/modeles/${code}`, { method: "DELETE" });
 
 // ---- Assistant IA ----
-// Renvoie { data: { reply, model, degraded, judge, meta: { perimetre, sources, pii_masked, cache_hit… } }, ... }
-export const sendChatMessage = (message, history = [], judge = false) =>
-  request("/ai/chat", { method: "POST", body: { message, history, judge } });
+// Renvoie { data: { reply, model, degraded, judge, meta: { perimetre, conversation_id… } }, ... }
+export const sendChatMessage = (message, { history = [], judge = false, sessionId = null, audience = "collaborateur" } = {}) =>
+  request("/ai/chat", { method: "POST", body: { message, history, judge, session_id: sessionId, audience } });
+
+// ---- Historique des chats (sessions persistées en base) ----
+export const getChatSessions = () => request("/chat/sessions");
+export const createChatSession = () => request("/chat/sessions", { method: "POST" });
+export const getChatSessionMessages = (id) => request(`/chat/sessions/${id}/messages`);
+export const deleteChatSession = (id) => request(`/chat/sessions/${id}`, { method: "DELETE" });
 
 // Journaux d'audit IA (supervision ADMIN) : { data: [...], meta: { count, total_tokens, sensibles } }
 export const getAiLogs = (params) => request("/ai/logs", { params });
+
+// ---- Recherche globale ----
+// { data: { results: [{type,id,title,subtitle,url,icon}], total, query } }
+export const globalSearch = (q, limit = 10) => request("/search", { params: { q, limit } });
 
 // ---- Journal d'audit (ADMIN) ----
 // Mutations tracées automatiquement : { data: [{ date, action, entite, actor, ip, changements }], meta: { total } }
@@ -100,8 +110,22 @@ export const getAuditLogs = (params) => request("/audit", { params });
 
 // ---- Documents ----
 export const getDocuments = (params) => request("/documents", { params });
-export const getDocumentModeles = () => request("/documents/modeles");
+export const getDocumentModeles = (params) => request("/documents/modeles", { params });
+// Gestion des types de documents (RH/Direction).
+export const createDocumentModele = (data) => request("/documents/modeles", { method: "POST", body: data });
+export const updateDocumentModele = (code, data) => request(`/documents/modeles/${code}`, { method: "PUT", body: data });
+export const deleteDocumentModele = (code) => request(`/documents/modeles/${code}`, { method: "DELETE" });
 export const createDocument = (data) => request("/documents", { method: "POST", body: data });
+// Types de documents disponibles (filtrés par rôle) : champs requis/optionnels + validation RH.
+export const getDocumentTypes = () => request("/documents/types");
+// Workflow preview -> submit (aperçu signé HMAC puis confirmation).
+export const previewDocument = (data) => request("/documents/preview", { method: "POST", body: data });
+export const confirmDocument = (preview_token) => request("/documents/submit", { method: "POST", body: { preview_token } });
+export const getMyDocuments = () => request("/documents/my");
+// Édition d'un brouillon (nom et/ou contenu) — propriétaire, statut draft/refused.
+export const updateDocument = (id, data) => request(`/documents/${id}`, { method: "PATCH", body: data });
+// Soumission explicite : draft|refused -> pending (validation RH).
+export const submitDocument = (id) => request(`/documents/${id}/submit`, { method: "POST" });
 export const updateDocumentStatus = (id, status) =>
   request(`/documents/${id}/status`, { method: "PATCH", body: { status } });
 

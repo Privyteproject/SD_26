@@ -102,10 +102,41 @@ class DocumentCreate(BaseModel):
     code_modele: Optional[str] = None
     employee_id: Optional[str] = None      # matricule (défaut: soi-même)
     nom_fichier: Optional[str] = None
+    contenu: Optional[str] = None          # corps initial (sinon généré par défaut)
+
+
+class DocumentUpdate(BaseModel):
+    nom_fichier: Optional[str] = None
+    contenu: Optional[str] = None
+
+
+class ModeleDocumentCreate(BaseModel):
+    libelle: str = Field(..., min_length=1)
+    categorie: Optional[str] = None
+    gabarit: Optional[str] = None
+
+
+class ModeleDocumentUpdate(BaseModel):
+    libelle: Optional[str] = Field(None, min_length=1)
+    categorie: Optional[str] = None
+    gabarit: Optional[str] = None
+    actif: Optional[bool] = None
 
 
 class DocumentStatusUpdate(BaseModel):
-    status: Literal["validated", "refused"]
+    # Accepte le vocabulaire interne (validated/refused) ET celui de la spec (valide/refuse).
+    status: Literal["validated", "refused", "valide", "refuse"]
+    comment: Optional[str] = None
+
+
+class DocumentPreviewRequest(BaseModel):
+    type: str = Field(..., min_length=1)
+    employee_id: Optional[str] = None          # matricule (défaut: soi-même)
+    additional_data: dict = Field(default_factory=dict)
+
+
+class DocumentSubmitRequest(BaseModel):
+    preview_token: str = Field(..., min_length=1)
 
 
 # --- RAG / ingestion documentaire ---

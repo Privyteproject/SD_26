@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Bell, LogOut, ChevronDown } from "lucide-react";
+import { Bell, LogOut, ChevronDown } from "lucide-react";
 import { useSession } from "../app/providers/SessionProvider";
 import { useI18n } from "../app/providers/I18nProvider";
 import { ROLE_LABELS } from "../lib/constants";
+import GlobalSearchBar from "./layout/GlobalSearchBar";
 import LanguageToggle from "./LanguageToggle";
 import ThemeToggle from "./ThemeToggle";
 
@@ -18,10 +19,8 @@ export default function Header() {
 
   return (
     <header style={{ height: 64, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--bg)", display: "flex", alignItems: "center", gap: 14, padding: "0 22px", position: "sticky", top: 0, zIndex: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, maxWidth: 360, height: 38, padding: "0 12px", borderRadius: 9, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--muted)" }}>
-        <Search size={16} />
-        <input placeholder={t("header.search")} style={{ border: "none", outline: "none", background: "transparent", color: "var(--ink)", width: "100%", fontSize: 13.5, fontFamily: "inherit" }} />
-      </div>
+      {/* Recherche globale (largeur fixe, ne s'étire pas) */}
+      <GlobalSearchBar />
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
         <LanguageToggle />

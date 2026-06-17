@@ -1,0 +1,12 @@
+{% extends "_base.html.j2" %}
+{% block body %}
+<p>Note de frais soumise par <b>{{ employee.prenom }} {{ employee.nom }}</b> ({{ employee.department.nom or "—" }}).</p>
+<p class="doc-meta">
+  Date de la dépense : <b>{{ date_depense | format_date }}</b><br/>
+  Nature de la dépense : {{ nature_depense or "—" }}<br/>
+  Montant : <b>{{ montant or "—" }}</b>
+</p>
+{% if justificatif_note %}<p>Justificatif : {{ justificatif_note }}</p>{% endif %}
+{% if commentaire %}<p>Commentaire : {{ commentaire }}</p>{% endif %}
+<p>Le remboursement est soumis à la validation du service RH après vérification des justificatifs.</p>
+{% endblock %}

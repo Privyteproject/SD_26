@@ -8,7 +8,7 @@ Renvoie des objets ORM ; la sérialisation passe par leur .to_dict().
 
 from datetime import date, datetime
 
-from sqlalchemy import delete as sa_delete, func, select, update as sa_update
+from sqlalchemy import delete as sa_delete, func, or_, select, update as sa_update
 from sqlalchemy.orm import Session
 
 from app.db.models import (
@@ -251,7 +251,7 @@ def dashboard_counts(db) -> dict:
 
 
 # ───────────── Journalisation IA (table interaction_ia) ─────────────
-def log_ia_interaction(db, *, user_email, prompt, reponse, tokens, model, sensible=False):
+def log_ia_interaction(db, *, user_email, prompt, reponse, tokens, model, sensible=False, conversation_id=None):
     from app.db.models import InteractionIA
     u = db.scalar(select(Utilisateur).where(Utilisateur.email == user_email))
     if u is None:
@@ -259,11 +259,212 @@ def log_ia_interaction(db, *, user_email, prompt, reponse, tokens, model, sensib
     it = InteractionIA(
         prompt=prompt, reponse=reponse, tokens_used=tokens, model_name=model,
         statut="ok", sensible=sensible, id_utilisateur=u.id_utilisateur,
+        id_conversation=conversation_id,
     )
     db.add(it)
+    if conversation_id is not None:
+        touch_conversation(db, conversation_id)  # met à jour date_maj
     db.commit()
     db.refresh(it)
     return it
+
+
+# ───────────── Conversations IA (historique des chats) ─────────────
+def _conversation_owned(db, id_conversation, user_email):
+    """Renvoie la conversation si elle appartient à l'utilisateur, sinon None."""
+    from app.db.models import ConversationIA
+    c = db.get(ConversationIA, id_conversation)
+    if c is None:
+        return None
+    u = db.scalar(select(Utilisateur).where(Utilisateur.email == user_email))
+    if u is None or c.id_utilisateur != u.id_utilisateur:
+        return None
+    return c
+
+
+def create_conversation(db, *, user_email, titre):
+    from app.db.models import ConversationIA
+    u = db.scalar(select(Utilisateur).where(Utilisateur.email == user_email))
+    if u is None:
+        return None
+    titre = (titre or "Nouvelle conversation").strip()[:160] or "Nouvelle conversation"
+    c = ConversationIA(titre=titre, id_utilisateur=u.id_utilisateur)
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    return c
+
+
+def touch_conversation(db, id_conversation):
+    from app.db.models import ConversationIA
+    c = db.get(ConversationIA, id_conversation)
+    if c is not None:
+        c.date_maj = datetime.now()
+    return c
+
+
+def list_conversations(db, *, user_email) -> list[dict]:
+    """Conversations non archivées de l'utilisateur (récentes d'abord) + aperçu."""
+    from app.db.models import ConversationIA, InteractionIA
+    u = db.scalar(select(Utilisateur).where(Utilisateur.email == user_email))
+    if u is None:
+        return []
+    rows = list(db.scalars(
+        select(ConversationIA)
+        .where(ConversationIA.id_utilisateur == u.id_utilisateur, ConversationIA.archivee.is_(False))
+        .order_by(ConversationIA.date_maj.desc())
+    ))
+    out = []
+    for c in rows:
+        n = db.scalar(select(func.count(InteractionIA.id_interaction))
+                      .where(InteractionIA.id_conversation == c.id_conversation)) or 0
+        out.append({
+            "id": c.id_conversation, "titre": c.titre,
+            "date_creation": c.date_creation.isoformat() if c.date_creation else None,
+            "date_maj": c.date_maj.isoformat() if c.date_maj else None,
+            "messages": int(n),
+        })
+    return out
+
+
+def conversation_messages(db, *, id_conversation) -> list[dict]:
+    """Échanges (question/réponse) d'une conversation, du plus ancien au plus récent."""
+    from app.db.models import InteractionIA
+    rows = list(db.scalars(
+        select(InteractionIA)
+        .where(InteractionIA.id_conversation == id_conversation)
+        .order_by(InteractionIA.date_creation.asc(), InteractionIA.id_interaction.asc())
+    ))
+    out = []
+    for it in rows:
+        out.append({"role": "user", "content": it.prompt})
+        if it.reponse is not None:
+            out.append({"role": "assistant", "content": it.reponse})
+    return out
+
+
+def rename_conversation(db, *, id_conversation, user_email, titre):
+    c = _conversation_owned(db, id_conversation, user_email)
+    if c is None:
+        return None
+    c.titre = (titre or c.titre).strip()[:160] or c.titre
+    db.commit()
+    db.refresh(c)
+    return c
+
+
+def archive_conversation(db, *, id_conversation, user_email) -> bool:
+    """Suppression douce : marque la conversation comme archivée (conservée pour l'audit)."""
+    c = _conversation_owned(db, id_conversation, user_email)
+    if c is None:
+        return False
+    c.archivee = True
+    db.commit()
+    return True
+
+
+# ───────────── Chat : sessions + messages persistés (chat_sessions / chat_messages) ─────────────
+def _uid(db, user_email):
+    return db.scalar(select(Utilisateur.id_utilisateur).where(Utilisateur.email == user_email))
+
+
+def chat_session_owned(db, session_id, user_email):
+    """Renvoie la session si elle appartient à l'utilisateur et n'est pas supprimée (anti-IDOR)."""
+    from app.db.models import ChatSession
+    s = db.get(ChatSession, session_id)
+    if s is None or s.is_deleted:
+        return None
+    uid = _uid(db, user_email)
+    return s if (uid is not None and s.id_utilisateur == uid) else None
+
+
+def chat_create_session(db, *, user_email, title=None):
+    from app.db.models import ChatSession
+    uid = _uid(db, user_email)
+    if uid is None:
+        return None
+    s = ChatSession(id_utilisateur=uid, title=(title or "Nouvelle conversation")[:200] or "Nouvelle conversation")
+    db.add(s)
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+def chat_list_sessions(db, *, user_email):
+    from app.db.models import ChatMessage, ChatSession
+    uid = _uid(db, user_email)
+    if uid is None:
+        return []
+    rows = list(db.scalars(
+        select(ChatSession)
+        .where(ChatSession.id_utilisateur == uid, ChatSession.is_deleted.is_(False))
+        .order_by(ChatSession.updated_at.desc())
+    ))
+    out = []
+    for s in rows:
+        n = db.scalar(select(func.count(ChatMessage.id)).where(ChatMessage.session_id == s.id)) or 0
+        out.append({
+            "id": s.id, "title": s.title,
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+            "message_count": int(n),
+        })
+    return out
+
+
+def chat_get_messages(db, *, session_id):
+    from app.db.models import ChatMessage
+    rows = list(db.scalars(
+        select(ChatMessage).where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+    ))
+    return [{"id": m.id, "role": m.role, "content": m.content, "mode": m.mode,
+             "sources": m.sources, "created_at": m.created_at.isoformat() if m.created_at else None}
+            for m in rows]
+
+
+def chat_history_for_llm(db, session_id, limit=20):
+    """Derniers échanges au format LLM [{role, content}] (source de vérité serveur)."""
+    msgs = chat_get_messages(db, session_id=session_id)
+    return [{"role": m["role"], "content": m["content"]} for m in msgs][-limit:]
+
+
+def chat_add_message(db, *, session_id, role, content, mode=None, sources=None):
+    from app.db.models import ChatMessage, ChatSession
+    # Horodatage Python (microseconde) pour un ordre fiable, même sur SQLite (func.now()
+    # n'a qu'une résolution à la seconde et le PK UUID n'est pas triable).
+    m = ChatMessage(session_id=session_id, role=role, content=content, mode=mode,
+                    sources=sources, created_at=datetime.now())
+    db.add(m)
+    s = db.get(ChatSession, session_id)
+    if s is not None:
+        s.updated_at = datetime.now()
+        # Titre auto = 50 premiers caractères du 1er message utilisateur.
+        if role == "user" and (not s.title or s.title == "Nouvelle conversation"):
+            s.title = content[:50] or s.title
+    db.commit()
+    db.refresh(m)
+    return m
+
+
+def chat_soft_delete(db, *, session_id, user_email) -> bool:
+    s = chat_session_owned(db, session_id, user_email)
+    if s is None:
+        return False
+    s.is_deleted = True
+    db.commit()
+    # Audit explicite (uniquement la suppression de session, pas chaque message).
+    log_audit(db, action="CHAT_SESSION_DELETED", type_entite="chat_sessions",
+              id_entite=session_id, user_email=user_email)
+    return True
+
+
+def log_audit(db, *, action, type_entite, id_entite, user_email=None):
+    """Écrit une entrée d'audit explicite (pour les actions non couvertes par les events)."""
+    from app.db.models import JournalAudit
+    uid = _uid(db, user_email) if user_email else None
+    db.add(JournalAudit(action=action, type_entite=type_entite,
+                        id_entite=str(id_entite), id_utilisateur=uid))
+    db.commit()
 
 
 def list_ia_interactions(db, *, limit: int = 100) -> list[dict]:
@@ -518,9 +719,58 @@ def set_tache_status(db, id_tache, new_status, date_realisation=None):
 
 
 # ───────────── Documents (génération + validation) ─────────────
-def list_modele_document(db):
+def list_modele_document(db, *, only_active: bool = False):
     from app.db.models import ModeleDocument
-    return list(db.scalars(select(ModeleDocument)))
+    stmt = select(ModeleDocument)
+    if only_active:
+        stmt = stmt.where(ModeleDocument.actif.is_(True))
+    return list(db.scalars(stmt.order_by(ModeleDocument.libelle)))
+
+
+def create_modele_document(db, *, libelle, categorie=None, gabarit=None, code=None):
+    """Crée un type de document (modèle). Code auto si non fourni."""
+    import uuid
+
+    from app.db.models import ModeleDocument
+    code = code or ("D_" + uuid.uuid4().hex[:6].upper())
+    m = ModeleDocument(code_modele=code, libelle=libelle, categorie=categorie,
+                       gabarit=gabarit, actif=True)
+    db.add(m)
+    db.commit()
+    db.refresh(m)
+    return m
+
+
+def update_modele_document(db, code, patch: dict):
+    from app.db.models import ModeleDocument
+    m = db.get(ModeleDocument, code)
+    if m is None:
+        return None
+    if patch.get("libelle"):
+        m.libelle = patch["libelle"]
+    if "categorie" in patch:
+        m.categorie = patch["categorie"]
+    if "gabarit" in patch:
+        m.gabarit = patch["gabarit"]
+    if patch.get("actif") is not None:
+        m.actif = patch["actif"]
+    db.commit()
+    db.refresh(m)
+    return m
+
+
+def delete_modele_document(db, code) -> str:
+    """Renvoie 'not_found', 'in_use' (référencé par des documents) ou 'ok'."""
+    from app.db.models import Document, ModeleDocument
+    m = db.get(ModeleDocument, code)
+    if m is None:
+        return "not_found"
+    used = db.scalar(select(func.count(Document.id_document)).where(Document.code_modele == code))
+    if used:
+        return "in_use"
+    db.delete(m)
+    db.commit()
+    return "ok"
 
 
 def modele_document_exists(db, code_modele: str) -> bool:
@@ -543,9 +793,34 @@ def get_document(db, id_document: int):
     return db.get(Document, id_document)
 
 
-def create_document(db, *, matricule, code_modele=None, nom_fichier=None):
-    """« Génère » un document : crée l'enregistrement en statut pending.
-    La génération de fichier réelle + upload MinIO se branchera ici (cle_minio)."""
+def _default_document_body(db, matricule, code_modele) -> str:
+    """Corps de brouillon par défaut (modèle + données réelles de l'employé)."""
+    from app.db.models import Employe, ModeleDocument
+    libelle = "Document"
+    gabarit = None
+    if code_modele:
+        m = db.get(ModeleDocument, code_modele)
+        if m:
+            libelle = m.libelle
+            gabarit = m.gabarit
+    if gabarit:
+        return gabarit
+    emp = db.get(Employe, matricule)
+    nom = f"{emp.prenom} {emp.nom}" if emp else matricule
+    poste = (emp.poste if emp else None) or "—"
+    return (
+        f"{libelle}\n{'=' * len(libelle)}\n\n"
+        f"Collaborateur : {nom}\n"
+        f"Matricule     : {matricule}\n"
+        f"Poste         : {poste}\n\n"
+        "Objet : à compléter.\n\n"
+        "[ Rédigez ici le contenu du document. Ce brouillon n'est pas encore soumis. ]\n"
+    )
+
+
+def create_document(db, *, matricule, code_modele=None, nom_fichier=None, contenu=None):
+    """« Génère » un document en BROUILLON (statut draft). L'utilisateur le relit,
+    le modifie, puis le soumet explicitement (draft -> pending). Upload MinIO à brancher."""
     import uuid
 
     from app.db.models import Document, ModeleDocument
@@ -555,12 +830,49 @@ def create_document(db, *, matricule, code_modele=None, nom_fichier=None):
             m = db.get(ModeleDocument, code_modele)
             libelle = m.libelle if m else code_modele
         nom_fichier = f"{(libelle or 'document').replace(' ', '_').lower()}_{matricule}.pdf"
+    if contenu is None:
+        contenu = _default_document_body(db, matricule, code_modele)
     # Clé MinIO unique (un même collaborateur peut générer plusieurs fois le même type).
     uniq = uuid.uuid4().hex[:8]
     doc = Document(matricule=matricule, code_modele=code_modele,
-                   nom_fichier=nom_fichier, statut="pending",
+                   nom_fichier=nom_fichier, statut="draft", contenu=contenu,
                    cle_minio=f"documents/{matricule}/{uniq}_{nom_fichier}")
     db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+def create_submitted_document(db, *, matricule, document_name, contenu, type_doc=None, cle_minio=None, code_modele=None):
+    """Crée un document directement en statut 'pending' (workflow preview -> submit)."""
+    from app.db.models import Document
+    doc = Document(matricule=matricule, code_modele=code_modele, nom_fichier=document_name,
+                   type_doc=type_doc, contenu=contenu, statut="pending", cle_minio=cle_minio)
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+def set_document_minio(db, id_document, cle_minio):
+    from app.db.models import Document
+    doc = db.get(Document, id_document)
+    if doc is not None:
+        doc.cle_minio = cle_minio
+        db.commit()
+    return doc
+
+
+def update_document(db, id_document, *, nom_fichier=None, contenu=None):
+    """Édite un brouillon (nom et/ou contenu). Renvoie None si introuvable."""
+    from app.db.models import Document
+    doc = db.get(Document, id_document)
+    if doc is None:
+        return None
+    if nom_fichier is not None:
+        doc.nom_fichier = nom_fichier
+    if contenu is not None:
+        doc.contenu = contenu
     db.commit()
     db.refresh(doc)
     return doc
@@ -578,6 +890,136 @@ def set_document_status(db, id_document, new_status, *, valideur_id=None):
     db.commit()
     db.refresh(doc)
     return doc
+
+
+# ───────────── Recherche globale v2 (contrat plat results[]) ─────────────
+def dept_matricules(db, dept_id) -> list[str]:
+    """Matricules d'un département (périmètre manager)."""
+    from app.db.models import Employe
+    if dept_id is None:
+        return []
+    return list(db.scalars(select(Employe.matricule).where(Employe.id_departement == dept_id)))
+
+
+def gsearch_employees(db, q, *, dept_id=None, limit=5):
+    """Employés par nom/prénom/email/poste (ILIKE). dept_id => périmètre équipe."""
+    from app.db.models import Departement, Employe, Utilisateur
+    like = f"%{q}%"
+    stmt = (
+        select(Employe, Utilisateur.email, Departement.nom)
+        .join(Utilisateur, Employe.id_utilisateur == Utilisateur.id_utilisateur, isouter=True)
+        .join(Departement, Employe.id_departement == Departement.id_departement, isouter=True)
+        .where(or_(Employe.nom.ilike(like), Employe.prenom.ilike(like),
+                   Employe.poste.ilike(like), Utilisateur.email.ilike(like)))
+    )
+    if dept_id is not None:
+        stmt = stmt.where(Employe.id_departement == dept_id)
+    rows = db.execute(stmt.limit(limit)).all()
+    out = []
+    for e, email, dept in rows:
+        sub = " · ".join(x for x in [e.poste, dept] if x) or (email or e.matricule)
+        out.append({"type": "employee", "id": e.matricule,
+                    "title": f"{e.prenom} {e.nom}".strip() or e.matricule,
+                    "subtitle": sub, "url": "/rh/collaborateurs", "icon": "user"})
+    return out
+
+
+def gsearch_documents(db, q, *, matricules=None, limit=3):
+    """Documents par nom/type. matricules=None => tous ; sinon restreint au périmètre."""
+    from app.db.models import Document
+    like = f"%{q}%"
+    stmt = select(Document).where(or_(Document.nom_fichier.ilike(like), Document.type_doc.ilike(like)))
+    if matricules is not None:
+        if not matricules:
+            return []
+        stmt = stmt.where(Document.matricule.in_(matricules))
+    rows = list(db.scalars(stmt.order_by(Document.date_creation.desc()).limit(limit)))
+    return [{"type": "document", "id": d.id_document, "title": d.nom_fichier,
+             "subtitle": (d.type_doc or d.statut or "document"),
+             "url": "/app/documents", "icon": "file"} for d in rows]
+
+
+def gsearch_absences(db, q, *, matricules=None, limit=3):
+    """Absences (demandes de type absence) par type/détail. matricules => périmètre."""
+    from app.db.models import Demande
+    from app.db.seed import ABSENCE_TYPE_CODES
+    like = f"%{q}%"
+    stmt = select(Demande).where(
+        Demande.code_type.in_(ABSENCE_TYPE_CODES),
+        or_(Demande.code_type.ilike(like), Demande.detail.ilike(like)),
+    )
+    if matricules is not None:
+        if not matricules:
+            return []
+        stmt = stmt.where(Demande.matricule.in_(matricules))
+    rows = list(db.scalars(stmt.order_by(Demande.date_depot.desc()).limit(limit)))
+    return [{"type": "absence", "id": d.id_demande, "title": f"{d.code_type} — {d.matricule}",
+             "subtitle": f"{d.statut}", "url": "/rh/demandes", "icon": "calendar"} for d in rows]
+
+
+# ───────────── Recherche globale (legacy, conservée) ─────────────
+def search_documents(db, q, *, matricule=None, limit=8):
+    from app.db.models import Document
+    like = f"%{q}%"
+    stmt = select(Document).where(or_(Document.nom_fichier.ilike(like), Document.contenu.ilike(like)))
+    if matricule:
+        stmt = stmt.where(Document.matricule == matricule)
+    rows = list(db.scalars(stmt.order_by(Document.date_creation.desc()).limit(limit)))
+    return [{"id": d.id_document, "title": d.nom_fichier, "subtitle": d.statut,
+             "matricule": d.matricule} for d in rows]
+
+
+def search_conversations(db, q, *, user_email, limit=8):
+    from app.db.models import ConversationIA
+    u = db.scalar(select(Utilisateur).where(Utilisateur.email == user_email))
+    if u is None:
+        return []
+    like = f"%{q}%"
+    rows = list(db.scalars(
+        select(ConversationIA).where(
+            ConversationIA.id_utilisateur == u.id_utilisateur,
+            ConversationIA.archivee.is_(False),
+            ConversationIA.titre.ilike(like),
+        ).order_by(ConversationIA.date_maj.desc()).limit(limit)
+    ))
+    return [{"id": c.id_conversation, "title": c.titre} for c in rows]
+
+
+def search_employees(db, q, *, limit=8):
+    from app.db.models import Employe
+    like = f"%{q}%"
+    rows = list(db.scalars(
+        select(Employe).where(or_(
+            Employe.nom.ilike(like), Employe.prenom.ilike(like),
+            Employe.poste.ilike(like), Employe.matricule.ilike(like),
+        )).limit(limit)
+    ))
+    return [{"id": e.matricule, "title": f"{e.prenom} {e.nom}".strip(),
+             "subtitle": e.poste or e.matricule} for e in rows]
+
+
+def search_demandes(db, q, *, matricule=None, limit=8):
+    from app.db.models import Demande
+    like = f"%{q}%"
+    stmt = select(Demande).where(or_(Demande.detail.ilike(like), Demande.code_type.ilike(like)))
+    if matricule:
+        stmt = stmt.where(Demande.matricule == matricule)
+    rows = list(db.scalars(stmt.order_by(Demande.date_depot.desc()).limit(limit)))
+    return [{"id": d.id_demande, "title": d.code_type, "subtitle": d.statut,
+             "matricule": d.matricule} for d in rows]
+
+
+def search_procedures(db, q, *, limit=8):
+    """Procédures internes = modèles de tâches de parcours (hors tâches CUSTOM)."""
+    from app.db.models import ModeleTache
+    like = f"%{q}%"
+    rows = list(db.scalars(
+        select(ModeleTache).where(
+            ~ModeleTache.code_tache.like("CUSTOM\\_%", escape="\\"),
+            ModeleTache.libelle.ilike(like),
+        ).limit(limit)
+    ))
+    return [{"id": m.code_tache, "title": m.libelle, "subtitle": m.type_parcours} for m in rows]
 
 
 # ───────────── Scores de risque & indicateurs RH ─────────────

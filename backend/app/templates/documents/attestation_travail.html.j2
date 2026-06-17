@@ -1,0 +1,13 @@
+{% extends "_base.html.j2" %}
+{% block body %}
+<p>Je soussigné(e), représentant(e) de la société <b>{{ company.nom }}</b>, atteste que :</p>
+<p class="doc-meta">
+  <b>{{ employee.prenom }} {{ employee.nom }}</b><br/>
+  Poste : {{ employee.poste or "—" }}<br/>
+  Département : {{ employee.department.nom or "—" }}<br/>
+  {% if employee.date_entree %}Entré(e) dans l'entreprise le : {{ employee.date_entree | format_date }}{% endif %}
+</p>
+<p>est employé(e) au sein de notre société à ce jour.</p>
+{% if objet %}<p>Cette attestation est délivrée pour : <b>{{ objet }}</b>.</p>{% endif %}
+<p>En foi de quoi, la présente attestation est délivrée à l'intéressé(e) pour servir et valoir ce que de droit.</p>
+{% endblock %}

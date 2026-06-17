@@ -27,12 +27,13 @@ services:
       - CHROMA_HOST=chromadb
       - REDIS_URL=redis://redis:6379/0
       - MINIO_ENDPOINT=minio:9000
+      - MINIO_PUBLIC_ENDPOINT=localhost:9000
     volumes:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
-    command: sh -c "pip install python-keycloak redis && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "pip install python-keycloak redis minio jinja2 && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       db:
         condition: service_healthy

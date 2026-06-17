@@ -1,0 +1,11 @@
+{% extends "_base.html.j2" %}
+{% block body %}
+<p>Demande déposée par <b>{{ employee.prenom }} {{ employee.nom }}</b> ({{ employee.poste or "—" }}, {{ employee.department.nom or "—" }}).</p>
+<p class="doc-meta">
+  Type de congé : <b>{{ type_conge or "—" }}</b><br/>
+  Du <b>{{ date_debut | format_date }}</b> au <b>{{ date_fin | format_date }}</b><br/>
+  Motif : {{ motif or "—" }}
+</p>
+{% if commentaire %}<p>Commentaire : {{ commentaire }}</p>{% endif %}
+<p>Cette demande est soumise à la validation de la hiérarchie et du service RH.</p>
+{% endblock %}

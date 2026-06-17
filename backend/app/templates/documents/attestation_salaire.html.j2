@@ -1,0 +1,12 @@
+{% extends "_base.html.j2" %}
+{% block body %}
+<p>Je soussigné(e), représentant(e) de la société <b>{{ company.nom }}</b>, atteste que :</p>
+<p class="doc-meta">
+  <b>{{ employee.prenom }} {{ employee.nom }}</b><br/>
+  Poste : {{ employee.poste or "—" }}<br/>
+  Département : {{ employee.department.nom or "—" }}
+</p>
+<p>perçoit une rémunération mensuelle nette conforme à son contrat de travail{% if include_primes %}, primes incluses{% endif %}.</p>
+<p class="doc-meta"><i>Le détail chiffré de la rémunération est communiqué séparément par le service RH, conformément à la politique de confidentialité.</i></p>
+{% if objet %}<p>Cette attestation est délivrée pour : <b>{{ objet }}</b>.</p>{% endif %}
+{% endblock %}

@@ -16,6 +16,7 @@ export function navForRole(role, status) {
   if (RH_SPACE_ROLES.includes(role)) {
     const items = [
       { key: "nav.dashboard", to: "/rh", icon: "LayoutDashboard" },
+      { key: "nav.assistantRh", to: "/rh/assistant", icon: "Bot" },
       { key: "nav.team", to: "/rh/equipe", icon: "Users" },
       { key: "nav.analytics", to: "/rh/analytique/turnover", icon: "TrendingUp" },
       { key: "nav.disengagement", to: "/rh/desengagement", icon: "Activity" },

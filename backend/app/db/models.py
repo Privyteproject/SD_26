@@ -13,9 +13,11 @@ front intégré (employes / absences) sont regroupées en bas de fichier.
 
 from __future__ import annotations
 
+import uuid
 from datetime import date, datetime
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     Date,
@@ -51,7 +53,9 @@ class ModeleDocument(Base):
     __tablename__ = "modele_document"
     code_modele: Mapped[str] = mapped_column(String(20), primary_key=True)
     libelle: Mapped[str] = mapped_column(String(120))
-    gabarit: Mapped[str | None] = mapped_column(Text, nullable=True)
+    categorie: Mapped[str | None] = mapped_column(String(40), nullable=True)  # attestation, conge, certificat…
+    gabarit: Mapped[str | None] = mapped_column(Text, nullable=True)          # corps par défaut du brouillon
+    actif: Mapped[bool] = mapped_column(Boolean, default=True)                # type proposé ou non aux utilisateurs
 
 
 class ModeleTache(Base):
@@ -184,8 +188,10 @@ class Document(Base):
     __tablename__ = "document"
     id_document: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     nom_fichier: Mapped[str] = mapped_column(String(255))
+    type_doc: Mapped[str | None] = mapped_column(String(40), nullable=True)  # type métier du document
+    contenu: Mapped[str | None] = mapped_column(Text, nullable=True)  # corps éditable (brouillon)
     cle_minio: Mapped[str | None] = mapped_column(String(255), unique=True)
-    statut: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    statut: Mapped[str] = mapped_column(String(20), default="draft", index=True)
     date_creation: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     date_validation: Mapped[date | None] = mapped_column(Date, nullable=True)
     matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
@@ -210,7 +216,46 @@ class TacheParcours(Base):
     modele: Mapped[ModeleTache] = relationship()
 
 
+# ───────────────────────── Chat : sessions + messages persistés ─────────────────────────
+def _uuid() -> str:
+    return uuid.uuid4().hex
+
+
+class ChatSession(Base):
+    """Session de conversation persistée (historique des chats)."""
+    __tablename__ = "chat_sessions"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    id_utilisateur: Mapped[int] = mapped_column(ForeignKey("utilisateur.id_utilisateur"), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="Nouvelle conversation")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ChatMessage(Base):
+    """Message d'une session de chat (rôle user/assistant + métadonnées de pipeline)."""
+    __tablename__ = "chat_messages"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    session_id: Mapped[str] = mapped_column(ForeignKey("chat_sessions.id"), index=True)
+    role: Mapped[str] = mapped_column(String(20))           # 'user' | 'assistant'
+    content: Mapped[str] = mapped_column(Text)
+    mode: Mapped[str | None] = mapped_column(String(20), nullable=True)  # rag | general | refusal
+    sources: Mapped[list | None] = mapped_column(JSON, nullable=True)    # documents sources si RAG
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # ───────────────────────── IA ─────────────────────────
+class ConversationIA(Base):
+    """Fil de conversation avec l'assistant : regroupe N interactions (historique)."""
+    __tablename__ = "conversation_ia"
+    id_conversation: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    titre: Mapped[str] = mapped_column(String(160))
+    archivee: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    date_creation: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    date_maj: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    id_utilisateur: Mapped[int] = mapped_column(ForeignKey("utilisateur.id_utilisateur"), index=True)
+
+
 class InteractionIA(Base):
     __tablename__ = "interaction_ia"
     id_interaction: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -222,6 +267,10 @@ class InteractionIA(Base):
     sensible: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     date_creation: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     id_utilisateur: Mapped[int] = mapped_column(ForeignKey("utilisateur.id_utilisateur"), index=True)
+    # Rattachement à un fil de conversation (historique). Nullable : compat. existant.
+    id_conversation: Mapped[int | None] = mapped_column(
+        ForeignKey("conversation_ia.id_conversation"), nullable=True, index=True
+    )
 
     sources: Mapped[list[Document]] = relationship(secondary="source_ia")
 
@@ -363,6 +412,8 @@ def _document_to_dict(self: Document) -> dict:
         "id": self.id_document,
         "employee_id": self.matricule,
         "nom_fichier": self.nom_fichier,
+        "type": self.type_doc,
+        "contenu": self.contenu,
         "code_modele": self.code_modele,
         "statut": self.statut,
         "cle_minio": self.cle_minio,
@@ -373,7 +424,11 @@ def _document_to_dict(self: Document) -> dict:
 
 
 def _modele_document_to_dict(self: ModeleDocument) -> dict:
-    return {"code": self.code_modele, "libelle": self.libelle}
+    return {
+        "code": self.code_modele, "libelle": self.libelle,
+        "categorie": self.categorie, "gabarit": self.gabarit,
+        "actif": bool(self.actif) if self.actif is not None else True,
+    }
 
 
 def _score_to_dict(self: ScoreRisque) -> dict:

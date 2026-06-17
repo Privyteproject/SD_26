@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.security import ROLE_ADMIN, CurrentUser, get_current_user, require_roles
 from app.db import repository as repo
 from app.db.base import get_db
-from app.schemas.ai import ChatRequest, JudgeRequest
+from app.schemas.ai import ChatRequest, ConversationUpdate, JudgeRequest
 from app.schemas.common import envelope
 from app.services import ai as ai_service
 from app.services import pipeline
@@ -27,14 +27,79 @@ def chat(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # 1) Session : on poursuit celle fournie (après contrôle de propriété) ou on en crée une.
+    session = None
+    if payload.session_id:
+        session = repo.chat_session_owned(db, payload.session_id, user.email)
+        if session is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Session introuvable")
+    if session is None:
+        session = repo.chat_create_session(db, user_email=user.email, title=payload.message[:50])
+    sid = session.id if session else None
+
+    # 2) Historique reconstruit côté serveur (source de vérité) + message utilisateur persisté.
+    history = repo.chat_history_for_llm(db, sid) if sid else payload.history
+    if sid:
+        repo.chat_add_message(db, session_id=sid, role="user", content=payload.message)
+
+    # 3) Génération.
     try:
-        data = pipeline.run_chat(db, user, payload.message, payload.history, payload.judge)
+        data = pipeline.run_chat(db, user, payload.message, history, payload.judge,
+                                 audience=payload.audience)
     except pipeline.RateLimited:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
                             detail="Trop de requêtes. Réessayez dans une minute.")
     except Exception as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=f"Service IA indisponible : {exc}") from exc
+
+    # 4) Réponse assistant persistée (avec mode + sources).
+    if sid:
+        meta = data.get("meta", {})
+        repo.chat_add_message(db, session_id=sid, role="assistant", content=data.get("reply") or "",
+                              mode=meta.get("mode"), sources=meta.get("sources") or None)
+        data.setdefault("meta", {})["session_id"] = sid
     return envelope(data)
+
+
+# ── Historique des chats : conversations de l'utilisateur courant ──
+@router.get("/conversations")
+def list_conversations(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = repo.list_conversations(db, user_email=user.email)
+    return envelope(rows, meta={"total": len(rows)})
+
+
+@router.get("/conversations/{conversation_id}")
+def get_conversation(
+    conversation_id: int, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    if repo._conversation_owned(db, conversation_id, user.email) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Conversation introuvable")
+    return envelope(repo.conversation_messages(db, id_conversation=conversation_id))
+
+
+@router.patch("/conversations/{conversation_id}")
+def update_conversation(
+    conversation_id: int, payload: ConversationUpdate,
+    user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db),
+):
+    if payload.archivee:
+        if not repo.archive_conversation(db, id_conversation=conversation_id, user_email=user.email):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Conversation introuvable")
+        return envelope({"id": conversation_id, "archived": True})
+    c = repo.rename_conversation(db, id_conversation=conversation_id, user_email=user.email, titre=payload.titre)
+    if c is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Conversation introuvable")
+    return envelope({"id": c.id_conversation, "titre": c.titre})
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: int, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Suppression douce (archivage) : la conversation est conservée pour l'audit."""
+    if not repo.archive_conversation(db, id_conversation=conversation_id, user_email=user.email):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Conversation introuvable")
+    return envelope({"id": conversation_id, "deleted": True})
 
 
 @router.get("/logs")

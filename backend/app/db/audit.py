@@ -32,8 +32,10 @@ _actor_ip: ContextVar[str | None] = ContextVar("audit_actor_ip", default=None)
 _UNSET = object()
 _actor_id: ContextVar[object] = ContextVar("audit_actor_id", default=_UNSET)
 
-# Tables jamais auditées (éviter la récursion ; le journal ne s'audite pas lui-même).
-_EXCLUDE = {"journal_audit"}
+# Tables jamais auditées (récursion + volumétrie).
+# chat_messages/chat_sessions : on n'audite QUE la suppression de session (fait manuellement),
+# pas chaque message (cf. contrainte RGPD/volumétrie).
+_EXCLUDE = {"journal_audit", "chat_messages", "chat_sessions"}
 # Mutations sur ces tables -> on invalide le cache du tableau de bord.
 _CACHE_BUSTERS = {"employe", "demande", "indicateur_rh", "departement", "utilisateur"}
 
