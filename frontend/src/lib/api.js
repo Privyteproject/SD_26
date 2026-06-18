@@ -54,6 +54,18 @@ export const getMe = () => request("/employees/me");
 export const getEmployees = (params) => request("/employees", { params });
 export const getEmployee = (id) => request(`/employees/${id}`);
 export const createEmployee = (data) => request("/employees", { method: "POST", body: data });
+// Import CSV d'employés (multipart) : renvoie { data: { created, errors[] } }.
+export async function importEmployeesCsv(file) {
+  const token = getAccessToken();
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${BASE}/employees/import`, {
+    method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, data?.detail || "Import échoué", data);
+  return data;
+}
 export const updateEmployee = (id, data) => request(`/employees/${id}`, { method: "PUT", body: data });
 export const deleteEmployee = (id) => request(`/employees/${id}`, { method: "DELETE" });
 
@@ -74,6 +86,9 @@ export const getParcoursModeles = (params) => request("/parcours/modeles", { par
 export const getParcours = (matricule, params) => request(`/parcours/${matricule}`, { params });
 export const initParcours = (matricule, typeParcours) =>
   request(`/parcours/${matricule}/init`, { method: "POST", body: { type_parcours: typeParcours } });
+// Génère un parcours via l'IA (planning 30 j adapté au poste) puis l'enregistre.
+export const generateParcours = (matricule, typeParcours = "ONBOARDING") =>
+  request(`/parcours/generate/${matricule}`, { method: "POST", params: { type: typeParcours } });
 export const updateTacheStatus = (id, status, dateRealisation) =>
   request(`/parcours/taches/${id}`, { method: "PATCH", body: { status, date_realisation: dateRealisation } });
 // Tâche personnalisée pour un employé + suppression d'une tâche
@@ -103,6 +118,13 @@ export const getAiLogs = (params) => request("/ai/logs", { params });
 // ---- Recherche globale ----
 // { data: { results: [{type,id,title,subtitle,url,icon}], total, query } }
 export const globalSearch = (q, limit = 10) => request("/search", { params: { q, limit } });
+
+// ---- Risques (recalcul algorithmique) ----
+export const calculateRisques = () => request("/dashboard/risques/calculate", { method: "POST" });
+
+// ---- Notifications (cloche) ----
+export const getNotifications = () => request("/notifications");
+export const markNotificationRead = (id) => request(`/notifications/${id}/read`, { method: "PATCH" });
 
 // ---- Journal d'audit (ADMIN) ----
 // Mutations tracées automatiquement : { data: [{ date, action, entite, actor, ip, changements }], meta: { total } }

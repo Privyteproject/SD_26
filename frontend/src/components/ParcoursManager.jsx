@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { Check, Plus, Trash2, Pencil } from "lucide-react";
+import { Check, Plus, Trash2, Pencil, Sparkles } from "lucide-react";
 import { useI18n } from "../app/providers/I18nProvider";
 import Card from "./Card";
 import Badge from "./Badge";
 import AsyncBoundary from "./AsyncBoundary";
 import { useAsync } from "../lib/useAsync";
 import {
-  getEmployees, getParcours, initParcours, updateTacheStatus,
+  getEmployees, getParcours, initParcours, updateTacheStatus, generateParcours,
   addParcoursTache, deleteParcoursTache,
   getParcoursModeles, createModele, updateModele, deleteModele,
 } from "../lib/api";
@@ -39,6 +39,11 @@ function TaskPanel({ matricule, type }) {
     try { await initParcours(matricule, type); reload(); }
     catch (e) { fail(t, e); } finally { setBusy(false); }
   };
+  const genAi = async () => {
+    setBusy(true);
+    try { await generateParcours(matricule, type); reload(); }
+    catch (e) { fail(t, e); } finally { setBusy(false); }
+  };
   const addTask = async () => {
     if (!newTask.trim()) return;
     setBusy(true);
@@ -63,6 +68,7 @@ function TaskPanel({ matricule, type }) {
                 <div style={{ width: `${progress}%`, height: "100%", background: "var(--gold)" }} />
               </div>
               <Badge tone="gold">{progress}%</Badge>
+              <button onClick={genAi} disabled={busy} title={t("parc.genAi")} style={smallBtn("var(--gold-deep)")}><Sparkles size={15} /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {tasks.map((tk) => {
@@ -84,7 +90,10 @@ function TaskPanel({ matricule, type }) {
         ) : (
           <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
             <div style={{ color: "var(--muted)", fontSize: 14, marginBottom: 12 }}>{t("parc.noParcours")}</div>
-            <button onClick={init} disabled={busy} style={goldBtn}>{busy ? t("common.loading") : t("parc.init")}</button>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              <button onClick={init} disabled={busy} style={{ ...goldBtn, background: "transparent", color: "var(--gold-deep)", border: "1px solid var(--line)" }}>{t("parc.init")}</button>
+              <button onClick={genAi} disabled={busy} style={goldBtn}><Sparkles size={16} /> {busy ? t("common.loading") : t("parc.genAi")}</button>
+            </div>
           </div>
         )}
 

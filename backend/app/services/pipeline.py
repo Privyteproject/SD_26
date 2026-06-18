@@ -54,7 +54,10 @@ SYSTEM_PROMPT_RH = (
     "définitions : CDI, CDD, période d'essai, préavis, congés légaux…), tu PEUX répondre "
     "à partir de tes connaissances générales, de manière factuelle et concise, en "
     "précisant qu'il s'agit d'une information générale et non d'un conseil juridique.\n"
-    "Ne donne pas de conseil médical."
+    "Ne donne pas de conseil médical. "
+    "Si la question concerne une situation humaine sensible ou urgente (harcèlement, "
+    "discrimination, détresse…), n'essaie pas d'y répondre seul : invite la personne à "
+    "contacter un référent RH (la plateforme ouvre alors automatiquement un ticket)."
 )
 SYSTEM_PROMPT_GENERAL = (
     "Tu es un assistant polyvalent dans le cadre d'une plateforme RH. "
@@ -69,6 +72,20 @@ RH_PILOT_NOTE = (
     "demandes, suivre les collaborateurs, proposer des réponses à valider et commenter les "
     "indicateurs RH. Tu PROPOSES ; la décision et la validation finales restent humaines."
 )
+
+
+# Situations RH sensibles -> escalade immédiate vers un référent humain (ouverture de ticket).
+_ESCALADE_KEYWORDS = [
+    "harcelement", "harcele", "harassment", "discrimination", "discrimine",
+    "agression", "agresse", "violence", "menace", "souffrance au travail",
+    "detresse", "depression", "suicide", "burn out", "epuisement professionnel",
+]
+
+
+def _needs_escalation(message: str) -> bool:
+    from app.services.text_utils import normalize
+    t = normalize(message)
+    return any(k in t for k in _ESCALADE_KEYWORDS)
 
 
 class RateLimited(Exception):
@@ -99,7 +116,8 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
     # L'assistant RH n'est « copilote » que pour un rôle réellement habilité (RBAC inchangé).
     audience = "rh" if (audience == "rh" and user.role in _ELEVATED) else "collaborateur"
     meta: dict = {"perimetre": None, "type_rh": None, "cache_hit": False, "audience": audience,
-                  "blocked": None, "authorized": None, "sources": [], "pii_masked": False}
+                  "blocked": None, "authorized": None, "sources": [], "pii_masked": False,
+                  "escalade": False}
 
     # Historique : la persistance est gérée par l'endpoint /ai/chat via chat_sessions
     # (l'`history` est déjà reconstruit côté serveur et passé ici).
@@ -115,6 +133,26 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
         meta.update({"perimetre": classifier.PERIMETRE_DANGEREUX, "blocked": "injection"})
         res = _refusal("Votre requête a été bloquée pour des raisons de sécurité.", meta)
         _audit(db, user, message, res)
+        try:  # alerte de sécurité diffusée aux RH/Admin
+            repo.create_alerte(db, message=f"Tentative d'injection bloquée ({user.email}).",
+                               categorie="securite", gravite="high", id_destinataire=None)
+        except Exception:
+            db.rollback()
+        return res
+
+    # 2bis) Escalade : situation RH sensible -> on n'appelle pas le LLM, on ouvre un ticket.
+    if _needs_escalation(message):
+        meta["escalade"] = True
+        res = {"reply": "Votre demande a été transférée à un référent RH, qui vous "
+               "recontactera rapidement et en toute confidentialité. En cas d'urgence, "
+               "contactez directement votre RH ou la médecine du travail.",
+               "model": "policy", "degraded": False, "usage": {}, "judge": None, "meta": meta}
+        _audit(db, user, message, res)
+        try:  # ouverture de ticket = notification RH (Mission 3)
+            repo.create_alerte(db, message=f"Escalade RH : situation sensible signalée ({user.email}).",
+                               categorie="escalade", gravite="high", id_destinataire=None)
+        except Exception:
+            db.rollback()
         return res
 
     # 3) Classification

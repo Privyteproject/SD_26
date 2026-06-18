@@ -458,6 +458,72 @@ def chat_soft_delete(db, *, session_id, user_email) -> bool:
     return True
 
 
+# ───────────── Notifications / Alertes ─────────────
+_ALERT_BROADCAST_ROLES = {"ADMIN", "RH", "DIRECTION"}
+
+
+def _alerte_to_dict(a) -> dict:
+    return {
+        "id": a.id_alerte, "message": a.message, "categorie": a.categorie,
+        "gravite": a.gravite, "lue": bool(a.lue),
+        "date_creation": a.date_creation.isoformat() if a.date_creation else None,
+        "matricule": a.matricule, "id_destinataire": a.id_destinataire,
+    }
+
+
+def create_alerte(db, *, message, categorie="info", gravite="mid", id_destinataire=None, matricule=None):
+    """Crée une notification/alerte. id_destinataire=None => diffusion RH/Admin."""
+    from app.db.models import Alerte
+    a = Alerte(message=message, categorie=categorie, gravite=gravite,
+               confidentielle=False, lue=False, resolue=False,
+               id_destinataire=id_destinataire, matricule=matricule)
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return a
+
+
+def manager_utilisateur_id(db, matricule) -> int | None:
+    """id_utilisateur du manager d'un employé (pour lui adresser une notification)."""
+    from app.db.models import Employe
+    emp = db.get(Employe, matricule)
+    if emp is None or not emp.matricule_manager:
+        return None
+    mgr = db.get(Employe, emp.matricule_manager)
+    return mgr.id_utilisateur if mgr else None
+
+
+def list_alertes_for(db, *, user_email, role, limit=30):
+    """Notifications visibles : celles adressées à l'utilisateur + diffusions (RH/Admin)."""
+    from app.db.models import Alerte
+    uid = _uid(db, user_email)
+    conds = []
+    if uid is not None:
+        conds.append(Alerte.id_destinataire == uid)
+    if role in _ALERT_BROADCAST_ROLES:
+        conds.append(Alerte.id_destinataire.is_(None))
+    if not conds:
+        return [], 0
+    stmt = select(Alerte).where(or_(*conds)).order_by(Alerte.lue.asc(), Alerte.date_creation.desc())
+    rows = list(db.scalars(stmt.limit(limit)))
+    unread = sum(1 for a in rows if not a.lue)
+    return [_alerte_to_dict(a) for a in rows], unread
+
+
+def mark_alerte_read(db, *, id_alerte, user_email, role) -> bool:
+    from app.db.models import Alerte
+    a = db.get(Alerte, id_alerte)
+    if a is None:
+        return False
+    uid = _uid(db, user_email)
+    owned = (a.id_destinataire == uid) or (a.id_destinataire is None and role in _ALERT_BROADCAST_ROLES)
+    if not owned:
+        return False
+    a.lue = True
+    db.commit()
+    return True
+
+
 def log_audit(db, *, action, type_entite, id_entite, user_email=None):
     """Écrit une entrée d'audit explicite (pour les actions non couvertes par les events)."""
     from app.db.models import JournalAudit
@@ -709,6 +775,7 @@ def set_tache_status(db, id_tache, new_status, date_realisation=None):
     if t is None:
         return None
     t.statut = new_status
+    t.completed = (new_status == "done")  # garde le booléen synchronisé avec le statut
     if new_status == "done" and date_realisation is None:
         t.date_realisation = date.today()
     elif date_realisation is not None:

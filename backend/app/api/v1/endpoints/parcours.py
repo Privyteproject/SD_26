@@ -5,6 +5,8 @@ S'appuie sur modele_tache (gabarits) et tache_parcours (instances).
 - consultation d'un parcours : l'employé concerné ou un rôle élevé.
 """
 
+from datetime import date, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -20,6 +22,7 @@ from app.core.security import (
 from app.db import repository as repo
 from app.db.base import get_db
 from app.schemas.common import envelope
+from app.services import onboarding_agent
 from app.schemas.hr import (
     ModeleTacheCreate,
     ModeleTacheUpdate,
@@ -87,6 +90,29 @@ def delete_tache(id_tache: int, _: CurrentUser = Depends(_MANAGE), db: Session =
     return envelope({"id": id_tache, "deleted": True})
 
 
+@router.post("/generate/{matricule}", status_code=status.HTTP_201_CREATED)
+def generate_parcours(
+    matricule: str,
+    type_parcours: str = Query("ONBOARDING", alias="type"),
+    _: CurrentUser = Depends(_MANAGE), db: Session = Depends(get_db),
+):
+    """Génère un parcours par IA (planning 30 j adapté au poste) et l'enregistre."""
+    emp = repo.get_employee(db, matricule)
+    if emp is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
+    type_parcours = "OFFBOARDING" if type_parcours.upper() == "OFFBOARDING" else "ONBOARDING"
+    plan = onboarding_agent.generate_plan(emp.poste, type_parcours)
+    today = date.today()
+    created = []
+    for step in plan:
+        t = repo.add_tache(db, matricule=matricule, libelle=step["libelle"],
+                           type_parcours=type_parcours,
+                           date_echeance=today + timedelta(days=step["delai_jours"]))
+        created.append(t)
+    return envelope([t.to_dict() for t in created],
+                    meta={"total": len(created), "generated_by": "ai", "type": type_parcours})
+
+
 @router.post("/{matricule}/init", status_code=status.HTTP_201_CREATED)
 def init_parcours(
     matricule: str, payload: ParcoursInit,
@@ -116,9 +142,16 @@ def get_parcours(
 @router.patch("/taches/{id_tache}")
 def update_tache(
     id_tache: int, payload: TacheStatusUpdate,
-    _: CurrentUser = Depends(_MANAGE), db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db),
 ):
-    t = repo.set_tache_status(db, id_tache, payload.status, payload.date_realisation)
+    # RH/Manager/Direction/Admin : OK sur toute tâche. Sinon, le collaborateur ne peut
+    # cocher que SES propres tâches (il valide son onboarding).
+    t = repo.get_tache(db, id_tache)
     if t is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tâche introuvable")
+    if user.role not in _ELEVATED:
+        emp = repo.find_employee_by_email(db, user.email)
+        if not emp or emp.matricule != t.matricule:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Accès non autorisé")
+    t = repo.set_tache_status(db, id_tache, payload.status, payload.date_realisation)
     return envelope(t.to_dict())
