@@ -6,7 +6,7 @@
 Un collaborateur ne voit/génère que ses propres documents.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
@@ -199,7 +199,7 @@ def preview_document(
         "type": payload.type, "matricule": matricule,
         "additional_data": payload.additional_data, "user_email": user.email,
     }, ttl=settings.DOC_PREVIEW_TTL)
-    expires_at = (datetime.now() + timedelta(seconds=settings.DOC_PREVIEW_TTL)).isoformat()
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=settings.DOC_PREVIEW_TTL)).isoformat()
     return envelope({"preview_token": token, "html_preview": html_preview,
                      "document_name": document_name, "expires_at": expires_at})
 
