@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Sparkles } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useSession } from "../../../app/providers/SessionProvider";
@@ -7,7 +9,7 @@ import KpiCard from "../../../components/KpiCard";
 import Badge from "../../../components/Badge";
 import AsyncBoundary from "../../../components/AsyncBoundary";
 import { useAsync } from "../../../lib/useAsync";
-import { getDashboardRh, getDashboardIndicateurs, getEmployees } from "../../../lib/api";
+import { getDashboardRh, getDashboardIndicateurs, getEmployees, calculateRisques } from "../../../lib/api";
 
 const pct = (v) => (v === null || v === undefined ? "—" : `${v}%`);
 const riskTone = { high: "danger", mid: "warning", low: "success" };
@@ -31,6 +33,12 @@ export default function DashboardRh() {
       employees: (emps && emps.data) || [],
     };
   });
+
+  const [calc, setCalc] = useState(false);
+  const recalc = async () => {
+    setCalc(true);
+    try { await calculateRisques(); reload(); } catch (e) { /* ignore */ } finally { setCalc(false); }
+  };
 
   const rh = data?.rh || {};
   const ind = rh.indicateurs || {};
@@ -63,6 +71,11 @@ export default function DashboardRh() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{t("nav.dashboard")}</h1>
         <Badge tone="gold">{isManager ? t("scope.team") : t("scope.org")}</Badge>
+        {(isExec || isMed) && (
+          <button onClick={recalc} disabled={calc} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 14, cursor: calc ? "wait" : "pointer", opacity: calc ? 0.6 : 1, fontFamily: "inherit" }}>
+            <Sparkles size={16} /> {calc ? t("common.loading") : t("rh.recalcRisk")}
+          </button>
+        )}
       </div>
 
       <AsyncBoundary loading={loading} error={error} onRetry={reload}>

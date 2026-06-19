@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Check, Rocket } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useSession } from "../../../app/providers/SessionProvider";
@@ -5,7 +6,7 @@ import Card from "../../../components/Card";
 import Badge from "../../../components/Badge";
 import AsyncBoundary from "../../../components/AsyncBoundary";
 import { useAsync } from "../../../lib/useAsync";
-import { getParcours } from "../../../lib/api";
+import { getParcours, updateTacheStatus } from "../../../lib/api";
 import { ONBOARDING_CONTACTS } from "../../../mock/mockData";
 
 export default function Onboarding() {
@@ -13,12 +14,20 @@ export default function Onboarding() {
   const { currentUser } = useSession();
   const matricule = currentUser?.id;
 
-  // Parcours d'onboarding de l'utilisateur courant (consultation autorisée pour lui-même).
+  // Parcours d'onboarding de l'utilisateur courant (il peut cocher ses propres tâches).
   const { data, loading, error, reload } = useAsync(
     () => (matricule ? getParcours(matricule, { type: "ONBOARDING" }) : Promise.resolve({ data: [] })),
     [matricule]
   );
+  const [busyId, setBusyId] = useState(null);
   const tasks = ((data && data.data) || []).slice().sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
+
+  const toggle = async (tk) => {
+    setBusyId(tk.id);
+    try { await updateTacheStatus(tk.id, tk.status === "done" ? "todo" : "done"); reload(); }
+    catch (e) { /* ignore */ }
+    finally { setBusyId(null); }
+  };
   const done = tasks.filter((x) => x.status === "done").length;
   const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
 
@@ -42,17 +51,20 @@ export default function Onboarding() {
         <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 16, marginTop: 16 }}>
           <Card style={{ alignSelf: "flex-start" }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>{t("parc.tasks")}</div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>{t("parc.readonly")}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>{t("parc.checkHint")}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {tasks.map((tk) => {
                 const isDone = tk.status === "done";
+                const busy = busyId === tk.id;
                 return (
-                  <div key={tk.id} style={{ display: "flex", alignItems: "center", gap: 11, fontSize: 14, color: isDone ? "var(--muted)" : "var(--ink)" }}>
+                  <button key={tk.id} onClick={() => toggle(tk)} disabled={busy}
+                    style={{ display: "flex", alignItems: "center", gap: 11, fontSize: 14, color: isDone ? "var(--muted)" : "var(--ink)", background: "transparent", border: "none", textAlign: "left", cursor: busy ? "wait" : "pointer", padding: "7px 4px", borderRadius: 8, fontFamily: "inherit", opacity: busy ? 0.6 : 1 }}>
                     <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: `1px solid ${isDone ? "var(--gold)" : "var(--line)"}`, background: isDone ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {isDone && <Check size={13} color="var(--on-gold)" strokeWidth={3} />}
                     </span>
-                    <span style={{ textDecoration: isDone ? "line-through" : "none" }}>{tk.libelle || tk.code_tache}</span>
-                  </div>
+                    <span style={{ flex: 1, textDecoration: isDone ? "line-through" : "none" }}>{tk.libelle || tk.code_tache}</span>
+                    {tk.date_echeance && <span style={{ fontSize: 11.5, color: "var(--muted)", flexShrink: 0 }}>{tk.date_echeance}</span>}
+                  </button>
                 );
               })}
             </div>

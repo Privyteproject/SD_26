@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Check, Minus, Plus, Trash2, X, Pencil } from "lucide-react";
+import { Check, Minus, Plus, Trash2, X, Pencil, Upload } from "lucide-react";
+import ImportModal from "./ImportModal";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useSession } from "../../../app/providers/SessionProvider";
 import { ROLES, ROLE_LABELS, STATUS, STATUS_LABELS } from "../../../lib/constants";
@@ -47,6 +48,7 @@ export default function Users() {
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const startCreate = () => { setEditingId(null); setForm(EMPTY); setErr(""); setOpen(true); };
@@ -108,10 +110,17 @@ export default function Users() {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{t("usr.title")}</h1>
-        <button onClick={open ? close : startCreate} style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 42, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-          {open ? <X size={17} /> : <Plus size={17} />} {open ? t("usr.cancel") : t("usr.new")}
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => setImportOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 42, padding: "0 16px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+            <Upload size={16} /> {t("imp.btn")}
+          </button>
+          <button onClick={open ? close : startCreate} style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 42, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+            {open ? <X size={17} /> : <Plus size={17} />} {open ? t("usr.cancel") : t("usr.new")}
+          </button>
+        </div>
       </div>
+
+      {importOpen && <ImportModal onClose={() => setImportOpen(false)} onDone={reload} />}
 
       {open && (
         <Card style={{ marginTop: 16 }}>

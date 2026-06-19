@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, MessageSquare, ShieldCheck, AlertCircle, Database, Zap, Plus, Trash2 } from "lucide-react";
+import { Send, MessageSquare, ShieldCheck, AlertCircle, Database, Zap, Plus, Trash2, LifeBuoy } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useChat } from "../useChat";
 
@@ -118,11 +118,19 @@ export default function Assistant({ audience = "collaborateur" }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {messages.map((m, i) => {
                   const isUser = m.role === "user";
+                  const escalade = !isUser && m.meta?.escalade;
+                  const bg = isUser ? "var(--gold)" : escalade ? "rgba(180,120,20,.12)" : (m.error ? "rgba(180,64,46,.10)" : "var(--field)");
+                  const border = isUser ? "none" : escalade ? "1px solid #9a6b12" : "1px solid var(--line)";
                   return (
                     <div key={i} style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
-                      <div style={{ maxWidth: "80%", background: isUser ? "var(--gold)" : (m.error ? "rgba(180,64,46,.10)" : "var(--field)"), color: isUser ? "var(--on-gold)" : (m.error ? "var(--danger)" : "var(--ink)"), border: isUser ? "none" : "1px solid var(--line)", borderRadius: 14, padding: "10px 14px", fontSize: 14, lineHeight: 1.5 }}>
+                      <div style={{ maxWidth: "80%", background: bg, color: isUser ? "var(--on-gold)" : (m.error ? "var(--danger)" : "var(--ink)"), border, borderRadius: 14, padding: "10px 14px", fontSize: 14, lineHeight: 1.5 }}>
+                        {escalade && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700, color: "#9a6b12", marginBottom: 6 }}>
+                            <LifeBuoy size={15} /> {t("esc.title")}
+                          </div>
+                        )}
                         <div dir={isRtl(m.content) ? "rtl" : "ltr"} style={{ whiteSpace: "pre-wrap", textAlign: isRtl(m.content) ? "right" : "left" }}>{m.content}</div>
-                        {!isUser && !m.error && <AssistantMeta meta={m.meta} model={m.model} degraded={m.degraded} />}
+                        {!isUser && !m.error && !escalade && <AssistantMeta meta={m.meta} model={m.model} degraded={m.degraded} />}
                       </div>
                     </div>
                   );

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, LogOut, ChevronDown } from "lucide-react";
+import { LogOut, ChevronDown } from "lucide-react";
 import { useSession } from "../app/providers/SessionProvider";
 import { useI18n } from "../app/providers/I18nProvider";
 import { ROLE_LABELS } from "../lib/constants";
 import GlobalSearchBar from "./layout/GlobalSearchBar";
+import NotificationBell from "./layout/NotificationBell";
 import LanguageToggle from "./LanguageToggle";
 import ThemeToggle from "./ThemeToggle";
 
@@ -25,9 +26,7 @@ export default function Header() {
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
         <LanguageToggle />
         <ThemeToggle />
-        <button aria-label="Notifications" style={{ width: 38, height: 38, borderRadius: 9, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Bell size={18} />
-        </button>
+        <NotificationBell />
 
         <div style={{ position: "relative" }}>
           <button onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 8px 0 6px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", fontFamily: "inherit" }}>

@@ -68,6 +68,15 @@ def create_absence(
         db, matricule=matricule, type_value=payload.type,
         start_date=payload.start_date, end_date=payload.end_date, reason=payload.reason,
     )
+    # Notification : prévenir le manager (ou, à défaut, diffusion RH).
+    try:
+        mgr_uid = repo.manager_utilisateur_id(db, matricule)
+        repo.create_alerte(
+            db, message=f"Nouvelle demande d'absence ({payload.type}) de {matricule}.",
+            categorie="absence", gravite="mid", id_destinataire=mgr_uid, matricule=matricule,
+        )
+    except Exception:
+        db.rollback()
     return envelope(ab.to_dict())
 
 

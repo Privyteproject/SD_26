@@ -23,7 +23,7 @@ from app.core.config import settings
 from app.db import repository as repo
 from app.db.base import get_db
 from app.schemas.common import envelope
-from app.services import redis_cache
+from app.services import redis_cache, risk_calculator
 
 router = APIRouter()
 
@@ -60,6 +60,15 @@ def dashboard_rh(_: CurrentUser = Depends(_RH_VIEW), db: Session = Depends(get_d
     data["risques"] = repo.risk_summary(db)            # distribution + top employés à risque
     data["indicateurs"] = repo.latest_indicateurs(db)  # turnover / absentéisme / engagement
     return envelope(data)
+
+
+@router.post("/risques/calculate")
+def calculate_risques(_: CurrentUser = Depends(_WELLBEING), db: Session = Depends(get_db)):
+    """Recalcule les scores de risque (burnout + turnover) à partir des données métier.
+    Réservé RH/Médecine/Direction/Admin."""
+    summary = risk_calculator.recompute(db)
+    redis_cache.delete("dashboard:kpis")  # les KPIs dépendent des risques
+    return envelope(summary)
 
 
 @router.get("/risques")

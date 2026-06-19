@@ -4,7 +4,10 @@ La route littérale /me est déclarée AVANT /{employee_id} : "me" n'est donc
 jamais capturé comme identifiant (et l'id est typé int).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import csv
+import io
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -89,6 +92,49 @@ def create_employee(
     )
     
     return envelope(emp.to_dict())
+
+
+@router.post("/import")
+def import_employees(
+    file: UploadFile = File(...), _: CurrentUser = Depends(_MANAGE), db: Session = Depends(get_db)
+):
+    """Import en masse d'employés via CSV (colonnes : email, prenom, nom, role?, status?,
+    poste?, department_id?, password?). Réservé RH/Admin. Chaque ligne est traitée en
+    transaction isolée : une erreur (ex. e-mail déjà pris) n'interrompt pas l'import."""
+    if not (file.filename or "").lower().endswith(".csv"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Fichier .csv attendu")
+    text = file.file.read().decode("utf-8-sig", errors="replace")
+    reader = csv.DictReader(io.StringIO(text))
+    created, errors = 0, []
+    for i, raw in enumerate(reader, start=2):  # ligne 1 = en-tête
+        row = {(k or "").strip().lower(): (v.strip() if isinstance(v, str) else v) for k, v in raw.items()}
+        email = row.get("email")
+        prenom = row.get("prenom") or row.get("prénom")
+        nom = row.get("nom")
+        if not email or not prenom or not nom:
+            errors.append({"line": i, "error": "email, prenom et nom sont requis"})
+            continue
+        data = {
+            "email": email, "prenom": prenom, "nom": nom,
+            "role": (row.get("role") or "COLLABORATEUR").upper(),
+            "status": (row.get("status") or "ACTIVE").upper(),
+            "poste": row.get("poste"),
+            "department_id": row.get("department_id") or row.get("departement"),
+        }
+        try:
+            repo.create_employee(db, data)  # crée Utilisateur + Employe (commit interne)
+        except Exception as exc:
+            db.rollback()
+            errors.append({"line": i, "error": str(exc)[:120]})
+            continue
+        try:  # propagation Keycloak best-effort
+            create_user_in_keycloak(email=email, first_name=prenom, last_name=nom,
+                                    role=data["role"], password=row.get("password"))
+        except Exception:
+            pass
+        created += 1
+    return envelope({"created": created, "errors": errors},
+                    meta={"created": created, "failed": len(errors)})
 
 
 @router.get("/{employee_id}")

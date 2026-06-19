@@ -208,6 +208,7 @@ class TacheParcours(Base):
     __tablename__ = "tache_parcours"
     id_tache: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     statut: Mapped[str] = mapped_column(String(20), default="todo", index=True)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False)  # tâche cochée/terminée
     date_echeance: Mapped[date | None] = mapped_column(Date, nullable=True)
     date_realisation: Mapped[date | None] = mapped_column(Date, nullable=True)
     code_tache: Mapped[str] = mapped_column(ForeignKey("modele_tache.code_tache"), index=True)
@@ -396,6 +397,7 @@ def _tache_to_dict(self: TacheParcours) -> dict:
         "type_parcours": m.type_parcours if m else None,
         "ordre": m.ordre if m else None,
         "status": self.statut,
+        "completed": bool(self.completed),
         "date_echeance": self.date_echeance.isoformat() if self.date_echeance else None,
         "date_realisation": self.date_realisation.isoformat() if self.date_realisation else None,
     }
