@@ -113,6 +113,10 @@ class Employe(Base):
     prenom: Mapped[str] = mapped_column(String(80))
     poste: Mapped[str | None] = mapped_column(String(120), nullable=True)
     date_embauche: Mapped[date | None] = mapped_column(Date, nullable=True)
+    date_naissance: Mapped[date | None] = mapped_column(Date, nullable=True)
+    site: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)  # Paris/Lyon/…/Remote
+    type_contrat: Mapped[str | None] = mapped_column(String(20), nullable=True)       # CDI/CDD/Alternance
+    genre: Mapped[str | None] = mapped_column(String(10), nullable=True)              # M/F/Autre
     statut: Mapped[str] = mapped_column(String(10), default="ACTIVE", index=True)
     id_departement: Mapped[int | None] = mapped_column(
         ForeignKey("departement.id_departement"), nullable=True, index=True
@@ -150,9 +154,31 @@ class DossierConfidentiel(Base):
 class HistoriqueSalaire(Base):
     __tablename__ = "historique_salaire"
     id_historique: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    montant: Mapped[float] = mapped_column(Numeric(12, 2))
-    date_effet: Mapped[date] = mapped_column(Date, index=True)
+    montant: Mapped[float] = mapped_column(Numeric(12, 2))            # = nouveau_salaire
+    date_effet: Mapped[date] = mapped_column(Date, index=True)        # = date_changement
+    motif: Mapped[str | None] = mapped_column(String(20), nullable=True)  # Embauche/Annuel/Promotion
     matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+
+
+class EnqueteEngagement(Base):
+    """Sondage d'engagement trimestriel (scores sur 10)."""
+    __tablename__ = "enquete_engagement"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+    date_enquete: Mapped[date] = mapped_column(Date, index=True)
+    satisfaction_globale: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    equilibre_pro_perso: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    charge_travail: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reconnaissance: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class EntretienAnnuel(Base):
+    """Entretien annuel d'évaluation (note de performance sur 5)."""
+    __tablename__ = "entretien_annuel"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+    date_entretien: Mapped[date] = mapped_column(Date, index=True)
+    note_performance_1_5: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 # ───────────────────────── Demandes RH ─────────────────────────

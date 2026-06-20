@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, Plus, Trash2, Pencil, Sparkles } from "lucide-react";
+import { Check, Plus, Trash2, Pencil, Sparkles, FileText } from "lucide-react";
 import { useI18n } from "../app/providers/I18nProvider";
 import Card from "./Card";
 import Badge from "./Badge";
@@ -7,7 +7,7 @@ import AsyncBoundary from "./AsyncBoundary";
 import { useAsync } from "../lib/useAsync";
 import {
   getEmployees, getParcours, initParcours, updateTacheStatus, generateParcours,
-  addParcoursTache, deleteParcoursTache,
+  addParcoursTache, deleteParcoursTache, generateTransferSummary,
   getParcoursModeles, createModele, updateModele, deleteModele,
 } from "../lib/api";
 
@@ -24,6 +24,13 @@ function TaskPanel({ matricule, type }) {
   const tasks = ((data && data.data) || []).slice().sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
   const [busy, setBusy] = useState(false);
   const [newTask, setNewTask] = useState("");
+  const [summary, setSummary] = useState("");
+
+  const genSummary = async () => {
+    setBusy(true); setSummary("");
+    try { const r = await generateTransferSummary(matricule); setSummary((r && r.data && r.data.summary) || ""); }
+    catch (e) { fail(t, e); } finally { setBusy(false); }
+  };
 
   const done = tasks.filter((x) => x.status === "done").length;
   const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
@@ -110,6 +117,20 @@ function TaskPanel({ matricule, type }) {
             <Plus size={16} /> {t("parc.add")}
           </button>
         </div>
+
+        {/* Synthèse de transfert — offboarding uniquement */}
+        {type === "OFFBOARDING" && (
+          <div style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+            <button onClick={genSummary} disabled={busy} style={{ ...goldBtn, background: "transparent", color: "var(--gold-deep)", border: "1px solid var(--line)", opacity: busy ? 0.6 : 1 }}>
+              <FileText size={16} /> {t("parc.transferSummary")}
+            </button>
+            {summary && (
+              <div style={{ marginTop: 12, background: "var(--field)", border: "1px solid var(--line)", borderRadius: 10, padding: 14, fontSize: 13.5, color: "var(--ink)", whiteSpace: "pre-wrap", maxHeight: 320, overflowY: "auto" }}>
+                {summary}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
     </AsyncBoundary>
   );

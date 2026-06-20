@@ -4,12 +4,22 @@ import { useI18n } from "../../../app/providers/I18nProvider";
 import { useSession } from "../../../app/providers/SessionProvider";
 import { can } from "../../../lib/rbac";
 import Card from "../../../components/Card";
-import { PAYROLL_TREND } from "../../../mock/mockData";
+import AsyncBoundary from "../../../components/AsyncBoundary";
+import { useAsync } from "../../../lib/useAsync";
+import { getDashboardAnalytics } from "../../../lib/api";
 
+// Masse salariale : somme du dernier salaire connu des actifs, ventilée par site (dynamique).
 export default function Payroll() {
   const { t } = useI18n();
   const { role } = useSession();
   const allowed = can(role, "payroll.view");
+
+  const { data, loading, error, reload } = useAsync(
+    async () => (allowed ? ((await getDashboardAnalytics()).data || {}) : {}),
+    [allowed]
+  );
+  const masse = data?.masse_salariale || {};
+  const bySite = (masse.by_site || []).map((s) => ({ m: s.site, v: Math.round((s.mensuel || 0) / 1000) }));
 
   return (
     <div>
@@ -22,17 +32,22 @@ export default function Payroll() {
         </Card>
       ) : (
         <Card>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>{t("an.payroll")} (M€)</div>
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={PAYROLL_TREND} margin={{ top: 6, right: 10, left: -18, bottom: 0 }}>
-                <XAxis dataKey="m" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} domain={[1.7, 2]} />
-                <Tooltip />
-                <Bar dataKey="v" fill="var(--gold)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{t("an.payroll")} — {t("an.monthlyBySite")} (k€)</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("an.totalMonthly")} : <b style={{ color: "var(--ink)" }}>{Math.round((masse.mensuelle || 0) / 1000).toLocaleString()} k€</b></div>
           </div>
+          <AsyncBoundary loading={loading} error={error} onRetry={reload} empty={!bySite.length} emptyLabel={t("common.empty")}>
+            <div style={{ height: 300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={bySite} margin={{ top: 6, right: 10, left: -10, bottom: 0 }}>
+                  <XAxis dataKey="m" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip />
+                  <Bar dataKey="v" fill="var(--gold)" radius={[4, 4, 0, 0]} name="k€/mois" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </AsyncBoundary>
         </Card>
       )}
     </div>

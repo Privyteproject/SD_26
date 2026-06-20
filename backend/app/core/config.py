@@ -73,6 +73,9 @@ class Settings:
     CACHE_ENABLED: bool = os.getenv("CACHE_ENABLED", "true").lower() == "true"
     DASHBOARD_CACHE_TTL: int = int(os.getenv("DASHBOARD_CACHE_TTL", "300"))  # 5 min
 
+    # --- Intégration SIRH externe (webhooks serveur-à-serveur) ---
+    SIRH_API_KEY: str = os.getenv("SIRH_API_KEY", "dev-sirh-key-change-me")
+
     # --- Audit ---
     # Journalisation automatique des mutations (INSERT/UPDATE/DELETE) dans journal_audit.
     AUDIT_ENABLED: bool = os.getenv("AUDIT_ENABLED", "true").lower() == "true"

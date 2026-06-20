@@ -139,6 +139,18 @@ class DocumentSubmitRequest(BaseModel):
     preview_token: str = Field(..., min_length=1)
 
 
+# --- Intégration SIRH externe ---
+class SirhSalaryUpdate(BaseModel):
+    matricule: str = Field(..., min_length=1)
+    nouveau_salaire: float
+    date: Optional[date] = None
+    motif: Optional[str] = "SIRH"
+
+
+class SirhSyncRequest(BaseModel):
+    updates: list[SirhSalaryUpdate] = Field(default_factory=list)
+
+
 # --- RAG / ingestion documentaire ---
 class RagChunk(BaseModel):
     title: str = Field(..., min_length=1)

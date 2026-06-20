@@ -88,6 +88,20 @@ def _needs_escalation(message: str) -> bool:
     return any(k in t for k in _ESCALADE_KEYWORDS)
 
 
+# Intention d'exfiltration de données -> « risque de fuite ».
+_EXFIL_KEYWORDS = [
+    "tous les salaires", "toutes les donnees", "liste des", "liste de tous", "exporte",
+    "export ", "base de donnees", "dump", "tous les employes", "fichier complet",
+    "extraire toutes", "telecharge la liste", "donne moi tous",
+]
+
+
+def _is_exfil(message: str) -> bool:
+    from app.services.text_utils import normalize
+    t = normalize(message)
+    return any(k in t for k in _EXFIL_KEYWORDS)
+
+
 class RateLimited(Exception):
     pass
 
@@ -133,9 +147,14 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
         meta.update({"perimetre": classifier.PERIMETRE_DANGEREUX, "blocked": "injection"})
         res = _refusal("Votre requête a été bloquée pour des raisons de sécurité.", meta)
         _audit(db, user, message, res)
-        try:  # alerte de sécurité diffusée aux RH/Admin
-            repo.create_alerte(db, message=f"Tentative d'injection bloquée ({user.email}).",
-                               categorie="securite", gravite="high", id_destinataire=None)
+        # Classification : tentative d'EXFILTRATION de données -> « risque de fuite ».
+        is_leak = _is_exfil(message)
+        try:
+            repo.create_alerte(
+                db, message=(f"Tentative de fuite de données bloquée ({user.email})." if is_leak
+                             else f"Tentative d'injection bloquée ({user.email})."),
+                categorie="fuite_donnees" if is_leak else "securite",
+                gravite="high", id_destinataire=None)
         except Exception:
             db.rollback()
         return res
@@ -173,6 +192,13 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
     # 5) Routage périmètre -> mode de génération
     P = classifier
     if cls["perimetre"] == P.PERIMETRE_DANGEREUX:
+        # Sujet dangereux : si intention d'exfiltration de données -> alerte « fuite ».
+        if _is_exfil(message):
+            try:
+                repo.create_alerte(db, message=f"Tentative d'accès/fuite de données bloquée ({user.email}).",
+                                   categorie="fuite_donnees", gravite="high", id_destinataire=None)
+            except Exception:
+                db.rollback()
         return generate(db, user, message, history, mode="refusal", meta=meta,
                         want_judge=want_judge, ck=ck,
                         refusal_text="Désolé, je ne peux pas traiter ce sujet (refus de sécurité).")
@@ -191,6 +217,17 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
     authorized = not (cls["type_rh"] in _RESTRICTED_TYPES and user.role not in _ELEVATED)
     meta["authorized"] = authorized
     if not authorized:
+        # Sécurité IA : tracer la tentative d'accès non autorisé + classer si répétée.
+        try:
+            emp = repo.find_employee_by_email(db, user.email)
+            mat = emp.matricule if emp else None
+            repete = repo.count_recent_refusals(db, mat) >= 2  # ce refus = au moins le 3e en 1h
+            repo.create_alerte(
+                db, message=f"Accès non autorisé via l'IA ({user.email}) — type « {cls['type_rh']} ».",
+                categorie="acces_refuse_repete" if repete else "acces_refuse",
+                gravite="high" if repete else "mid", id_destinataire=None, matricule=mat)
+        except Exception:
+            db.rollback()
         return generate(db, user, message, history, mode="refusal", meta=meta,
                         want_judge=want_judge, ck=ck,
                         refusal_text="Cette demande relève des RH. Je vous oriente vers votre "

@@ -118,7 +118,7 @@ def seed_if_empty(db: Session) -> None:
     ])
 
     # Scores de risque (désengagement / burnout) — IA
-    from app.db.models import IndicateurRH, ScoreRisque
+    from app.db.models import ScoreRisque
     db.add_all([
         ScoreRisque(matricule="EMP006", type="desengagement", valeur=0.82, niveau="high", date_calcul=date(2026, 6, 1)),
         ScoreRisque(matricule="EMP005", type="burnout", valeur=0.55, niveau="mid", date_calcul=date(2026, 6, 1)),
@@ -126,11 +126,6 @@ def seed_if_empty(db: Session) -> None:
         ScoreRisque(matricule="EMP008", type="desengagement", valeur=0.22, niveau="low", date_calcul=date(2026, 6, 1)),
     ])
 
-    # Indicateurs RH agrégés (turnover, absentéisme, engagement)
-    db.add_all([
-        IndicateurRH(type="turnover", valeur=8.2, periode="2026-Q2", date_calcul=date(2026, 6, 1)),
-        IndicateurRH(type="absenteisme", valeur=2.7, periode="2026-Q2", date_calcul=date(2026, 6, 1)),
-        IndicateurRH(type="engagement", valeur=84, periode="2026-Q2", date_calcul=date(2026, 6, 1)),
-        IndicateurRH(type="engagement", valeur=80, periode="2026-Q1", date_calcul=date(2026, 3, 1)),
-    ])
+    # NB : plus d'IndicateurRH écrits en dur — les KPIs (turnover/absentéisme/engagement)
+    # sont désormais calculés dynamiquement par services/kpi_service.py sur toute la base.
     db.commit()

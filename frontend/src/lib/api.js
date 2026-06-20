@@ -89,6 +89,9 @@ export const initParcours = (matricule, typeParcours) =>
 // Génère un parcours via l'IA (planning 30 j adapté au poste) puis l'enregistre.
 export const generateParcours = (matricule, typeParcours = "ONBOARDING") =>
   request(`/parcours/generate/${matricule}`, { method: "POST", params: { type: typeParcours } });
+// Synthèse de transfert (offboarding) générée par l'IA + stockée comme document.
+export const generateTransferSummary = (matricule) =>
+  request(`/parcours/${matricule}/transfer-summary`, { method: "POST" });
 export const updateTacheStatus = (id, status, dateRealisation) =>
   request(`/parcours/taches/${id}`, { method: "PATCH", body: { status, date_realisation: dateRealisation } });
 // Tâche personnalisée pour un employé + suppression d'une tâche
@@ -114,6 +117,10 @@ export const deleteChatSession = (id) => request(`/chat/sessions/${id}`, { metho
 
 // Journaux d'audit IA (supervision ADMIN) : { data: [...], meta: { count, total_tokens, sensibles } }
 export const getAiLogs = (params) => request("/ai/logs", { params });
+// Indicateurs de sécurité IA (refus 24h/7j, alertes par gravité, taux sensibles).
+export const getAiSecurityStats = () => request("/ai/security-stats");
+// Détail complet d'un échange (accès tracé/audité côté serveur).
+export const getAiLogDetail = (id) => request(`/ai/logs/${id}`);
 
 // ---- Recherche globale ----
 // { data: { results: [{type,id,title,subtitle,url,icon}], total, query } }
@@ -122,9 +129,42 @@ export const globalSearch = (q, limit = 10) => request("/search", { params: { q,
 // ---- Risques (recalcul algorithmique) ----
 export const calculateRisques = () => request("/dashboard/risques/calculate", { method: "POST" });
 
+// ---- Prédictions ML (Random Forest) ----
+export const trainRiskModels = () => request("/predict/train", { method: "POST" });
+export const getRiskPrediction = (matricule) => request(`/predict/risks/${matricule}`);
+// Scoring par lot de tous les employés actifs -> table ScoreRisque.
+export const batchScoreRisks = () => request("/predict/batch", { method: "POST" });
+// Plan d'action ciblé pour un employé (selon ses risques).
+export const getActionPlan = (matricule) => request(`/predict/action-plan/${matricule}`);
+// Projection / simulation de scénario (effectifs + masse salariale).
+export const getProjection = (params) => request("/dashboard/projection", { params });
+
+// ---- KPIs analytiques + rapport PDF ----
+export const getDashboardAnalytics = () => request("/dashboard/analytics");
+export async function downloadReport() {
+  const token = getAccessToken();
+  const res = await fetch(`${BASE}/rapports/generate`, {
+    method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new ApiError(res.status, "Génération du rapport impossible");
+  const blob = await res.blob();
+  const cd = res.headers.get("Content-Disposition") || "";
+  const m = /filename="?([^"]+)"?/.exec(cd);
+  const filename = m ? m[1] : "rapport_rh.pdf";
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // ---- Notifications (cloche) ----
 export const getNotifications = () => request("/notifications");
 export const markNotificationRead = (id) => request(`/notifications/${id}/read`, { method: "PATCH" });
+
+// ---- Worklist priorisée (alertes RH/sécurité) ----
+export const getPrioritizedAlertes = (params) => request("/alertes/prioritized", { params });
+export const resolveAlerte = (id) => request(`/alertes/${id}/resolve`, { method: "PATCH" });
 
 // ---- Journal d'audit (ADMIN) ----
 // Mutations tracées automatiquement : { data: [{ date, action, entite, actor, ip, changements }], meta: { total } }

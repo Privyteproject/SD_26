@@ -8,6 +8,7 @@ S'appuie sur modele_tache (gabarits) et tache_parcours (instances).
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -22,6 +23,7 @@ from app.core.security import (
 from app.db import repository as repo
 from app.db.base import get_db
 from app.schemas.common import envelope
+from app.services import ai as ai_service
 from app.services import onboarding_agent
 from app.schemas.hr import (
     ModeleTacheCreate,
@@ -111,6 +113,44 @@ def generate_parcours(
         created.append(t)
     return envelope([t.to_dict() for t in created],
                     meta={"total": len(created), "generated_by": "ai", "type": type_parcours})
+
+
+@router.post("/{matricule}/transfer-summary", status_code=status.HTTP_201_CREATED)
+def transfer_summary(
+    matricule: str, _: CurrentUser = Depends(_MANAGE), db: Session = Depends(get_db),
+):
+    """Synthèse de transfert (offboarding) générée par l'IA à partir des tâches de
+    départ et des sujets récents du collaborateur. Stockée comme document dédié."""
+    emp = repo.get_employee(db, matricule)
+    if emp is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
+
+    taches = repo.list_taches(db, matricule, "OFFBOARDING")
+    taches_txt = ", ".join((t.modele.libelle if t.modele else t.code_tache) for t in taches) or "(aucune)"
+    prompts = []
+    if emp.id_utilisateur:
+        from app.db.models import InteractionIA
+        prompts = list(db.scalars(
+            select(InteractionIA.prompt).where(InteractionIA.id_utilisateur == emp.id_utilisateur)
+            .order_by(InteractionIA.date_creation.desc()).limit(15)))
+    sujets = "; ".join(p[:80] for p in prompts) or "(aucun)"
+
+    system = (
+        "Tu es un assistant RH. Rédige une SYNTHÈSE DE TRANSFERT claire et structurée pour "
+        "le départ d'un collaborateur, afin de préserver les connaissances. Sections : "
+        "1) Projets en cours, 2) Outils/compétences maîtrisés, 3) Contacts clés, "
+        "4) Procédures à transmettre, 5) Points d'attention. Sois concret et concis."
+    )
+    contexte = (f"Poste : {emp.poste or '—'}. Tâches d'offboarding : {taches_txt}. "
+                f"Sujets récents abordés par le collaborateur : {sujets}.")
+    out = ai_service.complete(system, contexte, [])
+    text = (out.get("reply") or "").strip() or "Synthèse non disponible (IA indisponible)."
+
+    doc = repo.create_submitted_document(
+        db, matricule=matricule, document_name=f"synthese_transfert_{matricule}.txt",
+        contenu=text, type_doc="synthese_transfert")
+    repo.set_document_status(db, doc.id_document, "validated")  # doc interne consultable
+    return envelope({"document_id": doc.id_document, "summary": text})
 
 
 @router.post("/{matricule}/init", status_code=status.HTTP_201_CREATED)

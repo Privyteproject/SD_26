@@ -465,10 +465,60 @@ _ALERT_BROADCAST_ROLES = {"ADMIN", "RH", "DIRECTION"}
 def _alerte_to_dict(a) -> dict:
     return {
         "id": a.id_alerte, "message": a.message, "categorie": a.categorie,
-        "gravite": a.gravite, "lue": bool(a.lue),
+        "gravite": a.gravite, "lue": bool(a.lue), "resolue": bool(a.resolue),
         "date_creation": a.date_creation.isoformat() if a.date_creation else None,
         "matricule": a.matricule, "id_destinataire": a.id_destinataire,
     }
+
+
+def count_recent_refusals(db, matricule, hours: int = 1) -> int:
+    """Nombre de refus d'accès récents (<= hours) pour un matricule (anti-abus)."""
+    from datetime import datetime, timedelta, timezone
+    from app.db.models import Alerte
+    if not matricule:
+        return 0
+    rows = db.scalars(
+        select(Alerte.date_creation).where(
+            Alerte.matricule == matricule,
+            Alerte.categorie.in_(["acces_refuse", "acces_refuse_repete"]),
+        ).order_by(Alerte.date_creation.desc()).limit(20)
+    ).all()
+    now = datetime.now(timezone.utc)
+    cnt = 0
+    for d in rows:
+        if not d:
+            continue
+        dd = d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+        if now - dd <= timedelta(hours=hours):
+            cnt += 1
+    return cnt
+
+
+_GRAVITE_RANK = {"high": 0, "mid": 1, "low": 2}
+
+
+def list_alertes_prioritized(db, *, include_resolved=False, limit=100):
+    """Worklist : alertes triées par criticité (high d'abord) puis date (récent d'abord)."""
+    from app.db.models import Alerte
+    stmt = select(Alerte)
+    if not include_resolved:
+        stmt = stmt.where(Alerte.resolue.is_(False))
+    rows = list(db.scalars(stmt.limit(500)))
+    rows.sort(key=lambda a: (_GRAVITE_RANK.get(a.gravite, 3),
+                             -(a.date_creation.timestamp() if a.date_creation else 0)))
+    return [_alerte_to_dict(a) for a in rows[:limit]]
+
+
+def resolve_alerte(db, id_alerte) -> bool:
+    from datetime import date as _date
+    from app.db.models import Alerte
+    a = db.get(Alerte, id_alerte)
+    if a is None:
+        return False
+    a.resolue = True
+    a.date_resolution = _date.today()
+    db.commit()
+    return True
 
 
 def create_alerte(db, *, message, categorie="info", gravite="mid", id_destinataire=None, matricule=None):
@@ -534,7 +584,11 @@ def log_audit(db, *, action, type_entite, id_entite, user_email=None):
 
 
 def list_ia_interactions(db, *, limit: int = 100) -> list[dict]:
-    """Journaux des échanges IA (supervision) : prompt, statut, tokens, utilisateur."""
+    """Journaux des échanges IA (supervision) — MÉTADONNÉES uniquement.
+
+    Conformité : le contenu (prompt/réponse) n'est PAS exposé ici. On renvoie une
+    longueur indicative (`prompt_len`) ; le détail est accessible via un endpoint
+    dédié et tracé. Les e-mails sont pseudonymisés (partiellement masqués)."""
     from app.db.models import InteractionIA
     rows = db.execute(
         select(InteractionIA, Utilisateur)
@@ -547,16 +601,41 @@ def list_ia_interactions(db, *, limit: int = 100) -> list[dict]:
         out.append({
             "id": it.id_interaction,
             "date": it.date_creation.isoformat() if it.date_creation else None,
-            "email": u.email if u else None,
+            "user": _mask_email(u.email) if u else None,
             "role": u.code_role if u else None,
-            "prompt": it.prompt,
-            "reponse": it.reponse,
+            "prompt_len": len(it.prompt or ""),
             "statut": it.statut,
             "sensible": it.sensible,
             "tokens": it.tokens_used,
             "model": it.model_name,
         })
     return out
+
+
+def _mask_email(email: str | None) -> str | None:
+    """j***@domaine.com — pseudonymisation pour la supervision."""
+    if not email or "@" not in email:
+        return email
+    local, dom = email.split("@", 1)
+    return f"{local[0]}***@{dom}"
+
+
+def ia_interaction_detail(db, id_interaction, *, viewer_email=None) -> dict | None:
+    """Contenu complet d'un échange IA — accès réservé et TRACÉ (audit)."""
+    from app.db.models import InteractionIA, Utilisateur
+    it = db.get(InteractionIA, id_interaction)
+    if it is None:
+        return None
+    u = db.get(Utilisateur, it.id_utilisateur) if it.id_utilisateur else None
+    log_audit(db, action="IA_LOG_VIEW", type_entite="interaction_ia",
+              id_entite=id_interaction, user_email=viewer_email)
+    return {
+        "id": it.id_interaction,
+        "date": it.date_creation.isoformat() if it.date_creation else None,
+        "user": u.email if u else None, "role": u.code_role if u else None,
+        "prompt": it.prompt, "reponse": it.reponse,
+        "sensible": it.sensible, "tokens": it.tokens_used, "model": it.model_name,
+    }
 
 
 def ia_interactions_stats(db) -> dict:
@@ -568,6 +647,41 @@ def ia_interactions_stats(db) -> dict:
         select(func.count(InteractionIA.id_interaction)).where(InteractionIA.sensible.is_(True))
     ) or 0
     return {"count": int(total), "total_tokens": int(tokens), "sensibles": int(sensibles)}
+
+
+def security_stats(db) -> dict:
+    """Indicateurs de sécurité IA : refus 24h/7j, alertes par gravité, taux sensibles."""
+    from datetime import datetime, timedelta, timezone
+    from app.db.models import Alerte, InteractionIA
+
+    now = datetime.now(timezone.utc)
+
+    def _within(d, hours):
+        if not d:
+            return False
+        dd = d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+        return now - dd <= timedelta(hours=hours)
+
+    refus_cats = {"acces_refuse", "acces_refuse_repete"}
+    alertes = list(db.scalars(select(Alerte).order_by(Alerte.date_creation.desc()).limit(2000)))
+    refus_24h = sum(1 for a in alertes if a.categorie in refus_cats and _within(a.date_creation, 24))
+    refus_7j = sum(1 for a in alertes if a.categorie in refus_cats and _within(a.date_creation, 24 * 7))
+    by_gravite = {g: sum(1 for a in alertes if a.gravite == g) for g in ("high", "mid", "low")}
+    injections = sum(1 for a in alertes if a.categorie == "securite")
+    escalades = sum(1 for a in alertes if a.categorie == "escalade")
+    non_resolues = sum(1 for a in alertes if not a.resolue)
+
+    total = db.scalar(select(func.count(InteractionIA.id_interaction))) or 0
+    sensibles = db.scalar(
+        select(func.count(InteractionIA.id_interaction)).where(InteractionIA.sensible.is_(True))) or 0
+    taux_sensibles = round(100.0 * sensibles / total, 1) if total else 0.0
+
+    return {
+        "refus_24h": refus_24h, "refus_7j": refus_7j,
+        "alertes_total": len(alertes), "alertes_non_resolues": non_resolues,
+        "par_gravite": by_gravite, "injections": injections, "escalades": escalades,
+        "interactions": int(total), "sensibles": int(sensibles), "taux_sensibles": taux_sensibles,
+    }
 
 
 # ───────────── Journal d'audit ─────────────
@@ -1087,6 +1201,54 @@ def search_procedures(db, q, *, limit=8):
         ).limit(limit)
     ))
     return [{"id": m.code_tache, "title": m.libelle, "subtitle": m.type_parcours} for m in rows]
+
+
+# ───────────── KPIs analytiques (pyramide âges / masse salariale / sites) ─────────────
+def age_pyramid(db) -> list[dict]:
+    from app.db.models import Employe
+    buckets = ["20-25", "26-30", "31-35", "36-40", "41-45", "46-50", "51-55", "56-60", "60+"]
+    counts = {b: 0 for b in buckets}
+    today = date.today()
+    for dn in db.scalars(select(Employe.date_naissance)):
+        if not dn:
+            continue
+        age = (today - dn).days // 365
+        if age < 26:
+            b = "20-25"
+        elif age >= 60:
+            b = "60+"
+        else:
+            lo = ((age - 1) // 5) * 5 + 1
+            b = f"{lo}-{lo + 4}"
+        counts[b] = counts.get(b, 0) + 1
+    return [{"tranche": b, "count": counts[b]} for b in buckets]
+
+
+def headcount_by_site(db, *, dept=None) -> list[dict]:
+    from app.db.models import Employe
+    stmt = select(Employe.site, func.count()).group_by(Employe.site)
+    if dept is not None:
+        stmt = stmt.where(Employe.id_departement == dept)
+    rows = db.execute(stmt).all()
+    return [{"site": s or "—", "count": int(c)} for s, c in rows]
+
+
+def salary_mass(db) -> dict:
+    """Masse salariale = somme du DERNIER salaire connu par employé (table historique_salaire)."""
+    from app.db.models import Employe, HistoriqueSalaire
+    latest: dict[str, tuple] = {}
+    for m, d, mt in db.execute(select(HistoriqueSalaire.matricule, HistoriqueSalaire.date_effet,
+                                      HistoriqueSalaire.montant)).all():
+        if m not in latest or (d and d > latest[m][0]):
+            latest[m] = (d, float(mt or 0))
+    emp_site = dict(db.execute(select(Employe.matricule, Employe.site)).all())
+    by_site: dict[str, float] = {}
+    for m, (_, mt) in latest.items():
+        s = emp_site.get(m) or "—"
+        by_site[s] = by_site.get(s, 0.0) + mt
+    total = sum(v[1] for v in latest.values())
+    return {"total": round(total, 2),
+            "by_site": [{"site": s, "montant": round(v, 2)} for s, v in sorted(by_site.items())]}
 
 
 # ───────────── Scores de risque & indicateurs RH ─────────────

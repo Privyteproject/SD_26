@@ -62,6 +62,14 @@ DOCUMENT_TYPES = {
         "roles_allowed": ["manager", "rh", "admin"],
         "requires_rh_validation": True,
     },
+    "synthese_transfert": {
+        "label": "Synthèse de transfert (offboarding)",
+        "description": "Capitalisation des connaissances avant départ (projets, outils, contacts)",
+        "required_fields": [],
+        "optional_fields": [],
+        "roles_allowed": ["manager", "rh", "admin"],
+        "requires_rh_validation": False,
+    },
 }
 
 # Rôle applicatif (UPPER) -> rôle du registre. DIRECTION assimilé à RH ; MEDECINE restreint.
