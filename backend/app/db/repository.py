@@ -533,6 +533,66 @@ def create_alerte(db, *, message, categorie="info", gravite="mid", id_destinatai
     return a
 
 
+def create_feedback(db, *, matricule, note_1_5=None, categorie=None, commentaire=None,
+                    auteur=None, date_feedback=None):
+    """Enregistre un feedback interne sur un collaborateur (signal pour le ML désengagement)."""
+    from app.db.models import Feedback
+    f = Feedback(matricule=matricule, note_1_5=note_1_5, categorie=categorie,
+                 commentaire=commentaire, auteur=auteur, date_feedback=date_feedback or date.today())
+    db.add(f)
+    db.commit()
+    db.refresh(f)
+    return f
+
+
+def list_feedbacks(db, matricule=None, limit=200):
+    from app.db.models import Feedback
+    stmt = select(Feedback).order_by(Feedback.date_feedback.desc())
+    if matricule:
+        stmt = stmt.where(Feedback.matricule == matricule)
+    return list(db.scalars(stmt.limit(limit)))
+
+
+def check_overdue_onboarding(db) -> dict:
+    """Crée une alerte par tâche d'onboarding EN RETARD (échéance dépassée, non terminée).
+    Idempotent : ne re-signale pas une tâche déjà alertée non résolue (catégorie
+    'parcours_retard', id de tâche encodé dans le message)."""
+    from app.db.models import Alerte, Employe, ModeleTache, TacheParcours
+    today = date.today()
+    rows = list(db.execute(
+        select(TacheParcours, ModeleTache.libelle, Employe.prenom, Employe.nom)
+        .join(ModeleTache, TacheParcours.code_tache == ModeleTache.code_tache)
+        .join(Employe, TacheParcours.matricule == Employe.matricule)
+        .where(ModeleTache.type_parcours == "ONBOARDING",
+               TacheParcours.completed.is_(False),
+               TacheParcours.date_echeance.is_not(None),
+               TacheParcours.date_echeance < today)
+    ).all())
+
+    # Tâches déjà signalées (alerte ouverte) -> éviter les doublons.
+    already = set()
+    for (msg,) in db.execute(
+        select(Alerte.message).where(Alerte.categorie == "parcours_retard",
+                                     Alerte.resolue.is_(False))).all():
+        if msg and "#tache=" in msg:
+            already.add(msg.split("#tache=")[-1].strip())
+
+    created = 0
+    for tache, libelle, prenom, nom in rows:
+        tag = str(tache.id_tache)
+        if tag in already:
+            continue
+        retard = (today - tache.date_echeance).days
+        db.add(Alerte(
+            categorie="parcours_retard", gravite="high" if retard > 7 else "mid",
+            message=(f"Onboarding en retard : « {libelle} » pour {prenom} {nom} "
+                     f"({tache.matricule}) — échéance dépassée de {retard} j. #tache={tag}"),
+            confidentielle=False, lue=False, resolue=False, matricule=tache.matricule))
+        created += 1
+    db.commit()
+    return {"overdue": len(rows), "alertes_creees": created}
+
+
 def manager_utilisateur_id(db, matricule) -> int | None:
     """id_utilisateur du manager d'un employé (pour lui adresser une notification)."""
     from app.db.models import Employe

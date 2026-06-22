@@ -70,6 +70,22 @@ DOCUMENT_TYPES = {
         "roles_allowed": ["manager", "rh", "admin"],
         "requires_rh_validation": False,
     },
+    "synthese_onboarding": {
+        "label": "Synthèse d'intégration (onboarding)",
+        "description": "Feuille de route métier + manuels internes pour un nouvel arrivant",
+        "required_fields": [],
+        "optional_fields": [],
+        "roles_allowed": ["rh", "admin"],
+        "requires_rh_validation": False,
+    },
+    "formulaire_sortie": {
+        "label": "Formulaire de sortie (offboarding)",
+        "description": "Formulaire de départ personnalisé selon le poste, l'ancienneté et le contexte",
+        "required_fields": ["date_depart", "motif_depart"],
+        "optional_fields": ["dernier_jour", "remplacant", "commentaire"],
+        "roles_allowed": ["manager", "rh", "admin"],
+        "requires_rh_validation": True,
+    },
 }
 
 # Rôle applicatif (UPPER) -> rôle du registre. DIRECTION assimilé à RH ; MEDECINE restreint.

@@ -86,13 +86,16 @@ def dashboard_projection(
     turnover_pct: float | None = Query(None),
     hiring_per_month: int = Query(0, ge=0),
     raise_pct: float = Query(0.0),
+    absenteisme_pct: float | None = Query(None),
+    mobilite_pct: float | None = Query(None),
     user: CurrentUser = Depends(_RH_VIEW), db: Session = Depends(get_db),
 ):
-    """Projection (et simulation de scénario) des effectifs et de la masse salariale."""
+    """Projection / simulation « what-if » des effectifs, masse salariale, absentéisme
+    (jours perdus + coût) et mobilité interne (mouvements attendus)."""
     dept = _dept_for(user, db)
     return envelope(kpi_service.projection(
         db, months=months, turnover_pct=turnover_pct, hiring_per_month=hiring_per_month,
-        raise_pct=raise_pct, dept=dept))
+        raise_pct=raise_pct, absenteisme_pct=absenteisme_pct, mobilite_pct=mobilite_pct, dept=dept))
 
 
 @router.get("/analytics")

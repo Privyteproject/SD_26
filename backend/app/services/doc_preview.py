@@ -25,6 +25,21 @@ def _format_date(value):
     return str(value) if value is not None else ""
 
 
+def _anciennete_annees(value):
+    """Ancienneté en années (entier) depuis une date d'entrée. 0 si inconnue/non datée."""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value).date()
+        except ValueError:
+            return 0
+    if isinstance(value, datetime):
+        value = value.date()
+    if not isinstance(value, date):
+        return 0
+    today = date.today()
+    return max(0, today.year - value.year - ((today.month, today.day) < (value.month, value.day)))
+
+
 def _env():
     global _ENV
     if _ENV is not None:
@@ -38,6 +53,7 @@ def _env():
         autoescape=select_autoescape(["html", "j2"]),
     )
     _ENV.filters["format_date"] = _format_date
+    _ENV.filters["anciennete_annees"] = _anciennete_annees
     return _ENV
 
 

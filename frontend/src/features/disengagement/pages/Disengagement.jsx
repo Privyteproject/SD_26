@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, ChevronLeft, ChevronRight, Lightbulb, X } from "lucide-react";
+import { Activity, ChevronLeft, ChevronRight, Lightbulb, X, TrendingUp, Send } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useSession } from "../../../app/providers/SessionProvider";
 import { ROLES } from "../../../lib/constants";
@@ -7,7 +7,7 @@ import Card from "../../../components/Card";
 import Badge from "../../../components/Badge";
 import AsyncBoundary from "../../../components/AsyncBoundary";
 import { useAsync } from "../../../lib/useAsync";
-import { getDashboardRisques, getEmployees, getActionPlan } from "../../../lib/api";
+import { getDashboardRisques, getEmployees, getActionPlan, createFeedback } from "../../../lib/api";
 
 const tone = { high: "danger", mid: "warning", low: "success" };
 const key = { high: "dis.high", mid: "dis.mid", low: "dis.low" };
@@ -28,9 +28,31 @@ export default function Disengagement() {
   const PAGE_SIZE = 20;
   const [plan, setPlan] = useState(null);
   const [planFor, setPlanFor] = useState("");
+  const [fb, setFb] = useState({ note: "3", comment: "" });
+  const [fbBusy, setFbBusy] = useState(false);
+  const [fbMsg, setFbMsg] = useState("");
   const openPlan = async (mat) => {
-    setPlanFor(mat); setPlan(null);
+    setPlanFor(mat); setPlan(null); setFb({ note: "3", comment: "" }); setFbMsg("");
     try { const r = await getActionPlan(mat); setPlan((r && r.data) || null); } catch (e) { setPlan({ actions: [] }); }
+  };
+  const sendFeedback = async () => {
+    setFbBusy(true); setFbMsg("");
+    try {
+      await createFeedback({ employee_id: planFor, note_1_5: Number(fb.note),
+                             categorie: "desengagement", commentaire: fb.comment || null });
+      setFb({ note: "3", comment: "" }); setFbMsg(t("dis.feedbackSent"));
+    } catch (e) { setFbMsg((e && (e.payload?.detail || e.message)) || t("common.error")); }
+    finally { setFbBusy(false); }
+  };
+  // Agrège les facteurs explicatifs renvoyés par le plan d'action (par type de risque).
+  const planFactors = () => {
+    const risks = (plan && plan.risks) || {};
+    const out = [];
+    for (const k of ["turnover", "absent"]) {
+      for (const f of ((risks[k] && risks[k].facteurs) || [])) out.push(f);
+    }
+    const seen = new Set();
+    return out.filter((f) => (seen.has(f.label) ? false : seen.add(f.label)));
   };
 
   const nameById = {}, deptById = {};
@@ -106,9 +128,49 @@ export default function Disengagement() {
             {!plan ? (
               <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("common.loading")}</div>
             ) : (
-              <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 8 }}>
-                {(plan.actions || []).map((a, i) => <li key={i} style={{ fontSize: 14, color: "var(--ink)", lineHeight: 1.5 }}>{a}</li>)}
-              </ul>
+              <>
+                {/* Facteurs explicatifs (explicabilité §4.1) */}
+                {planFactors().length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 7 }}>
+                      <TrendingUp size={15} color="var(--gold-deep)" /> {t("dis.whyRisk")}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      {planFactors().map((f, i) => (
+                        <div key={i} style={{ fontSize: 13, color: "var(--ink)", display: "flex", justifyContent: "space-between", gap: 10 }}>
+                          <span>{f.label}</span>
+                          <span style={{ color: "var(--muted)" }}>{f.valeur} <span style={{ opacity: 0.7 }}>(moy. {f.moyenne})</span> · {f.sens}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {(plan.actions || []).map((a, i) => <li key={i} style={{ fontSize: 14, color: "var(--ink)", lineHeight: 1.5 }}>{a}</li>)}
+                </ul>
+
+                {/* Feedback interne (alimente le ML désengagement) */}
+                <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>{t("dis.feedbackTitle")}</div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
+                    <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("dis.feedbackNote")}</label>
+                    <select value={fb.note} onChange={(e) => setFb({ ...fb, note: e.target.value })}
+                      style={{ height: 36, borderRadius: 8, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 10px", fontFamily: "inherit" }}>
+                      {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <textarea value={fb.comment} onChange={(e) => setFb({ ...fb, comment: e.target.value })}
+                    placeholder={t("dis.feedbackComment")} rows={2}
+                    style={{ width: "100%", borderRadius: 8, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: 10, fontFamily: "inherit", fontSize: 13.5, resize: "vertical", boxSizing: "border-box" }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                    <button onClick={sendFeedback} disabled={fbBusy} style={{ height: 38, padding: "0 14px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13.5, cursor: fbBusy ? "wait" : "pointer", opacity: fbBusy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "inherit" }}>
+                      <Send size={15} /> {t("dis.feedbackSend")}
+                    </button>
+                    {fbMsg && <span style={{ fontSize: 12.5, color: "var(--gold-deep)" }}>{fbMsg}</span>}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>

@@ -20,7 +20,12 @@ async def lifespan(app: FastAPI):
     init_db()  # create_all + seed si vide
     # Branché APRÈS le seed pour ne pas auditer les données de démo initiales.
     register_audit_listeners()
-    yield
+    from app.services import scheduler
+    scheduler.start()  # jobs périodiques : onboarding en retard + scoring ML
+    try:
+        yield
+    finally:
+        scheduler.shutdown()
 
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION, lifespan=lifespan)

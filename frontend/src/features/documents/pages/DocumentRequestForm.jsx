@@ -19,6 +19,8 @@ const LABELS = {
   date_entretien: "Date de l'entretien", evaluateur_nom: "Évaluateur", periode_evaluee: "Période évaluée",
   points_forts: "Points forts", axes_amelioration: "Axes d'amélioration",
   objectifs_annee_suivante: "Objectifs année suivante",
+  date_depart: "Date de départ", motif_depart: "Motif du départ",
+  dernier_jour: "Dernier jour travaillé", remplacant: "Remplaçant·e prévu·e",
 };
 const labelOf = (k) => LABELS[k] || k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 const inputType = (k) => k.includes("date") ? "date" : k.startsWith("include_") ? "boolean" : k === "montant" ? "number" : (TEXTAREA.has(k) ? "textarea" : "text");

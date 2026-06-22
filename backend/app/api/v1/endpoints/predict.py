@@ -37,6 +37,24 @@ def batch_score(_: CurrentUser = Depends(_RH), db: Session = Depends(get_db)):
                             detail="scikit-learn non installé sur le serveur")
 
 
+@router.get("/scheduler-status")
+def scheduler_status(_: CurrentUser = Depends(_RH)):
+    """État de l'ordonnanceur (jobs périodiques : onboarding en retard + scoring ML)."""
+    from app.services import scheduler
+    return envelope(scheduler.status())
+
+
+@router.get("/fairness")
+def fairness(_: CurrentUser = Depends(_RH), db: Session = Depends(get_db)):
+    """Contrôle d'équité (§4.1) : taux de prédiction « à risque » par groupe protégé
+    (genre, âge, site, contrat) + disparate impact ratio (règle des 4/5)."""
+    try:
+        return envelope(ml_predictions.fairness_audit(db))
+    except ModuleNotFoundError:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="scikit-learn non installé sur le serveur")
+
+
 @router.get("/action-plan/{matricule}")
 def action_plan(matricule: str, _: CurrentUser = Depends(_RH), db: Session = Depends(get_db)):
     """Plan d'action ciblé selon les risques prédits pour un employé."""

@@ -22,11 +22,31 @@ TODAY = date(2026, 6, 1)
 SITE_MAP = {"Paris": 0, "Lyon": 1, "Bordeaux": 2, "Remote": 3}
 CONTRAT_MAP = {"CDI": 0, "CDD": 1, "Alternance": 2}
 
+# Éthique / §4.1 : on EXCLUT volontairement les attributs personnels ou potentiellement
+# discriminatoires (âge, genre, site, type de contrat) des variables prédictives. Seuls
+# des signaux LIÉS AU TRAVAIL sont utilisés (engagement, charge, performance, ancienneté,
+# absentéisme, feedbacks). Ces attributs restent calculés UNIQUEMENT pour l'audit d'équité
+# a posteriori (fairness_audit), jamais en entrée du modèle.
+_PROTECTED = ["age", "genre", "site", "contrat"]
+
 # Features utilisées par chaque modèle (ordre = ordre des colonnes du vecteur).
 F_TURNOVER = ["delai_augm_mois", "evol_satisfaction", "nb_maladie_12m", "note_perf",
-              "age", "anciennete_mois", "site", "contrat", "charge", "equilibre", "recon"]
-F_ABSENT = ["charge", "equilibre", "age", "site", "contrat", "recon", "note_perf", "anciennete_mois"]
+              "anciennete_mois", "charge", "equilibre", "recon", "feedback_moyen"]
+F_ABSENT = ["charge", "equilibre", "recon", "note_perf", "anciennete_mois", "feedback_moyen"]
 F_MOBILITE = ["anciennete_mois", "note_perf", "recon"]
+
+# Libellés lisibles + sens « métier » du facteur (pour l'explicabilité par prédiction).
+FEATURE_LABELS = {
+    "delai_augm_mois": "Délai depuis la dernière augmentation",
+    "evol_satisfaction": "Évolution de la satisfaction",
+    "nb_maladie_12m": "Arrêts maladie (12 mois)",
+    "note_perf": "Note de performance",
+    "anciennete_mois": "Ancienneté",
+    "charge": "Charge de travail perçue",
+    "equilibre": "Équilibre pro/perso",
+    "recon": "Reconnaissance perçue",
+    "feedback_moyen": "Feedbacks internes (moyenne)",
+}
 
 
 def _months(d1: date, d2: date) -> int:
@@ -35,10 +55,15 @@ def _months(d1: date, d2: date) -> int:
 
 def _build_dataset(db) -> list[dict]:
     """Construit une ligne de features + cibles par employé (agrégation en mémoire)."""
-    from app.db.models import Demande, Employe, EnqueteEngagement, EntretienAnnuel, HistoriqueSalaire
+    from app.db.models import (Demande, Employe, EnqueteEngagement, EntretienAnnuel,
+                               Feedback, HistoriqueSalaire)
 
     employees = list(db.scalars(select(Employe)))
-    enquetes, entretiens, salaires, maladies = {}, {}, {}, {}
+    enquetes, entretiens, salaires, maladies, feedbacks = {}, {}, {}, {}, {}
+    for m, dt, note in db.execute(select(
+            Feedback.matricule, Feedback.date_feedback, Feedback.note_1_5)).all():
+        if note is not None:
+            feedbacks.setdefault(m, []).append((dt, note))
     for m, dt, sat, ch, eq, rec in db.execute(select(
             EnqueteEngagement.matricule, EnqueteEngagement.date_enquete,
             EnqueteEngagement.satisfaction_globale, EnqueteEngagement.charge_travail,
@@ -59,11 +84,12 @@ def _build_dataset(db) -> list[dict]:
     for e in employees:
         mat = e.matricule
         rows.append(_features_for(e, enquetes.get(mat, []), entretiens.get(mat, []),
-                                  salaires.get(mat, []), maladies.get(mat, [])))
+                                  salaires.get(mat, []), maladies.get(mat, []),
+                                  feedbacks.get(mat, [])))
     return rows
 
 
-def _features_for(e, enq, entr, sal, mal) -> dict:
+def _features_for(e, enq, entr, sal, mal, fbk=None) -> dict:
     age = _months(TODAY, e.date_naissance) // 12 if e.date_naissance else 40
     anciennete = _months(TODAY, e.date_embauche) if e.date_embauche else 0
 
@@ -88,8 +114,15 @@ def _features_for(e, enq, entr, sal, mal) -> dict:
 
     nb_maladie_12m = sum(1 for d0, _ in mal if d0 and _months(TODAY, d0) <= 12)
 
+    # Feedbacks internes récents (≤ 12 mois) : note moyenne sur 5 ; neutre (3) si aucun.
+    fbk = fbk or []
+    recent_fbk = [n for d, n in fbk if d and _months(TODAY, d) <= 12]
+    feedback_moyen = (sum(recent_fbk) / len(recent_fbk)) if recent_fbk else 3.0
+
     return {
         "matricule": e.matricule,
+        # Attributs protégés — AUDIT D'ÉQUITÉ UNIQUEMENT, jamais en entrée du modèle.
+        "genre": e.genre or "Autre",
         "delai_augm_mois": float(delai_augm),
         "evol_satisfaction": float(evol),
         "nb_maladie_12m": float(nb_maladie_12m),
@@ -101,6 +134,7 @@ def _features_for(e, enq, entr, sal, mal) -> dict:
         "charge": float(charge),
         "equilibre": float(equilibre),
         "recon": float(recon),
+        "feedback_moyen": float(feedback_moyen),
         # Cibles
         "y_turnover": 1 if e.statut == "LEAVING" else 0,
         "y_absent": 1 if nb_maladie_12m >= 3 else 0,
@@ -149,7 +183,22 @@ def train(db) -> dict:
         cm = confusion_matrix(yte, y_pred, labels=[0, 1]).tolist()  # [[TN, FP], [FN, TP]]
         importances = dict(sorted(zip(feats, (round(float(i), 3) for i in clf.feature_importances_)),
                                   key=lambda x: x[1], reverse=True))
-        bundle[name] = {"model": clf, "feats": feats}
+        # Statistiques par feature pour l'explicabilité individuelle :
+        # moyenne de cohorte + sens de corrélation (signe) avec la cible.
+        import numpy as np
+        Xa, ya = np.array(X, dtype=float), np.array(y, dtype=float)
+        means, corr_sign = {}, {}
+        for j, f in enumerate(feats):
+            col = Xa[:, j]
+            means[f] = round(float(col.mean()), 3)
+            sd = col.std()
+            if sd > 1e-9 and ya.std() > 1e-9:
+                c = float(np.corrcoef(col, ya)[0, 1])
+                corr_sign[f] = 1 if c > 0.02 else -1 if c < -0.02 else 0
+            else:
+                corr_sign[f] = 0
+        bundle[name] = {"model": clf, "feats": feats, "importances": importances,
+                        "means": means, "corr_sign": corr_sign}
         metrics[name] = {
             "trained": True, "n": len(y), "positives": int(sum(y)), "test_size": len(yte),
             "accuracy": round(float(acc), 3), "precision": round(float(prec), 3),
@@ -262,6 +311,37 @@ def _niveau(p: float) -> str:
     return "high" if p >= 0.66 else "mid" if p >= 0.33 else "low"
 
 
+def _explain(row, spec, top=3) -> list[dict]:
+    """Explicabilité par prédiction (§4.1) : top facteurs contributifs pour CET employé.
+
+    Pour chaque variable on regarde si la valeur de l'employé s'écarte de la moyenne de
+    cohorte dans le sens qui AUGMENTE le risque (selon le signe de corrélation appris).
+    On classe par importance du modèle. Repli : facteurs qui diminuent le risque.
+    """
+    importances = spec.get("importances", {})
+    means = spec.get("means", {})
+    corr_sign = spec.get("corr_sign", {})
+    up, down = [], []
+    for f in spec["feats"]:
+        val = row.get(f)
+        mean = means.get(f)
+        cs = corr_sign.get(f, 0)
+        if val is None or mean is None or cs == 0:
+            continue
+        dev = val - mean
+        if abs(dev) < 1e-9:
+            continue
+        raises_risk = (dev > 0 and cs > 0) or (dev < 0 and cs < 0)
+        item = {"feature": f, "label": FEATURE_LABELS.get(f, f),
+                "valeur": round(float(val), 2), "moyenne": round(float(mean), 2),
+                "importance": importances.get(f, 0.0),
+                "sens": "augmente le risque" if raises_risk else "diminue le risque"}
+        (up if raises_risk else down).append(item)
+    up.sort(key=lambda x: x["importance"], reverse=True)
+    down.sort(key=lambda x: x["importance"], reverse=True)
+    return (up or down)[:top]
+
+
 def predict_for(db, matricule: str) -> dict | None:
     """Évalue les 3 risques en temps réel pour un employé. None si employé inconnu."""
     from app.db.models import Employe
@@ -284,5 +364,59 @@ def predict_for(db, matricule: str) -> dict | None:
         if not spec:
             continue
         proba = float(spec["model"].predict_proba([_vec(row, spec["feats"])])[0][1])
-        out["risks"][name] = {"proba": round(proba, 3), "niveau": _niveau(proba)}
+        out["risks"][name] = {"proba": round(proba, 3), "niveau": _niveau(proba),
+                              "facteurs": _explain(row, spec)}  # explicabilité §4.1
     return out
+
+
+def fairness_audit(db) -> dict:
+    """Contrôle d'équité documenté (§4.1) : mesure le taux de prédiction « à risque »
+    par groupe protégé (genre, tranche d'âge, site, type de contrat) — bien que ces
+    attributs NE SOIENT PAS des variables d'entrée. Calcule le « disparate impact ratio »
+    (min/max des taux). Un ratio < 0.8 (règle des 4/5) signale un possible biais à investiguer.
+    """
+    from app.db.models import Employe
+    bundle = _load_bundle()
+    if not bundle:
+        return {"trained": False, "message": "Modèles non entraînés."}
+    rows = _build_dataset(db)
+    active = set(db.scalars(select(Employe.matricule).where(Employe.statut == "ACTIVE")))
+    rows = [r for r in rows if r["matricule"] in active]
+    if not rows:
+        return {"trained": True, "n": 0, "audits": {}}
+
+    def _age_band(a):
+        a = int(a)
+        return "<30" if a < 30 else "30-39" if a < 40 else "40-49" if a < 50 else "50+"
+
+    groupers = {
+        "genre": lambda r: r.get("genre", "Autre"),
+        "tranche_age": lambda r: _age_band(r.get("age", 40)),
+        "site": lambda r: {0: "Paris", 1: "Lyon", 2: "Bordeaux", 3: "Remote"}.get(int(r.get("site", 0)), "?"),
+        "contrat": lambda r: {0: "CDI", 1: "CDD", 2: "Alternance"}.get(int(r.get("contrat", 0)), "?"),
+    }
+
+    audits = {}
+    for model_name in ("turnover", "absent"):
+        spec = bundle.get(model_name)
+        if not spec:
+            continue
+        probas = spec["model"].predict_proba([_vec(r, spec["feats"]) for r in rows])[:, 1]
+        flagged = [1 if _niveau(float(p)) == "high" else 0 for p in probas]
+        per_attr = {}
+        for attr, fn in groupers.items():
+            buckets = {}
+            for r, fl in zip(rows, flagged):
+                g = fn(r)
+                b = buckets.setdefault(g, {"n": 0, "flagged": 0})
+                b["n"] += 1
+                b["flagged"] += fl
+            groups = {g: {"n": v["n"], "taux_risque": round(v["flagged"] / v["n"], 3)}
+                      for g, v in buckets.items() if v["n"] >= 10}  # ignore petits groupes
+            rates = [v["taux_risque"] for v in groups.values()]
+            di = round(min(rates) / max(rates), 3) if rates and max(rates) > 0 else 1.0
+            per_attr[attr] = {"groupes": groups, "disparate_impact_ratio": di,
+                              "biais_potentiel": di < 0.8}
+        audits[model_name] = per_attr
+    return {"trained": True, "n": len(rows), "regle": "disparate impact < 0.8 (4/5) = à investiguer",
+            "exclus_des_features": _PROTECTED, "audits": audits}

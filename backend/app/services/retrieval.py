@@ -42,6 +42,30 @@ KNOWLEDGE: list[dict] = [
      "audience": ["RH", "DIRECTION", "ADMIN"],
      "text": "Les bulletins de paie sont édités mensuellement. Les questions de rémunération "
              "individuelle relèvent des RH et restent confidentielles."},
+    {"id": "pol-rtt", "title": "RTT", "audience": [ALL],
+     "text": "Les RTT compensent les heures au-delà de 35h/semaine. Ils se posent via le module "
+             "Demandes (type RTT) avec validation du manager. Ils doivent être soldés avant la fin "
+             "de la période de référence."},
+    {"id": "pol-maladie", "title": "Arrêt maladie", "audience": [ALL],
+     "text": "En cas d'arrêt maladie, transmettre le justificatif sous 48h aux RH. La demande est "
+             "enregistrée via le module Demandes (type MALADIE). Le maintien de salaire suit la "
+             "convention collective."},
+    {"id": "pol-mobilite", "title": "Mobilité interne", "audience": [ALL],
+     "text": "La mobilité interne (changement de poste ou de département) est encouragée. Les postes "
+             "ouverts sont publiés en interne. Candidater auprès des RH ; un entretien et l'accord "
+             "du manager actuel sont requis."},
+    {"id": "pol-essai", "title": "Période d'essai", "audience": [ALL],
+     "text": "La période d'essai d'un CDI est généralement de 2 à 4 mois selon le statut, "
+             "renouvelable une fois. Elle permet à chaque partie d'évaluer l'adéquation au poste."},
+    {"id": "pol-frais", "title": "Note de frais", "audience": [ALL],
+     "text": "Les frais professionnels (déplacements, repas) sont remboursés sur justificatif via "
+             "le module Documents (Note de frais), après validation RH."},
+    {"id": "pol-formation", "title": "Formation professionnelle", "audience": [ALL],
+     "text": "Le plan de développement des compétences propose des formations. Les demandes se font "
+             "auprès du manager et des RH, qui priorisent selon les besoins métier et l'évolution."},
+    {"id": "pol-entretien", "title": "Entretien annuel", "audience": [ALL],
+     "text": "Chaque collaborateur bénéficie d'un entretien annuel d'évaluation : bilan de l'année, "
+             "objectifs, besoins de formation et perspectives d'évolution."},
 ]
 
 

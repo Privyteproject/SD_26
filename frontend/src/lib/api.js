@@ -92,6 +92,16 @@ export const generateParcours = (matricule, typeParcours = "ONBOARDING") =>
 // Synthèse de transfert (offboarding) générée par l'IA + stockée comme document.
 export const generateTransferSummary = (matricule) =>
   request(`/parcours/${matricule}/transfer-summary`, { method: "POST" });
+// Synthèse d'intégration (onboarding) générée par l'IA (manuels internes + feuille de route).
+export const generateOnboardingSummary = (matricule) =>
+  request(`/parcours/${matricule}/onboarding-summary`, { method: "POST" });
+// Recommandations d'intégration : formations ciblées + interlocuteurs + documents à lire.
+export const getOnboardingRecommandations = (matricule) =>
+  request(`/parcours/${matricule}/recommandations`);
+// Catalogue des formations internes.
+export const getFormations = () => request("/parcours/formations");
+// Détection des étapes d'onboarding en retard -> alertes RH (idempotent).
+export const checkOverdueParcours = () => request("/parcours/check-overdue", { method: "POST" });
 export const updateTacheStatus = (id, status, dateRealisation) =>
   request(`/parcours/taches/${id}`, { method: "PATCH", body: { status, date_realisation: dateRealisation } });
 // Tâche personnalisée pour un employé + suppression d'une tâche
@@ -136,6 +146,12 @@ export const getRiskPrediction = (matricule) => request(`/predict/risks/${matric
 export const batchScoreRisks = () => request("/predict/batch", { method: "POST" });
 // Plan d'action ciblé pour un employé (selon ses risques).
 export const getActionPlan = (matricule) => request(`/predict/action-plan/${matricule}`);
+// Audit d'équité des modèles (§4.1) + état de l'ordonnanceur.
+export const getFairnessAudit = () => request("/predict/fairness");
+export const getSchedulerStatus = () => request("/predict/scheduler-status");
+// Feedback interne sur un collaborateur (signal pour le ML désengagement).
+export const createFeedback = (data) => request("/feedback", { method: "POST", body: data });
+export const getFeedbacks = (params) => request("/feedback", { params });
 // Projection / simulation de scénario (effectifs + masse salariale).
 export const getProjection = (params) => request("/dashboard/projection", { params });
 

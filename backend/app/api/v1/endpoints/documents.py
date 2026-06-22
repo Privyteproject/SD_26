@@ -33,7 +33,7 @@ from app.schemas.hr import (
     ModeleDocumentCreate,
     ModeleDocumentUpdate,
 )
-from app.services import doc_preview, document_types as dtypes, redis_cache, storage
+from app.services import doc_preview, document_types as dtypes, pdf_service, redis_cache, storage
 
 router = APIRouter()
 
@@ -291,35 +291,29 @@ def download_document(
 
     emp = repo.get_employee(db, doc.matricule)
     nom_complet = f"{emp.prenom} {emp.nom}" if emp else doc.matricule
-    libelle = doc.code_modele or "Document"
+    libelle = doc.code_modele or (dtypes.label_of(doc.type_doc) if doc.type_doc else "Document")
     if doc.code_modele:
         from app.db.models import ModeleDocument
         m = db.get(ModeleDocument, doc.code_modele)
         if m:
             libelle = m.libelle
 
-    # Contenu : on sert le corps édité (brouillon validé) s'il existe, sinon on génère
-    # un en-tête à la volée (MinIO réel = brancher ici via cle_minio).
+    # Corps : le contenu édité/généré s'il existe, sinon un récapitulatif minimal.
     if doc.contenu:
-        content = (
-            f"SYNAPSE DIGITAL — {libelle}\n{'=' * 48}\n\n"
-            f"{doc.contenu}\n"
-        )
+        body = doc.contenu
     else:
-        content = (
-            f"SYNAPSE DIGITAL — {libelle}\n"
-            f"{'=' * 48}\n\n"
-            f"Matricule   : {doc.matricule}\n"
-            f"Collaborateur : {nom_complet}\n"
-            f"Document    : {doc.nom_fichier}\n"
-            f"Statut      : {doc.statut}\n"
-            f"Émis le     : {date.today().isoformat()}\n\n"
-            f"Ce document a été généré par la plateforme RH Synapse Digital.\n"
-        )
-    filename = (doc.nom_fichier or f"document_{document_id}").rsplit(".", 1)[0] + ".txt"
+        body = (f"Matricule : {doc.matricule}\n"
+                f"Collaborateur : {nom_complet}\n"
+                f"Document : {doc.nom_fichier}\n"
+                f"Statut : {doc.statut}")
+    subtitle = f"{nom_complet} · {doc.matricule}"
+    content, content_type = pdf_service.build_pdf(libelle, body, subtitle=subtitle)
+
+    ext = "pdf" if content_type.startswith("application/pdf") else "txt"
+    filename = (doc.nom_fichier or f"document_{document_id}").rsplit(".", 1)[0] + f".{ext}"
     return Response(
-        content=content.encode("utf-8"),
-        media_type="text/plain; charset=utf-8",
+        content=content,
+        media_type=content_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

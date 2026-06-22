@@ -23,8 +23,9 @@ from app.db.base import SessionLocal
 from app.db.models import (
     Alerte, ChatMessage, ChatSession, ConversationIA, Demande, Departement,
     Document, DossierConfidentiel, Employe, EnqueteEngagement, EntretienAnnuel,
-    HistoriqueSalaire, IndicateurRH, InteractionIA, JournalAudit, ModeleDocument,
-    ModeleTache, Role, ScoreRisque, SourceIA, TacheParcours, Utilisateur,
+    Feedback, HistoriqueSalaire, IndicateurRH, InteractionIA, JournalAudit,
+    ModeleDocument, ModeleTache, Role, ScoreRisque, SourceIA, TacheParcours,
+    Utilisateur,
 )
 
 N_EMPLOYES = 1000
@@ -48,7 +49,7 @@ def _wipe(db):
     """Supprime les données RH (enfants -> parents). Conserve roles/types/modeles/départements."""
     for model in (SourceIA, InteractionIA, ChatMessage, ChatSession, ConversationIA,
                   Document, TacheParcours, HistoriqueSalaire, EnqueteEngagement,
-                  EntretienAnnuel, ScoreRisque, DossierConfidentiel, Demande,
+                  EntretienAnnuel, Feedback, ScoreRisque, DossierConfidentiel, Demande,
                   Alerte, JournalAudit):
         db.execute(delete(model))
     db.execute(Departement.__table__.update().values(matricule_chef=None))
@@ -198,6 +199,18 @@ def _generate(db, dept_ids, fake):
                 d0 = date(y, random.randint(1, 12), random.randint(1, 28))
                 histories.append(Demande(matricule=matricule, code_type="TELETRAVAIL",
                                          date_debut=d0, date_fin=d0, statut="validated"))
+
+        # Feedbacks internes des 12 derniers mois (note corrélée au profil) — signal ML.
+        for _ in range(random.randint(1, 3)):
+            if profile == "stable":
+                note = random.choice([4, 4, 5, 5])
+                cat = random.choice(["performance", "ambiance", "collaboration"])
+            else:
+                note = random.choice([1, 2, 2, 3])
+                cat = random.choice(["charge", "performance", "engagement"])
+            d0 = TODAY - timedelta(days=random.randint(15, 350))
+            histories.append(Feedback(matricule=matricule, date_feedback=d0,
+                                      note_1_5=note, categorie=cat, auteur="manager"))
 
     db.add_all(emp_objs)
     db.flush()

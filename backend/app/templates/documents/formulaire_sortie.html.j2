@@ -1,0 +1,43 @@
+{% extends "_base.html.j2" %}
+{% block body %}
+{% set anc = employee.date_entree | anciennete_annees %}
+{% set poste_l = (employee.poste or "") | lower %}
+<p>Formulaire de sortie de <b>{{ employee.prenom }} {{ employee.nom }}</b>
+  ({{ employee.poste or "—" }}, matricule {{ employee.matricule }}).</p>
+
+<p class="doc-meta">
+  Département : {{ employee.department.nom or "—" }}<br/>
+  Date d'entrée : {{ employee.date_entree | format_date }}<br/>
+  Ancienneté : <b>{{ anc }} an{{ "s" if anc > 1 else "" }}</b><br/>
+  Date de départ : <b>{{ date_depart | format_date }}</b>
+  {% if dernier_jour %}<br/>Dernier jour travaillé : {{ dernier_jour | format_date }}{% endif %}<br/>
+  Motif du départ : <b>{{ motif_depart or "—" }}</b>
+  {% if remplacant %}<br/>Remplaçant·e prévu·e : {{ remplacant }}{% endif %}
+</p>
+
+<p><b>Étapes de sortie à compléter :</b></p>
+<ul>
+  <li>Entretien de départ avec les RH</li>
+  <li>Restitution du matériel (ordinateur, badge, téléphone, clés)</li>
+  <li>Clôture des accès informatiques et applicatifs</li>
+  <li>Solde de tout compte et remise des documents de fin de contrat</li>
+  {% if "manager" in poste_l or "chef" in poste_l or "directeur" in poste_l or "directrice" in poste_l %}
+  <li>Passation managériale : transfert des dossiers d'équipe et des délégations de signature</li>
+  <li>Transfert des responsabilités d'encadrement et information de l'équipe</li>
+  {% endif %}
+  {% if "développeur" in poste_l or "ingénieur" in poste_l or "analyste" in poste_l or "designer" in poste_l %}
+  <li>Transfert des dépôts de code, accès techniques et documentation projet</li>
+  {% endif %}
+  {% if "commercial" in poste_l or "consultant" in poste_l or "vente" in poste_l %}
+  <li>Transfert du portefeuille clients et des opportunités en cours</li>
+  {% endif %}
+  {% if anc >= 5 %}
+  <li>Vérification des droits liés à l'ancienneté ({{ anc }} ans) : primes, congés acquis, indemnités</li>
+  <li>Proposition d'un entretien bilan de carrière et lettre de recommandation</li>
+  {% endif %}
+</ul>
+
+{% if commentaire %}<p><b>Commentaire :</b><br/>{{ commentaire }}</p>{% endif %}
+
+<p>Document de suivi du parcours d'offboarding — à valider par les RH.</p>
+{% endblock %}

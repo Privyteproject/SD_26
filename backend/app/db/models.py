@@ -58,6 +58,28 @@ class ModeleDocument(Base):
     actif: Mapped[bool] = mapped_column(Boolean, default=True)                # type proposé ou non aux utilisateurs
 
 
+class Formation(Base):
+    """Catalogue de formations internes — base des recommandations d'onboarding
+    (matching poste ↔ mots-clés) et du plan de développement des compétences."""
+    __tablename__ = "formation"
+    code: Mapped[str] = mapped_column(String(30), primary_key=True)
+    titre: Mapped[str] = mapped_column(String(160))
+    categorie: Mapped[str | None] = mapped_column(String(40), nullable=True)  # technique/management/transverse…
+    mots_cles: Mapped[str | None] = mapped_column(String(255), nullable=True)  # tags séparés par des virgules
+    duree_jours: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    niveau: Mapped[str | None] = mapped_column(String(20), nullable=True)  # débutant/intermédiaire/avancé
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actif: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    def to_dict(self) -> dict:
+        return {
+            "code": self.code, "titre": self.titre, "categorie": self.categorie,
+            "mots_cles": [m.strip() for m in (self.mots_cles or "").split(",") if m.strip()],
+            "duree_jours": self.duree_jours, "niveau": self.niveau,
+            "description": self.description, "actif": bool(self.actif),
+        }
+
+
 class ModeleTache(Base):
     __tablename__ = "modele_tache"
     code_tache: Mapped[str] = mapped_column(String(20), primary_key=True)
@@ -179,6 +201,28 @@ class EntretienAnnuel(Base):
     matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
     date_entretien: Mapped[date] = mapped_column(Date, index=True)
     note_performance_1_5: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class Feedback(Base):
+    """Feedback interne sur un collaborateur (manager/RH/pair) — signal continu
+    complémentaire des enquêtes trimestrielles, exploité par les modèles ML
+    de désengagement (note moyenne récente)."""
+    __tablename__ = "feedback"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+    date_feedback: Mapped[date] = mapped_column(Date, index=True)
+    note_1_5: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1 (négatif) .. 5 (positif)
+    categorie: Mapped[str | None] = mapped_column(String(40), nullable=True)  # performance/ambiance/charge…
+    commentaire: Mapped[str | None] = mapped_column(Text, nullable=True)
+    auteur: Mapped[str | None] = mapped_column(String(120), nullable=True)  # email/rôle de l'auteur
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "employee_id": self.matricule,
+            "date_feedback": self.date_feedback.isoformat() if self.date_feedback else None,
+            "note_1_5": self.note_1_5, "categorie": self.categorie,
+            "commentaire": self.commentaire, "auteur": self.auteur,
+        }
 
 
 # ───────────────────────── Demandes RH ─────────────────────────

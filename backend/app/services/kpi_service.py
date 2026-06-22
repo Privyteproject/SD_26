@@ -179,22 +179,49 @@ def anomalies(db, dept=None) -> list[dict]:
     return out
 
 
-def projection(db, *, months=12, turnover_pct=None, hiring_per_month=0, raise_pct=0.0, dept=None) -> dict:
-    """Projection des effectifs et de la masse salariale sur N mois (scénario paramétrable)."""
+def projection(db, *, months=12, turnover_pct=None, hiring_per_month=0, raise_pct=0.0,
+               absenteisme_pct=None, mobilite_pct=None, dept=None) -> dict:
+    """Projection / simulation « what-if » sur N mois (scénario paramétrable).
+
+    Couvre 4 leviers : turnover (attrition), recrutement, augmentations (masse) ET,
+    en simulation forward, l'absentéisme (jours perdus + coût estimé) et la mobilité
+    interne (nombre de mouvements internes attendus). Les taux non fournis reprennent
+    la valeur courante mesurée -> on simule l'écart par rapport au réel.
+    """
     head = effectifs(db, dept)
     base_masse = masse_salariale(db, dept)["annuelle"]
     avg = (base_masse / head) if head else 0.0
     if turnover_pct is None:
         turnover_pct = turnover(db, dept)
+    if absenteisme_pct is None:
+        absenteisme_pct = absenteisme(db, dept)
+    if mobilite_pct is None:
+        mobilite_pct = mobilite_interne(db, dept)
     monthly_attr = (turnover_pct / 100.0) / 12.0
+    cout_jour = (avg / 12.0 / WORKDAYS_MONTH) if avg else 0.0  # coût journalier moyen d'un ETP
     rows = []
     h = float(head)
+    cumul_jours_abs, cumul_cout_abs, cumul_mobilites = 0.0, 0.0, 0.0
     for i in range(1, months + 1):
         h = max(0.0, h - h * monthly_attr + hiring_per_month)
         masse = h * avg * (1 + (raise_pct / 100.0) * (i / 12.0))
-        rows.append({"mois": i, "effectif": round(h), "masse": round(masse)})
+        # Simulation absentéisme : jours perdus du mois et coût associé.
+        jours_abs = h * WORKDAYS_MONTH * (absenteisme_pct / 100.0)
+        cout_abs = jours_abs * cout_jour
+        # Simulation mobilité interne : mouvements internes attendus dans le mois.
+        mobilites = h * (mobilite_pct / 100.0) / 12.0
+        cumul_jours_abs += jours_abs
+        cumul_cout_abs += cout_abs
+        cumul_mobilites += mobilites
+        rows.append({"mois": i, "effectif": round(h), "masse": round(masse),
+                     "jours_absence": round(jours_abs), "cout_absenteisme": round(cout_abs),
+                     "mobilites_internes": round(mobilites, 1)})
     return {"base_effectif": head, "base_masse": round(base_masse), "avg_salary": round(avg),
             "turnover_pct": turnover_pct, "hiring_per_month": hiring_per_month, "raise_pct": raise_pct,
+            "absenteisme_pct": absenteisme_pct, "mobilite_pct": mobilite_pct,
+            "totaux": {"jours_absence": round(cumul_jours_abs),
+                       "cout_absenteisme": round(cumul_cout_abs),
+                       "mobilites_internes": round(cumul_mobilites)},
             "projection": rows}
 
 

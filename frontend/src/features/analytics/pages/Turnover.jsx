@@ -37,7 +37,7 @@ export default function Turnover() {
   ];
 
   // Simulation de scénario (projection effectifs + masse salariale).
-  const [sim, setSim] = useState({ turnover_pct: "", hiring_per_month: "5", raise_pct: "2" });
+  const [sim, setSim] = useState({ turnover_pct: "", hiring_per_month: "5", raise_pct: "2", absenteisme_pct: "", mobilite_pct: "" });
   const [proj, setProj] = useState(null);
   const [busy, setBusy] = useState(false);
   const runSim = async () => {
@@ -45,10 +45,13 @@ export default function Turnover() {
     try {
       const params = { months: 12, hiring_per_month: Number(sim.hiring_per_month) || 0, raise_pct: Number(sim.raise_pct) || 0 };
       if (sim.turnover_pct !== "") params.turnover_pct = Number(sim.turnover_pct);
+      if (sim.absenteisme_pct !== "") params.absenteisme_pct = Number(sim.absenteisme_pct);
+      if (sim.mobilite_pct !== "") params.mobilite_pct = Number(sim.mobilite_pct);
       const r = await getProjection(params);
       setProj((r && r.data) || null);
     } catch (e) { /* ignore */ } finally { setBusy(false); }
   };
+  const fmt = (n) => (n != null ? Number(n).toLocaleString("fr-FR") : "—");
   const field = { height: 38, width: 110, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 10px", fontSize: 13.5, fontFamily: "inherit", outline: "none" };
 
   return (
@@ -104,10 +107,28 @@ export default function Turnover() {
               <input type="number" value={sim.hiring_per_month} onChange={(e) => setSim({ ...sim, hiring_per_month: e.target.value })} style={field} /></label>
             <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("an.simRaise")}<br />
               <input type="number" value={sim.raise_pct} onChange={(e) => setSim({ ...sim, raise_pct: e.target.value })} style={field} /></label>
+            <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("an.simAbsence")}<br />
+              <input type="number" value={sim.absenteisme_pct} placeholder="auto" onChange={(e) => setSim({ ...sim, absenteisme_pct: e.target.value })} style={field} /></label>
+            <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("an.simMobility")}<br />
+              <input type="number" value={sim.mobilite_pct} placeholder="auto" onChange={(e) => setSim({ ...sim, mobilite_pct: e.target.value })} style={field} /></label>
             <button onClick={runSim} disabled={busy} style={{ height: 40, padding: "0 16px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
               <Play size={16} /> {busy ? t("common.loading") : t("an.simRun")}
             </button>
           </div>
+          {proj && proj.totaux && (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+              {[
+                { label: t("an.simAbsDays"), value: fmt(proj.totaux.jours_absence) },
+                { label: t("an.simAbsCost"), value: `${fmt(proj.totaux.cout_absenteisme)} €` },
+                { label: t("an.simMobMoves"), value: fmt(proj.totaux.mobilites_internes) },
+              ].map((x) => (
+                <div key={x.label} style={{ flex: "1 1 150px", background: "var(--field)", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 12, color: "var(--muted)" }}>{x.label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "var(--ink)", marginTop: 2 }}>{x.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {proj && (
             <div style={{ height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">

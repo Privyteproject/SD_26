@@ -24,7 +24,9 @@ from app.db import repository as repo
 from app.db.base import get_db
 from app.schemas.common import envelope
 from app.services import ai as ai_service
+from app.services import formations as formations_service
 from app.services import onboarding_agent
+from app.services import retrieval
 from app.schemas.hr import (
     ModeleTacheCreate,
     ModeleTacheUpdate,
@@ -113,6 +115,99 @@ def generate_parcours(
         created.append(t)
     return envelope([t.to_dict() for t in created],
                     meta={"total": len(created), "generated_by": "ai", "type": type_parcours})
+
+
+@router.get("/formations")
+def list_formations(_: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Catalogue des formations internes (base des recommandations d'onboarding)."""
+    rows = formations_service.list_catalogue(db)
+    return envelope([f.to_dict() for f in rows], meta={"total": len(rows)})
+
+
+@router.get("/{matricule}/recommandations")
+def onboarding_recommandations(
+    matricule: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db),
+):
+    """Recommandations d'intégration pour un poste : formations ciblées, interlocuteurs
+    clés (manager, chef de département, référent RH) et documents internes à lire."""
+    emp = repo.get_employee(db, matricule)
+    if emp is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
+    if user.role not in _ELEVATED:  # le collaborateur peut voir ses propres recommandations
+        own = repo.find_employee_by_email(db, user.email)
+        if not own or own.matricule != matricule:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Accès non autorisé")
+
+    formations = formations_service.recommend_for(db, emp.poste)
+
+    # Interlocuteurs clés.
+    interlocuteurs = []
+    if emp.manager:
+        interlocuteurs.append({"role": "Manager", "nom": f"{emp.manager.prenom} {emp.manager.nom}",
+                               "poste": emp.manager.poste})
+    try:
+        chef = emp.department.chef if emp.department else None
+    except Exception:
+        chef = None
+    if chef and (not emp.manager or chef.matricule != emp.matricule_manager):
+        interlocuteurs.append({"role": "Responsable de département", "nom": f"{chef.prenom} {chef.nom}",
+                               "poste": chef.poste})
+    interlocuteurs.append({"role": "Référent RH", "nom": "Service Ressources Humaines",
+                           "poste": "Onboarding & administration"})
+
+    # Documents internes à lire (corpus RAG pertinent pour le poste).
+    query = f"intégration {emp.poste or 'collaborateur'} politique procédure congés télétravail"
+    docs = [{"titre": d["title"]} for d in retrieval.retrieve(query, role="RH", k=4)]
+
+    return envelope({
+        "matricule": matricule, "poste": emp.poste,
+        "formations": formations, "interlocuteurs": interlocuteurs, "documents_a_lire": docs,
+    })
+
+
+@router.post("/check-overdue")
+def check_overdue(_: CurrentUser = Depends(_MANAGE), db: Session = Depends(get_db)):
+    """Balaye les tâches d'onboarding dont l'échéance est dépassée (non terminées) et
+    crée une alerte RH par tâche en retard (idempotent). À déclencher périodiquement."""
+    return envelope(repo.check_overdue_onboarding(db))
+
+
+@router.post("/{matricule}/onboarding-summary", status_code=status.HTTP_201_CREATED)
+def onboarding_summary(
+    matricule: str, _: CurrentUser = Depends(_MANAGE), db: Session = Depends(get_db),
+):
+    """Synthèse d'intégration générée par l'IA : feuille de route métier + extraits
+    des manuels internes (corpus RAG) pertinents pour le poste. Stockée en document."""
+    emp = repo.get_employee(db, matricule)
+    if emp is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
+
+    taches = repo.list_taches(db, matricule, "ONBOARDING")
+    taches_txt = ", ".join((t.modele.libelle if t.modele else t.code_tache) for t in taches) or "(aucune)"
+
+    # Manuels/politiques internes pertinents pour le poste (corpus documentaire RAG).
+    query = f"intégration onboarding {emp.poste or 'collaborateur'} congés télétravail formation"
+    docs = retrieval.retrieve(query, role="RH", k=4)
+    manuels = "\n".join(f"- {d['title']} : {d['text']}" for d in docs) or "(aucun manuel indexé)"
+
+    system = (
+        "Tu es un assistant RH. Rédige une SYNTHÈSE D'INTÉGRATION claire et structurée pour "
+        "un nouveau collaborateur, en t'appuyant sur les manuels internes fournis. Sections : "
+        "1) Présentation du poste et objectifs des 30 jours, 2) Feuille de route métier, "
+        "3) Politiques internes à connaître (résumé des manuels), 4) Interlocuteurs clés, "
+        "5) Premiers réflexes. Sois concret et concis ; n'invente pas de politique absente des manuels."
+    )
+    contexte = (f"Poste : {emp.poste or '—'}. Site : {emp.site or '—'}. "
+                f"Tâches d'onboarding planifiées : {taches_txt}.\n\nManuels internes pertinents :\n{manuels}")
+    out = ai_service.complete(system, contexte, [])
+    text = (out.get("reply") or "").strip() or "Synthèse non disponible (IA indisponible)."
+
+    doc = repo.create_submitted_document(
+        db, matricule=matricule, document_name=f"synthese_onboarding_{matricule}.txt",
+        contenu=text, type_doc="synthese_onboarding")
+    repo.set_document_status(db, doc.id_document, "validated")  # doc interne consultable
+    return envelope({"document_id": doc.id_document, "summary": text,
+                     "sources": [d["title"] for d in docs]})
 
 
 @router.post("/{matricule}/transfer-summary", status_code=status.HTTP_201_CREATED)

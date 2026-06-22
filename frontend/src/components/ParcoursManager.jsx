@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, Plus, Trash2, Pencil, Sparkles, FileText } from "lucide-react";
+import { Check, Plus, Trash2, Pencil, Sparkles, FileText, GraduationCap, Users, BookOpen, Clock } from "lucide-react";
 import { useI18n } from "../app/providers/I18nProvider";
 import Card from "./Card";
 import Badge from "./Badge";
@@ -8,6 +8,7 @@ import { useAsync } from "../lib/useAsync";
 import {
   getEmployees, getParcours, initParcours, updateTacheStatus, generateParcours,
   addParcoursTache, deleteParcoursTache, generateTransferSummary,
+  generateOnboardingSummary, getOnboardingRecommandations, checkOverdueParcours,
   getParcoursModeles, createModele, updateModele, deleteModele,
 } from "../lib/api";
 
@@ -17,6 +18,21 @@ const smallBtn = (color) => ({ width: 32, height: 32, borderRadius: 8, border: "
 const goldBtn = { height: 38, padding: "0 16px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 };
 const fail = (t, e) => window.alert((e && (e.payload?.detail || e.message)) || t("common.error"));
 
+// Bloc de recommandations (formations / interlocuteurs / documents).
+function RecoBlock({ icon, title, items }) {
+  if (!items || !items.length) return null;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>
+        <span style={{ color: "var(--gold-deep)" }}>{icon}</span> {title}
+      </div>
+      <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
+        {items.map((x, i) => <li key={i} style={{ fontSize: 13, color: "var(--ink)", lineHeight: 1.45 }}>{x}</li>)}
+      </ul>
+    </div>
+  );
+}
+
 // ── Panneau de droite : tâches d'un employé (cocher, ajouter une tâche perso, supprimer) ──
 function TaskPanel({ matricule, type }) {
   const { t } = useI18n();
@@ -25,10 +41,23 @@ function TaskPanel({ matricule, type }) {
   const [busy, setBusy] = useState(false);
   const [newTask, setNewTask] = useState("");
   const [summary, setSummary] = useState("");
+  const [reco, setReco] = useState(null);
+
+  // Réinitialise les panneaux IA quand on change d'employé.
+  useEffect(() => { setSummary(""); setReco(null); }, [matricule]);
 
   const genSummary = async () => {
     setBusy(true); setSummary("");
-    try { const r = await generateTransferSummary(matricule); setSummary((r && r.data && r.data.summary) || ""); }
+    try {
+      const r = type === "OFFBOARDING"
+        ? await generateTransferSummary(matricule)
+        : await generateOnboardingSummary(matricule);
+      setSummary((r && r.data && r.data.summary) || "");
+    } catch (e) { fail(t, e); } finally { setBusy(false); }
+  };
+  const loadReco = async () => {
+    setBusy(true);
+    try { const r = await getOnboardingRecommandations(matricule); setReco((r && r.data) || null); }
     catch (e) { fail(t, e); } finally { setBusy(false); }
   };
 
@@ -118,17 +147,30 @@ function TaskPanel({ matricule, type }) {
           </button>
         </div>
 
-        {/* Synthèse de transfert — offboarding uniquement */}
-        {type === "OFFBOARDING" && (
-          <div style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-            <button onClick={genSummary} disabled={busy} style={{ ...goldBtn, background: "transparent", color: "var(--gold-deep)", border: "1px solid var(--line)", opacity: busy ? 0.6 : 1 }}>
-              <FileText size={16} /> {t("parc.transferSummary")}
+        {/* IA : synthèse (transfert pour offboarding, intégration pour onboarding) + recommandations onboarding */}
+        <div style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={genSummary} disabled={busy} style={{ ...goldBtn, background: "transparent", color: "var(--gold-deep)", border: "1px solid var(--line)", opacity: busy ? 0.6 : 1 }}>
+            <FileText size={16} /> {type === "OFFBOARDING" ? t("parc.transferSummary") : t("parc.onbSummary")}
+          </button>
+          {type === "ONBOARDING" && (
+            <button onClick={loadReco} disabled={busy} style={{ ...goldBtn, background: "transparent", color: "var(--gold-deep)", border: "1px solid var(--line)", opacity: busy ? 0.6 : 1 }}>
+              <GraduationCap size={16} /> {t("parc.reco")}
             </button>
-            {summary && (
-              <div style={{ marginTop: 12, background: "var(--field)", border: "1px solid var(--line)", borderRadius: 10, padding: 14, fontSize: 13.5, color: "var(--ink)", whiteSpace: "pre-wrap", maxHeight: 320, overflowY: "auto" }}>
-                {summary}
-              </div>
-            )}
+          )}
+        </div>
+        {summary && (
+          <div style={{ marginTop: 12, background: "var(--field)", border: "1px solid var(--line)", borderRadius: 10, padding: 14, fontSize: 13.5, color: "var(--ink)", whiteSpace: "pre-wrap", maxHeight: 320, overflowY: "auto" }}>
+            {summary}
+          </div>
+        )}
+        {reco && (
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 14 }}>
+            <RecoBlock icon={<GraduationCap size={15} />} title={t("parc.formations")}
+              items={(reco.formations || []).map((f) => `${f.titre}${f.duree_jours ? ` · ${f.duree_jours} j` : ""} — ${f.raison}`)} />
+            <RecoBlock icon={<Users size={15} />} title={t("parc.contacts")}
+              items={(reco.interlocuteurs || []).map((i) => `${i.role} : ${i.nom}${i.poste ? ` (${i.poste})` : ""}`)} />
+            <RecoBlock icon={<BookOpen size={15} />} title={t("parc.docsToRead")}
+              items={(reco.documents_a_lire || []).map((d) => d.titre)} />
           </div>
         )}
       </Card>
@@ -196,15 +238,32 @@ export default function ParcoursManager({ type, statusFilter, title, emptyLabel 
   const { data, loading, error, reload } = useAsync(() => getEmployees({ status: statusFilter }), [statusFilter]);
   const employees = (data && data.data) || [];
   const [selected, setSelected] = useState(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     if (employees.length && !employees.some((e) => e.id === selected)) setSelected(employees[0].id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
+  const checkOverdue = async () => {
+    setChecking(true);
+    try {
+      const r = await checkOverdueParcours();
+      const n = (r && r.data && r.data.alertes_creees) ?? 0;
+      window.alert(t("parc.overdueDone").replace("{n}", n));
+    } catch (e) { fail(t, e); } finally { setChecking(false); }
+  };
+
   return (
     <div>
-      <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: "0 0 18px" }}>{title}</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 18px", flexWrap: "wrap" }}>
+        <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0, flex: 1 }}>{title}</h1>
+        {type === "ONBOARDING" && (
+          <button onClick={checkOverdue} disabled={checking} style={{ ...goldBtn, background: "transparent", color: "var(--gold-deep)", border: "1px solid var(--line)", opacity: checking ? 0.6 : 1 }}>
+            <Clock size={16} /> {t("parc.checkOverdue")}
+          </button>
+        )}
+      </div>
 
       <AsyncBoundary loading={loading} error={error} onRetry={reload} empty={!employees.length} emptyLabel={emptyLabel}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 16 }}>
