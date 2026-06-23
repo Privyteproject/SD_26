@@ -31,7 +31,7 @@ export default function Alerts() {
     setBusy(a.id + "-plan");
     try {
       const res = await getActionPlan(a.matricule);
-      setModalAiResult(res && res.data ? res.data : { actions: ["Aucune recommandation générée."] });
+      setModalAiResult(res && res.data ? res.data : { actions: [t("al.noReco")] });
       setSelectedPlans([]);
       setModalAlerte(a);
     } catch (e) { /* ignore */ } finally { setBusy(null); }
@@ -47,22 +47,22 @@ export default function Alerts() {
     setBusy("submit-plan");
     try {
       await resolveAlerte(modalAlerte.id);
-      window.dispatchEvent(new CustomEvent("toast", { detail: { type: "success", message: "Plan d'action soumis avec succès !" } }));
+      window.dispatchEvent(new CustomEvent("toast", { detail: { type: "success", message: t("al.planSubmitted") } }));
       setModalAlerte(null);
       reload();
     } catch (e) {
-      window.dispatchEvent(new CustomEvent("toast", { detail: { type: "error", message: "Erreur lors de la soumission du plan." } }));
+      window.dispatchEvent(new CustomEvent("toast", { detail: { type: "error", message: t("al.planError") } }));
     } finally {
       setBusy(null);
     }
   };
 
   const planOptions = [
-    "Entretien de suivi",
-    "Ajustement de charge",
-    "Accompagnement managérial",
-    "Formation",
-    "Mobilité"
+    t("al.opt.interview"),
+    t("al.opt.workload"),
+    t("al.opt.mgr"),
+    t("al.opt.training"),
+    t("al.opt.mobility"),
   ];
 
   return (
@@ -86,19 +86,19 @@ export default function Alerts() {
                   </div>
                   
                   {a.resolue ? (
-                    <Badge tone="success">Traitée</Badge>
+                    <Badge tone="success">{t("al.handled")}</Badge>
                   ) : (
-                    <Badge tone="warning">Non traitée</Badge>
+                    <Badge tone="warning">{t("al.unresolved")}</Badge>
                   )}
 
                   {!a.resolue && a.matricule && (
-                    <button onClick={() => loadPlan(a)} disabled={busy === a.id + "-plan"} title="Voir plan d'action" style={{ height: 36, padding: "0 12px", borderRadius: 8, border: "1px solid var(--gold)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-                      <ClipboardList size={15} /> Plan d'action
+                    <button onClick={() => loadPlan(a)} disabled={busy === a.id + "-plan"} title={t("al.viewPlan")} style={{ height: 36, padding: "0 12px", borderRadius: 8, border: "1px solid var(--gold)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
+                      <ClipboardList size={15} /> {t("dis.actionPlan")}
                     </button>
                   )}
                   {!a.resolue && !a.matricule && (
-                    <button onClick={() => resolve(a.id)} disabled={busy === a.id} title="Marquer comme traitée" style={{ height: 36, padding: "0 12px", borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--success, #2e8c57)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-                      <Check size={15} /> Traiter
+                    <button onClick={() => resolve(a.id)} disabled={busy === a.id} title={t("al.markResolved")} style={{ height: 36, padding: "0 12px", borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--success, #2e8c57)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
+                      <Check size={15} /> {t("al.resolve")}
                     </button>
                   )}
                 </Card>
@@ -117,7 +117,7 @@ export default function Alerts() {
             <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
                 <ClipboardList size={20} color="var(--gold-deep)" />
-                Proposer un plan d'action
+                {t("al.proposePlan")}
               </h2>
               <button onClick={() => setModalAlerte(null)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--muted)", padding: 4, display: "flex" }}>
                 <X size={20} />
@@ -127,7 +127,7 @@ export default function Alerts() {
             {/* Content */}
             <div style={{ padding: "24px", overflowY: "auto" }}>
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>Concerne l'alerte :</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>{t("al.concerns")}</div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", padding: "10px 14px", background: "var(--field)", borderRadius: 8, border: "1px solid var(--line)" }}>
                   {modalAlerte.message}
                 </div>
@@ -136,7 +136,7 @@ export default function Alerts() {
               {modalAiResult && (
                 <div style={{ marginBottom: 24, padding: "14px 16px", background: "var(--gold-tint)", borderRadius: 10, border: "1px solid rgba(212, 175, 55, 0.3)" }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gold-deep)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                    Recommandations prédictives de l'IA
+                    {t("al.aiReco")}
                   </div>
                   <ul style={{ margin: 0, paddingLeft: 18, color: "var(--ink)", fontSize: 13.5, lineHeight: 1.5 }}>
                     {(modalAiResult.actions || []).map((act, i) => (
@@ -147,7 +147,7 @@ export default function Alerts() {
               )}
 
               <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>
-                Sélectionnez les actions ciblées à mettre en place :
+                {t("al.selectActions")}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {planOptions.map(option => (
@@ -173,14 +173,14 @@ export default function Alerts() {
                 onClick={() => setModalAlerte(null)} 
                 style={{ padding: "10px 18px", borderRadius: 8, border: "1px solid var(--line)", background: "transparent", cursor: "pointer", fontWeight: 600, color: "var(--ink)", fontSize: 14 }}
               >
-                Annuler
+                {t("al.cancel")}
               </button>
               <button 
                 disabled={selectedPlans.length === 0 || busy === "submit-plan"} 
                 onClick={submitPlan} 
                 style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: "var(--primary)", color: "#fff", cursor: selectedPlans.length === 0 ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 14, opacity: selectedPlans.length === 0 ? 0.5 : 1, display: "flex", alignItems: "center", gap: 8 }}
               >
-                {busy === "submit-plan" ? "En cours..." : "Soumettre le plan"}
+                {busy === "submit-plan" ? t("al.submitting") : t("al.submitPlan")}
               </button>
             </div>
 
