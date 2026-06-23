@@ -8,6 +8,7 @@ on:
       - frontend
       - develop
       - backend_completion
+      - Ghost_Work
   workflow_dispatch:
 
 jobs:
