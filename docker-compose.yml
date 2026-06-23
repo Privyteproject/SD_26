@@ -33,7 +33,7 @@ services:
       - ./backend/alembic:/app/alembic
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
-    command: sh -c "pip install python-keycloak redis minio jinja2 && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "pip install python-keycloak redis minio jinja2 python-docx && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       db:
         condition: service_healthy

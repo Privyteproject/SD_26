@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Send, Clock } from "lucide-react";
+import { X, Send, Clock, Download } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 
 // Modal d'aperçu : affiche le HTML généré, un compte à rebours d'expiration du
@@ -21,9 +21,12 @@ export default function DocumentPreviewModal({ preview, onConfirm, onClose, busy
   const expired = left <= 0;
   const mmss = `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
 
+  const iframeSrcMatch = preview.html_preview?.match(/src="([^"]+)"/);
+  const iframeSrc = iframeSrcMatch ? iframeSrcMatch[1] : null;
+
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 640, maxHeight: "88vh", background: "var(--surface)", borderRadius: 16, border: "1px solid var(--line)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 100, display: "flex", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: iframeSrc ? 850 : 640, height: "100vh", background: "var(--surface)", borderLeft: "1px solid var(--line)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid var(--line)" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{t("docs.preview")}</div>
@@ -35,12 +38,46 @@ export default function DocumentPreviewModal({ preview, onConfirm, onClose, busy
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={16} /></button>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: 22, background: "#fff" }}>
-          <div dangerouslySetInnerHTML={{ __html: preview.html_preview }} />
+        <div style={{ overflowY: "auto", padding: 0, background: "#fff", height: "calc(100vh - 130px)" }}>
+          {iframeSrc ? (
+            <iframe
+              title="live-preview"
+              src={iframeSrc}
+              style={{ width: "100%", height: "100%", border: "none", background: "#ffffff" }}
+            />
+          ) : (
+            <iframe
+              title="live-preview"
+              srcDoc={preview.html_preview}
+              style={{ width: "100%", height: "100%", border: "none", background: "#ffffff" }}
+            />
+          )}
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--line)" }}>
           <button onClick={onClose} style={{ height: 42, padding: "0 16px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--ink)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("docs.cancel")}</button>
+          {!preview.requires_rh_validation && (
+            <button 
+              onClick={() => window.open(`/api/v1/documents/preview/download?token=${preview.preview_token}`, "_blank")} 
+              disabled={expired}
+              style={{ 
+                height: 42, 
+                padding: "0 16px", 
+                borderRadius: 9, 
+                border: "1px solid var(--line)", 
+                background: "transparent", 
+                color: "var(--gold-deep)", 
+                fontWeight: 600, 
+                cursor: expired ? "not-allowed" : "pointer", 
+                fontFamily: "inherit",
+                display: "flex",
+                alignItems: "center",
+                gap: 6
+              }}
+            >
+              <Download size={15} /> Télécharger
+            </button>
+          )}
           <button onClick={onConfirm} disabled={busy || expired} style={{ height: 42, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, cursor: busy || expired ? "not-allowed" : "pointer", opacity: busy || expired ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
             <Send size={16} /> {t("docs.confirm")}
           </button>

@@ -111,6 +111,7 @@ class DocumentUpdate(BaseModel):
 
 
 class ModeleDocumentCreate(BaseModel):
+    code: Optional[str] = None
     libelle: str = Field(..., min_length=1)
     categorie: Optional[str] = None
     gabarit: Optional[str] = None

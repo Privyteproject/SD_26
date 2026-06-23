@@ -58,3 +58,11 @@ Thumbs.db
 backend/data/chroma/
 backend/data/chroma_recovered/
 backend/logs/*.jsonl
+
+# Agent and temporary test files
+.agents/
+tests_gabarits/
+**/tests_gabarits/
+AGENT_FIRST_PROMPT.md
+.cursorrules
+attestation_salaire_template.html

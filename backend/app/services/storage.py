@@ -65,12 +65,33 @@ def put_bytes(object_name: str, data: bytes, content_type: str = "text/plain; ch
 
 def presigned_get(object_name: str, expires_seconds: int | None = None) -> str | None:
     """URL de téléchargement signée (via l'endpoint public), valable `expires_seconds`."""
+    import os
     if _get() is None or _public is None:
         return None
     try:
+        filename = os.path.basename(object_name)
         return _public.presigned_get_object(
             settings.MINIO_BUCKET, object_name,
             expires=timedelta(seconds=expires_seconds or settings.DOC_DOWNLOAD_TTL),
+            response_headers={
+                "response-content-disposition": f'attachment; filename="{filename}"'
+            }
         )
     except Exception:
         return None
+
+
+def get_bytes(object_name: str) -> bytes | None:
+    """Récupère le contenu binaire d'un fichier dans le stockage MinIO."""
+    c = _get()
+    if c is None:
+        return None
+    try:
+        response = c.get_object(settings.MINIO_BUCKET, object_name)
+        return response.read()
+    except Exception:
+        return None
+    finally:
+        if "response" in locals():
+            response.close()
+            response.release_conn()

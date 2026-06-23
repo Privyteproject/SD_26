@@ -843,11 +843,12 @@ def create_document(db, *, matricule, code_modele=None, nom_fichier=None, conten
     return doc
 
 
-def create_submitted_document(db, *, matricule, document_name, contenu, type_doc=None, cle_minio=None, code_modele=None):
-    """Crée un document directement en statut 'pending' (workflow preview -> submit)."""
+def create_submitted_document(db, *, matricule, document_name, contenu, type_doc=None, cle_minio=None, code_modele=None, statut="pending", date_validation=None, id_valideur=None):
+    """Crée un document directement en statut spécifié (workflow preview -> submit)."""
     from app.db.models import Document
     doc = Document(matricule=matricule, code_modele=code_modele, nom_fichier=document_name,
-                   type_doc=type_doc, contenu=contenu, statut="pending", cle_minio=cle_minio)
+                   type_doc=type_doc, contenu=contenu, statut=statut, cle_minio=cle_minio,
+                   date_validation=date_validation, id_valideur=id_valideur)
     db.add(doc)
     db.commit()
     db.refresh(doc)

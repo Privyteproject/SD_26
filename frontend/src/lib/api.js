@@ -17,13 +17,21 @@ function qs(params) {
 async function parse(res) { try { return await res.json(); } catch { return null; } }
 
 async function request(path, { method = "GET", body, params, _retry = false } = {}) {
-  const headers = { "Content-Type": "application/json" };
+  const headers = {};
+  const isFormData = body instanceof FormData;
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
+  
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${path}${qs(params)}`, {
-    method, headers, body: body !== undefined ? JSON.stringify(body) : undefined,
+    method,
+    headers,
+    body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
   });
+
 
   // 401 : tenter un refresh silencieux UNE fois, puis rejouer la requête
   if (res.status === 401 && !_retry) {
@@ -114,6 +122,12 @@ export const getDocumentModeles = (params) => request("/documents/modeles", { pa
 // Gestion des types de documents (RH/Direction).
 export const createDocumentModele = (data) => request("/documents/modeles", { method: "POST", body: data });
 export const updateDocumentModele = (code, data) => request(`/documents/modeles/${code}`, { method: "PUT", body: data });
+export const uploadDocumentModeleFile = (code, file) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return request(`/documents/modeles/${code}/upload`, { method: "POST", body: fd });
+};
+export const previewDocumentTemplate = (data) => request("/documents/modeles/preview", { method: "POST", body: data });
 export const deleteDocumentModele = (code) => request(`/documents/modeles/${code}`, { method: "DELETE" });
 export const createDocument = (data) => request("/documents", { method: "POST", body: data });
 // Types de documents disponibles (filtrés par rôle) : champs requis/optionnels + validation RH.

@@ -91,10 +91,76 @@ def _extra():
     with _TC(_app) as c:
         print("== documents ==")
         k("GET /documents/modeles", c.get("/api/v1/documents/modeles", headers=RH),200)
-        g=k("POST /documents (RH/EMP005)", c.post("/api/v1/documents", headers=RH, json={"code_modele":"ATTEST_TRAVAIL","employee_id":"EMP005"}),201)
+        # Test 1: Auto-validation of ATTEST_TRAVAIL
+        g_auto=k("POST /documents auto (RH/EMP005)", c.post("/api/v1/documents", headers=RH, json={"code_modele":"ATTEST_TRAVAIL","employee_id":"EMP005"}),201)
+        sub_res=c.post(f"/api/v1/documents/{g_auto['data']['id']}/submit", headers=RH).json()
+        assert sub_res["data"]["statut"] in ("validated", "valide")
+        
+        # Test 2: Manual validation of ATTEST_SALAIRE (requires RH validation)
+        c.post("/api/v1/documents/modeles", headers=RH, json={"code":"ATTEST_SALAIRE", "libelle":"Attestation de salaire", "categorie":"attestation"})
+        g=k("POST /documents (RH/EMP005)", c.post("/api/v1/documents", headers=RH, json={"code_modele":"ATTEST_SALAIRE","employee_id":"EMP005"}),201)
         k("POST /documents modèle inconnu -> 422", c.post("/api/v1/documents", headers=RH, json={"code_modele":"NOPE"}),422)
+        c.post(f"/api/v1/documents/{g['data']['id']}/submit", headers=RH)
         k(f"PATCH /documents/{g['data']['id']}/status (RH)", c.patch(f"/api/v1/documents/{g['data']['id']}/status", headers=RH, json={"status":"validated"}),200)
         k("PATCH /documents status (CO -> 403)", c.patch(f"/api/v1/documents/{g['data']['id']}/status", headers=CO, json={"status":"refused"}),403)
+
+        # Test 3: Template validation on POST /modeles
+        k("POST /modeles with invalid Jinja -> 422", c.post("/api/v1/documents/modeles", headers=RH, json={"code":"BAD_JINJA", "libelle":"Bad", "gabarit":"Hello {% if %}"}), 422)
+        k("POST /modeles with valid template -> 201", c.post("/api/v1/documents/modeles", headers=RH, json={"code":"GOOD_JINJA", "libelle":"Good", "gabarit":"Hello {{ employee.prenom }} {{ missing_var.nested_field }}"}), 201)
+        
+        # Test 4: Live template preview endpoint
+        k("POST /modeles/preview with invalid Jinja -> 422", c.post("/api/v1/documents/modeles/preview", headers=RH, json={"gabarit":"Hello {% if %}"}), 422)
+        p_res = k("POST /modeles/preview with valid template -> 200", c.post("/api/v1/documents/modeles/preview", headers=RH, json={"gabarit":"Hello {{ employee.prenom }} {{ missing_var.nested_field }}"}), 200)
+        assert "Adam" in p_res["data"]["html_preview"]
+        
+        # Test 5: Word docx template upload and preview
+        from docx import Document
+        import io
+        import base64
+        
+        doc = Document()
+        doc.add_paragraph("Hello {{ employee.prenom }} this is Word.")
+        doc_bytes_io = io.BytesIO()
+        doc.save(doc_bytes_io)
+        doc_bytes = doc_bytes_io.getvalue()
+        
+        up_res = k("POST /modeles/GOOD_JINJA/upload docx", c.post("/api/v1/documents/modeles/GOOD_JINJA/upload", headers=RH, files={"file": ("test.docx", doc_bytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}), 200)
+        assert up_res["data"]["is_binary"] is True
+        assert up_res["data"]["format"] == "docx"
+        
+        p_docx_res = k("POST /modeles/preview Word model", c.post("/api/v1/documents/modeles/preview", headers=RH, json={"doc_type": "GOOD_JINJA"}), 200)
+        assert "Adam" in p_docx_res["data"]["html_preview"]
+        
+        # Test 6: PDF template upload, preview and download
+        from reportlab.pdfgen import canvas
+        pdf_io = io.BytesIO()
+        pdf_canvas = canvas.Canvas(pdf_io)
+        pdf_canvas.drawString(100, 750, "Hello World")
+        pdf_canvas.save()
+        pdf_bytes = pdf_io.getvalue()
+        
+        up_pdf_res = k("POST /modeles/GOOD_JINJA/upload pdf", c.post("/api/v1/documents/modeles/GOOD_JINJA/upload", headers=RH, files={"file": ("test.pdf", pdf_bytes, "application/pdf")}), 200)
+        assert up_pdf_res["data"]["is_binary"] is True
+        assert up_pdf_res["data"]["format"] == "pdf"
+        
+        p_pdf_res = k("POST /modeles/preview PDF model", c.post("/api/v1/documents/modeles/preview", headers=RH, json={"doc_type": "GOOD_JINJA"}), 200)
+        assert "preview/pdf?token=" in p_pdf_res["data"]["html_preview"]
+        
+        import re
+        token_match = re.search(r"token=([^&\"]+)", p_pdf_res["data"]["html_preview"])
+        assert token_match is not None
+        preview_token = token_match.group(1)
+        
+        # Get PDF preview stream
+        pdf_stream = c.get(f"/api/v1/documents/preview/pdf?token={preview_token}")
+        assert pdf_stream.status_code == 200
+        assert pdf_stream.headers["content-type"] == "application/pdf"
+        
+        # Get PDF preview download
+        pdf_download = c.get(f"/api/v1/documents/preview/download?token={preview_token}")
+        assert pdf_download.status_code == 200
+        assert pdf_download.headers["content-type"] == "application/pdf"
+
         print("== dashboard RH enrichi ==")
         k("GET /dashboard/rh (RH)", c.get("/api/v1/dashboard/rh", headers=RH),200)
         k("GET /dashboard/rh (CO -> 403)", c.get("/api/v1/dashboard/rh", headers=CO),403)

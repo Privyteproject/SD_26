@@ -424,11 +424,32 @@ def _document_to_dict(self: Document) -> dict:
 
 
 def _modele_document_to_dict(self: ModeleDocument) -> dict:
-    return {
+    import json
+    res = {
         "code": self.code_modele, "libelle": self.libelle,
         "categorie": self.categorie, "gabarit": self.gabarit,
         "actif": bool(self.actif) if self.actif is not None else True,
+        "is_binary": False,
+        "format": None,
+        "filename": None,
     }
+    if self.gabarit and self.gabarit.strip().startswith("{"):
+        try:
+            meta = json.loads(self.gabarit)
+            if meta.get("is_binary"):
+                res["is_binary"] = True
+                res["format"] = meta.get("format")
+                res["filename"] = meta.get("filename")
+                # Exclude base64 content from the standard API list response to save bandwidth
+                res["gabarit"] = json.dumps({
+                    "is_binary": True,
+                    "format": meta.get("format"),
+                    "filename": meta.get("filename"),
+                    "minio_key": meta.get("minio_key")
+                })
+        except Exception:
+            pass
+    return res
 
 
 def _score_to_dict(self: ScoreRisque) -> dict:
