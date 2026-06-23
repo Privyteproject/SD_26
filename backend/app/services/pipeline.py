@@ -150,11 +150,14 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
         # Classification : tentative d'EXFILTRATION de données -> « risque de fuite ».
         is_leak = _is_exfil(message)
         try:
+            from sqlalchemy import select
+            from app.db.models import Employe, Utilisateur
+            matricule = db.scalar(select(Employe.matricule).join(Utilisateur, Utilisateur.id_utilisateur == Employe.id_utilisateur).where(Utilisateur.email == user.email))
             repo.create_alerte(
                 db, message=(f"Tentative de fuite de données bloquée ({user.email})." if is_leak
                              else f"Tentative d'injection bloquée ({user.email})."),
                 categorie="fuite_donnees" if is_leak else "securite",
-                gravite="high", id_destinataire=None)
+                gravite="high", id_destinataire=None, matricule=matricule)
         except Exception:
             db.rollback()
         return res
@@ -168,8 +171,11 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
                "model": "policy", "degraded": False, "usage": {}, "judge": None, "meta": meta}
         _audit(db, user, message, res)
         try:  # ouverture de ticket = notification RH (Mission 3)
+            from sqlalchemy import select
+            from app.db.models import Employe, Utilisateur
+            matricule = db.scalar(select(Employe.matricule).join(Utilisateur, Utilisateur.id_utilisateur == Employe.id_utilisateur).where(Utilisateur.email == user.email))
             repo.create_alerte(db, message=f"Escalade RH : situation sensible signalée ({user.email}).",
-                               categorie="escalade", gravite="high", id_destinataire=None)
+                               categorie="escalade", gravite="high", id_destinataire=None, matricule=matricule)
         except Exception:
             db.rollback()
         return res

@@ -7,14 +7,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.security import ROLE_ADMIN, ROLE_DIRECTION, ROLE_MEDECINE, ROLE_RH, CurrentUser, require_roles
+from app.core.security import ROLE_ADMIN, ROLE_DIRECTION, ROLE_MEDECINE, ROLE_RH, ROLE_MANAGER, CurrentUser, require_roles
 from app.db.base import get_db
 from app.schemas.common import envelope
 from app.services import ml_predictions
 
 router = APIRouter()
 
-_RH = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MEDECINE)
+_RH = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MEDECINE, ROLE_MANAGER)
 
 
 @router.post("/train")

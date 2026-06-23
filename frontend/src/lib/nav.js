@@ -18,14 +18,17 @@ export function navForRole(role, status) {
       { key: "nav.dashboard", to: "/rh", icon: "LayoutDashboard" },
       { key: "nav.assistantRh", to: "/rh/assistant", icon: "Bot" },
       { key: "nav.team", to: "/rh/equipe", icon: "Users" },
-      { key: "nav.analytics", to: "/rh/analytique/turnover", icon: "TrendingUp" },
+      { key: "nav.alerts", to: "/rh/alertes", icon: "Bell" },
+      { key: "nav.analytics", to: "/rh/analytique/predictif", icon: "TrendingUp" },
       { key: "nav.disengagement", to: "/rh/desengagement", icon: "Activity" },
       { key: "nav.onboarding", to: "/rh/onboarding", icon: "UserPlus" },
       { key: "nav.offboarding", to: "/rh/offboarding", icon: "UserMinus" },
-      { key: "nav.employees", to: "/rh/collaborateurs", icon: "IdCard" },
       { key: "nav.reports", to: "/rh/rapports", icon: "FileBarChart" },
       { key: "nav.reqReview", to: "/rh/demandes", icon: "Inbox" },
     ];
+    if (role !== ROLES.MANAGER) {
+      items.splice(7, 0, { key: "nav.employees", to: "/rh/collaborateurs", icon: "IdCard" });
+    }
     // Validation des documents : RH et Direction uniquement.
     if (role === ROLES.RH || role === ROLES.DIRECTION) {
       items.push({ key: "nav.docsReview", to: "/rh/documents", icon: "FileCheck" });

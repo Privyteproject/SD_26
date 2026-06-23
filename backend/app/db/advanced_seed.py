@@ -67,6 +67,7 @@ def _ensure_referentiels(db):
         db.add(ModeleDocument(code_modele="ATTEST_TRAVAIL", libelle="Attestation de travail"))
     for code, lib in [("CONGE", "Congé payé"), ("MALADIE", "Arrêt maladie"),
                       ("TELETRAVAIL", "Télétravail"), ("RTT", "RTT"),
+                      ("ABSENCE", "Absence Injustifiée"),
                       ("ATTESTATION", "Attestation de travail")]:
         from app.db.models import TypeDemande
         if db.get(TypeDemande, code) is None:
@@ -188,13 +189,20 @@ def _generate(db, dept_ids, fake):
                     satisfaction_globale=sat, equilibre_pro_perso=eq,
                     charge_travail=ch, reconnaissance=rec))
 
-            # Absences MALADIE dictées par le profil + télétravail aléatoire
+            # Absences MALADIE et ABSENCE (injustifiée) dictées par le profil + télétravail aléatoire
             n_maladie = random.randint(0, 1) if profile == "stable" else random.randint(3, 5)
             for _ in range(n_maladie):
                 d0 = date(y, random.randint(1, 12), random.randint(1, 28))
                 histories.append(Demande(matricule=matricule, code_type="MALADIE",
                                          date_debut=d0, date_fin=d0 + timedelta(days=random.randint(1, 3)),
                                          statut="validated"))
+            if profile == "desengage":
+                n_absence = random.randint(1, 3)
+                for _ in range(n_absence):
+                    d0 = date(y, random.randint(1, 12), random.randint(1, 28))
+                    histories.append(Demande(matricule=matricule, code_type="ABSENCE",
+                                             date_debut=d0, date_fin=d0,
+                                             statut="validated"))
             if random.random() < 0.5:
                 d0 = date(y, random.randint(1, 12), random.randint(1, 28))
                 histories.append(Demande(matricule=matricule, code_type="TELETRAVAIL",

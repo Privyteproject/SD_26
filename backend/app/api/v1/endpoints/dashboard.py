@@ -27,7 +27,7 @@ from app.services import kpi_service, redis_cache, risk_calculator
 router = APIRouter()
 
 _RH_VIEW = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER, ROLE_MEDECINE)
-_WELLBEING = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MEDECINE)
+_WELLBEING = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MEDECINE, ROLE_MANAGER)
 
 
 def _dept_for(user: CurrentUser, db: Session):
@@ -136,8 +136,9 @@ def calculate_risques(_: CurrentUser = Depends(_WELLBEING), db: Session = Depend
 def dashboard_risques(
     niveau: str | None = Query(None),
     type_: str | None = Query(None, alias="type"),
-    _: CurrentUser = Depends(_WELLBEING),
+    user: CurrentUser = Depends(_WELLBEING),
     db: Session = Depends(get_db),
 ):
-    rows = repo.list_scores(db, niveau=niveau, type=type_)
+    dept = _dept_for(user, db)
+    rows = repo.list_scores(db, niveau=niveau, type=type_, department_id=dept)
     return envelope([s.to_dict() for s in rows], meta={"total": len(rows)})

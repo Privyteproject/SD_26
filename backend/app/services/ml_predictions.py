@@ -30,16 +30,17 @@ CONTRAT_MAP = {"CDI": 0, "CDD": 1, "Alternance": 2}
 _PROTECTED = ["age", "genre", "site", "contrat"]
 
 # Features utilisées par chaque modèle (ordre = ordre des colonnes du vecteur).
-F_TURNOVER = ["delai_augm_mois", "evol_satisfaction", "nb_maladie_12m", "note_perf",
+F_TURNOVER = ["delai_augm_mois", "evol_satisfaction", "nb_maladie_12m", "nb_absences_12m", "note_perf",
               "anciennete_mois", "charge", "equilibre", "recon", "feedback_moyen"]
-F_ABSENT = ["charge", "equilibre", "recon", "note_perf", "anciennete_mois", "feedback_moyen"]
-F_MOBILITE = ["anciennete_mois", "note_perf", "recon"]
+F_BURNOUT = ["charge", "equilibre", "recon", "nb_maladie_12m", "anciennete_mois", "feedback_moyen"]
+F_DESENGAGEMENT = ["charge", "equilibre", "evol_satisfaction", "nb_absences_12m", "note_perf", "feedback_moyen"]
 
 # Libellés lisibles + sens « métier » du facteur (pour l'explicabilité par prédiction).
 FEATURE_LABELS = {
     "delai_augm_mois": "Délai depuis la dernière augmentation",
     "evol_satisfaction": "Évolution de la satisfaction",
     "nb_maladie_12m": "Arrêts maladie (12 mois)",
+    "nb_absences_12m": "Absences injustifiées (12 mois)",
     "note_perf": "Note de performance",
     "anciennete_mois": "Ancienneté",
     "charge": "Charge de travail perçue",
@@ -76,9 +77,10 @@ def _build_dataset(db) -> list[dict]:
     for m, dt, motif in db.execute(select(
             HistoriqueSalaire.matricule, HistoriqueSalaire.date_effet, HistoriqueSalaire.motif)).all():
         salaires.setdefault(m, []).append((dt, motif or ""))
-    for m, d0, d1 in db.execute(select(
-            Demande.matricule, Demande.date_debut, Demande.date_fin).where(Demande.code_type == "MALADIE")).all():
-        maladies.setdefault(m, []).append((d0, d1))
+    for m, d0, ctype in db.execute(select(
+            Demande.matricule, Demande.date_debut, Demande.code_type).where(
+            Demande.code_type.in_(["MALADIE", "ABSENCE"]))).all():
+        maladies.setdefault(m, []).append((d0, ctype))
 
     rows = []
     for e in employees:
@@ -112,7 +114,8 @@ def _features_for(e, enq, entr, sal, mal, fbk=None) -> dict:
 
     note_perf = sorted(entr, key=lambda x: x[0])[-1][1] if entr else 3
 
-    nb_maladie_12m = sum(1 for d0, _ in mal if d0 and _months(TODAY, d0) <= 12)
+    nb_maladie_12m = sum(1 for d0, ctype in mal if d0 and ctype == "MALADIE" and _months(TODAY, d0) <= 12)
+    nb_absences_12m = sum(1 for d0, ctype in mal if d0 and ctype == "ABSENCE" and _months(TODAY, d0) <= 12)
 
     # Feedbacks internes récents (≤ 12 mois) : note moyenne sur 5 ; neutre (3) si aucun.
     fbk = fbk or []
@@ -126,6 +129,7 @@ def _features_for(e, enq, entr, sal, mal, fbk=None) -> dict:
         "delai_augm_mois": float(delai_augm),
         "evol_satisfaction": float(evol),
         "nb_maladie_12m": float(nb_maladie_12m),
+        "nb_absences_12m": float(nb_absences_12m),
         "note_perf": float(note_perf),
         "age": float(age),
         "anciennete_mois": float(anciennete),
@@ -137,8 +141,8 @@ def _features_for(e, enq, entr, sal, mal, fbk=None) -> dict:
         "feedback_moyen": float(feedback_moyen),
         # Cibles
         "y_turnover": 1 if e.statut == "LEAVING" else 0,
-        "y_absent": 1 if nb_maladie_12m >= 3 else 0,
-        "y_mobilite": promo_12m,
+        "y_burnout": 1 if nb_maladie_12m >= 3 and charge >= 7 and equilibre <= 5 else 0,
+        "y_desengagement": 1 if (evol < -0.5 or nb_absences_12m >= 1 or feedback_moyen < 3.0) else 0,
     }
 
 
@@ -158,8 +162,8 @@ def train(db) -> dict:
         return {"error": "Pas assez de données. Lancez advanced_seed.", "n": len(rows)}
 
     bundle, metrics = {}, {}
-    specs = [("turnover", F_TURNOVER, "y_turnover"), ("absent", F_ABSENT, "y_absent"),
-             ("mobilite", F_MOBILITE, "y_mobilite")]
+    specs = [("turnover", F_TURNOVER, "y_turnover"), ("burnout", F_BURNOUT, "y_burnout"),
+             ("desengagement", F_DESENGAGEMENT, "y_desengagement")]
     for name, feats, target in specs:
         X = [_vec(r, feats) for r in rows]
         y = [r[target] for r in rows]
@@ -233,9 +237,9 @@ def batch_score(db) -> dict:
         return {"scored": 0, "employes": 0}
 
     today = date.today()
-    db.execute(sa_delete(ScoreRisque).where(ScoreRisque.type.in_(["turnover", "burnout"])))
+    db.execute(sa_delete(ScoreRisque).where(ScoreRisque.type.in_(["turnover", "burnout", "desengagement"])))
     objs = []
-    for model_name, score_type in (("turnover", "turnover"), ("absent", "burnout")):
+    for model_name, score_type in (("turnover", "turnover"), ("burnout", "burnout"), ("desengagement", "desengagement")):
         spec = bundle.get(model_name)
         if not spec:
             continue
@@ -248,22 +252,23 @@ def batch_score(db) -> dict:
     db.bulk_save_objects(objs)  # une seule transaction
     db.commit()
 
-    # Alertes préventives : un signalement par employé à risque de départ ÉLEVÉ.
+    # Alertes préventives : un signalement par employé à risque ÉLEVÉ.
     from app.db.models import Alerte
     from app.db import repository as repo
     db.execute(sa_delete(Alerte).where(Alerte.categorie == "risque_eleve", Alerte.resolue.is_(False)))
     db.commit()
-    # On calcule les probas turnover pour cibler les employés « high ».
-    spec = bundle.get("turnover")
+    
     alerted = 0
-    if spec:
-        probas = spec["model"].predict_proba([_vec(r, spec["feats"]) for r in rows])[:, 1]
-        for r, p in zip(rows, probas):
-            if _niveau(float(p)) == "high":
-                repo.create_alerte(
-                    db, message=f"Risque de départ élevé détecté ({r['matricule']}, {round(float(p) * 100)}%).",
-                    categorie="risque_eleve", gravite="high", id_destinataire=None, matricule=r["matricule"])
-                alerted += 1
+    for key, label in [("turnover", "départ"), ("burnout", "burnout"), ("desengagement", "désengagement")]:
+        spec = bundle.get(key)
+        if spec:
+            probas = spec["model"].predict_proba([_vec(r, spec["feats"]) for r in rows])[:, 1]
+            for r, p in zip(rows, probas):
+                if _niveau(float(p)) == "high":
+                    repo.create_alerte(
+                        db, message=f"Risque de {label} élevé détecté ({r['matricule']}, {round(float(p) * 100)}%).",
+                        categorie="risque_eleve", gravite="high", id_destinataire=None, matricule=r["matricule"])
+                    alerted += 1
     return {"scored": len(objs), "employes": len(rows), "alertes_preventives": alerted}
 
 
@@ -274,23 +279,27 @@ def action_plan(db, matricule: str) -> dict | None:
         return None
     risks = pred.get("risks", {})
     t = (risks.get("turnover") or {}).get("niveau")
-    b = (risks.get("absent") or {}).get("niveau")
-    m = (risks.get("mobilite") or {}).get("niveau")
+    b = (risks.get("burnout") or {}).get("niveau")
+    d = (risks.get("desengagement") or {}).get("niveau")
     actions = []
     if t == "high":
         actions += [
-            "Planifier un entretien de suivi RH sous 2 semaines.",
+            "Planifier un entretien de fidélisation sous 2 semaines.",
             "Revue de rémunération / perspectives d'évolution.",
             "Étudier une opportunité de mobilité interne.",
         ]
     if b == "high":
         actions += [
-            "Ajuster la charge de travail à court terme.",
-            "Accompagnement managérial rapproché.",
+            "Ajuster la charge de travail de toute urgence.",
+            "Accompagnement managérial rapproché et bienveillant.",
             "Proposer un point avec la médecine du travail.",
         ]
-    if m == "high" and t != "high":
-        actions += ["Profil mobile : proposer une formation ou une évolution de poste."]
+    if d == "high" and t != "high":
+        actions += [
+            "Organiser un entretien de remotivation (Feedback 360).",
+            "Vérifier l'alignement des missions avec les compétences.",
+            "Proposer une nouvelle formation ou un changement de projet."
+        ]
     if not actions:
         actions = ["Aucune action urgente — maintenir le suivi régulier."]
     return {"matricule": matricule, "trained": pred.get("trained", False),
@@ -359,7 +368,7 @@ def predict_for(db, matricule: str) -> dict | None:
         return {"matricule": matricule, "trained": False}
 
     out = {"matricule": matricule, "trained": True, "risks": {}}
-    for name in ("turnover", "absent", "mobilite"):
+    for name in ("turnover", "burnout", "desengagement"):
         spec = bundle.get(name)
         if not spec:
             continue
@@ -397,7 +406,7 @@ def fairness_audit(db) -> dict:
     }
 
     audits = {}
-    for model_name in ("turnover", "absent"):
+    for model_name in ("turnover", "burnout", "desengagement"):
         spec = bundle.get(model_name)
         if not spec:
             continue

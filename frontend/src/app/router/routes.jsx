@@ -20,9 +20,8 @@ import Profile from "../../features/misc/pages/Profile";
 import DashboardRh from "../../features/dashboard/pages/DashboardRh";
 import AssistantRh from "../../features/assistant/pages/AssistantRh";
 import Team from "../../features/misc/pages/Team";
-import Turnover from "../../features/analytics/pages/Turnover";
+import PredictiveAnalytics from "../../features/analytics/pages/PredictiveAnalytics";
 import Payroll from "../../features/analytics/pages/Payroll";
-import Absenteeism from "../../features/analytics/pages/Absenteeism";
 import Disengagement from "../../features/disengagement/pages/Disengagement";
 import OnboardingRh from "../../features/onboarding/pages/OnboardingRh";
 import Offboarding from "../../features/offboarding/pages/Offboarding";
@@ -60,9 +59,9 @@ export default function AppRoutes() {
         <Route path="/rh" element={<RoleGuard roles={RH_SPACE_ROLES}><DashboardRh /></RoleGuard>} />
         <Route path="/rh/equipe" element={<RoleGuard roles={RH_SPACE_ROLES}><Team /></RoleGuard>} />
         <Route path="/rh/assistant" element={<RoleGuard roles={RH_SPACE_ROLES}><AssistantRh /></RoleGuard>} />
-        <Route path="/rh/analytique/turnover" element={<RoleGuard roles={RH_SPACE_ROLES}><Turnover /></RoleGuard>} />
+        <Route path="/rh/alertes" element={<RoleGuard roles={RH_SPACE_ROLES}><Alerts /></RoleGuard>} />
+        <Route path="/rh/analytique/predictif" element={<RoleGuard roles={RH_SPACE_ROLES}><PredictiveAnalytics /></RoleGuard>} />
         <Route path="/rh/analytique/masse-salariale" element={<RoleGuard roles={RH_SPACE_ROLES}><Payroll /></RoleGuard>} />
-        <Route path="/rh/analytique/absenteisme" element={<RoleGuard roles={RH_SPACE_ROLES}><Absenteeism /></RoleGuard>} />
         <Route path="/rh/desengagement" element={<RoleGuard roles={RH_SPACE_ROLES}><Disengagement /></RoleGuard>} />
         <Route path="/rh/onboarding" element={<RoleGuard roles={RH_SPACE_ROLES}><OnboardingRh /></RoleGuard>} />
         <Route path="/rh/offboarding" element={<RoleGuard roles={RH_SPACE_ROLES}><Offboarding /></RoleGuard>} />

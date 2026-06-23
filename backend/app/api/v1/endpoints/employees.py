@@ -66,9 +66,15 @@ def list_employees(
     department_id: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    _: CurrentUser = Depends(_READ),
+    user: CurrentUser = Depends(_READ),
     db: Session = Depends(get_db),
 ):
+    # RBAC périmètre : un MANAGER ne voit que son département
+    if user.role == "MANAGER":
+        emp = repo.find_employee_by_email(db, user.email)
+        if emp and emp.id_departement:
+            department_id = str(emp.id_departement)
+
     rows = repo.list_employees(db, search=search, role=role, status=status_, department_id=department_id)
     total = len(rows)
     start = (page - 1) * page_size

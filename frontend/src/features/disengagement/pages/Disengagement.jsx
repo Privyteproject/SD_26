@@ -48,7 +48,7 @@ export default function Disengagement() {
   const planFactors = () => {
     const risks = (plan && plan.risks) || {};
     const out = [];
-    for (const k of ["turnover", "absent"]) {
+    for (const k of ["turnover", "burnout", "desengagement"]) {
       for (const f of ((risks[k] && risks[k].facteurs) || [])) out.push(f);
     }
     const seen = new Set();

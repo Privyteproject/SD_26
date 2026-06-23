@@ -1,0 +1,148 @@
+<h2 class="sr-only">Checklist des spécifications fonctionnelles — YDAYS 2026</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.wrap{padding:1rem 0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.25rem}
+.stat{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.7rem 1rem}
+.stat-l{font-size:12px;color:var(--color-text-secondary);margin-bottom:3px}
+.stat-v{font-size:20px;font-weight:500;color:var(--color-text-primary)}
+.bar{height:5px;background:var(--color-border-tertiary);border-radius:3px;margin-top:5px;overflow:hidden}
+.fill{height:100%;background:var(--color-text-success);transition:width .3s}
+.section{margin-bottom:1.25rem}
+.sec-hd{font-size:13px;font-weight:500;color:var(--color-text-secondary);background:var(--color-background-secondary);padding:6px 12px;border-radius:var(--border-radius-md);margin-bottom:.5rem}
+.item{display:flex;align-items:flex-start;gap:9px;padding:6px 4px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.item:last-child{border-bottom:none}
+.cb{width:15px;height:15px;border:0.5px solid var(--color-border-secondary);border-radius:4px;flex-shrink:0;margin-top:2px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cb.done{background:var(--color-background-success);border-color:var(--color-border-success)}
+.cb.done::after{content:'✓';font-size:10px;color:var(--color-text-success)}
+.title{font-size:13px;color:var(--color-text-primary);line-height:1.5;cursor:pointer}
+.title.done{text-decoration:line-through;color:var(--color-text-tertiary)}
+</style>
+<div class="wrap">
+<div class="stats">
+  <div class="stat"><div class="stat-l">Total</div><div class="stat-v" id="tt">0</div></div>
+  <div class="stat"><div class="stat-l">Faites</div><div class="stat-v" id="dn">0</div></div>
+  <div class="stat"><div class="stat-l">Progression</div><div class="stat-v" id="pc">0%</div><div class="bar"><div class="fill" id="fl" style="width:0%"></div></div></div>
+</div>
+
+<div class="section"><div class="sec-hd">🤖 Assistant IA RH conversationnel (collaborateur)</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Réponse instantanée sur congés, absences, paie, mobilité, procédures, politiques RH</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Disponibilité 24/7 via interface web intégrable aux outils internes</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Réponses formulées à partir des documents RH validés (politique, conventions, guides)</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Redirection automatique vers un référent RH humain si demande sensible/ambiguë</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Refus contrôlé si la demande sort du périmètre d'autorisation de l'utilisateur</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">📄 Génération automatique de documents RH (collaborateur)</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Création assistée : attestations, formulaires, demandes internes, synthèses, courriers</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Préremplissage intelligent à partir des données autorisées du collaborateur</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Vérification de cohérence avant validation par l'équipe RH</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Historisation des documents générés (suivi + consultation)</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">🚀 Parcours d'onboarding personnalisé</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Génération automatique d'un calendrier d'intégration sur 30 jours</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Synthèse des manuels internes, feuilles de route métier, infos spécifiques au poste</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Recommandation formations, interlocuteurs clés, documents à lire, actions à faire</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Suivi de l'avancement + alertes si étape non réalisée</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">✨ Expérience collaborateur</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Accès centralisé aux informations RH essentielles</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Réduction du temps d'attente pour les réponses administratives</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Explications simples et contextualisées des processus internes</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Renforcement de l'autonomie des collaborateurs</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">🗄 Base de données RH interne</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Centralisation collaborateurs, absences, documents, postes, départements, entretiens, indicateurs</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Alimentation par saisie manuelle, import de fichiers, formulaires admin</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Mise à jour contrôlée par les profils autorisés (RBAC)</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Architecture ouverte préparée pour intégration SIRH future</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">📊 Dashboard RH automatisé et prédictif</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Tableaux de bord générés automatiquement depuis la BDD interne</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">KPI : effectifs, absentéisme, turnover, mobilité interne, pyramide des âges, masse salariale, engagement</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Visualisation par entité, département, site ou équipe</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Centralisation progressive (réduction des fichiers dispersés)</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">🔮 Analyse prédictive et scénarios RH</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Projection de l'évolution des effectifs et de la masse salariale</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Simulation de scénarios turnover / absentéisme / mobilité interne</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Détection des écarts inhabituels dans les données RH</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Rapports conformes, auditables, exploitables par la direction</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">⚠️ Détection précoce du désengagement</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Croisement absentéisme, arrêts maladie, enquêtes engagement, entretiens, charge, feedbacks</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Identification des signaux faibles (burnout, désengagement, départ)</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Génération d'alertes préventives pour managers et RH</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Proposition de plans d'action ciblés (entretien, charge, accompagnement, formation, mobilité)</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">🛡 Analyse des comportements avec l'assistant IA</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Collecte de logs d'interaction pour suivre usages et détecter anomalies</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Analyse des comportements inhabituels (accès répétés, contournement, requêtes non autorisées)</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Indicateurs de sécurité : fréquence accès refusés, requêtes sensibles, alertes générées</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Espace de supervision admin (sans exposer le contenu personnel des conversations)</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">🚨 Alertes RH et administrateurs</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Déclenchement d'alerte si tentative d'accès hors périmètre via l'IA</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Notification admin/RH en cas de comportement suspect, répétitif ou critique</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Classification par gravité : anomalie simple / répétée / critique / risque de fuite</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Historique des alertes pour audits et amélioration continue</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">📤 Workflows agentiques d'offboarding</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Formulaires de sortie personnalisés (poste, ancienneté, contexte du départ)</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Suivi des étapes de conformité : restitution matériel, révocation accès, clôture admin, transfert</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Assistance à la capitalisation des connaissances avant le départ</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Synthèse de transfert (projets, outils, contacts, procédures)</div></div>
+</div>
+
+<div class="section"><div class="sec-hd">🎯 Pilotage RH augmenté</div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Centralisation des données RH dans une interface unique</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Priorisation automatique des situations nécessitant une intervention humaine</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Aide à la décision pour managers, RH, admin, direction</div></div>
+<div class="item"><div class="cb" onclick="t(this)"></div><div class="title">Libération de temps pour les missions RH stratégiques</div></div>
+</div>
+
+</div>
+<script>
+let st={};
+function t(cb){
+  const id=cb.parentElement.dataset.id||(cb.parentElement.dataset.id=Math.random().toString(36).slice(2));
+  st[id]=!st[id];
+  cb.classList.toggle('done',st[id]);
+  cb.nextElementSibling.classList.toggle('done',st[id]);
+  try{window.storage.set('specs_checklist',JSON.stringify(st));}catch(e){}
+  u();
+}
+function u(){
+  const all=document.querySelectorAll('.cb'), d=document.querySelectorAll('.cb.done');
+  const total=all.length, done=d.length;
+  document.getElementById('tt').textContent=total;
+  document.getElementById('dn').textContent=done;
+  const p=total?Math.round(done/total*100):0;
+  document.getElementById('pc').textContent=p+'%';
+  document.getElementById('fl').style.width=p+'%';
+}
+async function init(){
+  try{
+    const r=await window.storage.get('specs_checklist');
+    if(r&&r.value){
+      st=JSON.parse(r.value);
+      document.querySelectorAll('.cb').forEach(cb=>{
+        const id=cb.parentElement.dataset.id;
+        if(id&&st[id]){cb.classList.add('done');cb.nextElementSibling.classList.add('done');}
+      });
+    }
+  }catch(e){}
+  u();
+}
+init();
+</script>

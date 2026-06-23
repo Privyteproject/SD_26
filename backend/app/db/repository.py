@@ -497,10 +497,12 @@ def count_recent_refusals(db, matricule, hours: int = 1) -> int:
 _GRAVITE_RANK = {"high": 0, "mid": 1, "low": 2}
 
 
-def list_alertes_prioritized(db, *, include_resolved=False, limit=100):
+def list_alertes_prioritized(db, *, include_resolved=False, limit=100, department_id=None):
     """Worklist : alertes triées par criticité (high d'abord) puis date (récent d'abord)."""
-    from app.db.models import Alerte
+    from app.db.models import Alerte, Employe
     stmt = select(Alerte)
+    if department_id:
+        stmt = stmt.join(Employe, Employe.matricule == Alerte.matricule).where(Employe.id_departement == department_id)
     if not include_resolved:
         stmt = stmt.where(Alerte.resolue.is_(False))
     rows = list(db.scalars(stmt.limit(500)))
@@ -1312,9 +1314,11 @@ def salary_mass(db) -> dict:
 
 
 # ───────────── Scores de risque & indicateurs RH ─────────────
-def list_scores(db, *, niveau=None, type=None):
-    from app.db.models import ScoreRisque
+def list_scores(db, *, niveau=None, type=None, department_id=None):
+    from app.db.models import ScoreRisque, Employe
     stmt = select(ScoreRisque)
+    if department_id:
+        stmt = stmt.join(Employe, Employe.matricule == ScoreRisque.matricule).where(Employe.id_departement == department_id)
     if niveau:
         stmt = stmt.where(ScoreRisque.niveau == niveau)
     if type:
