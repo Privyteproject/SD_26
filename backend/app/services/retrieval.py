@@ -66,6 +66,45 @@ KNOWLEDGE: list[dict] = [
     {"id": "pol-entretien", "title": "Entretien annuel", "audience": [ALL],
      "text": "Chaque collaborateur bénéficie d'un entretien annuel d'évaluation : bilan de l'année, "
              "objectifs, besoins de formation et perspectives d'évolution."},
+    {"id": "pol-code-conduite", "title": "Code de conduite et Éthique", "audience": [ALL],
+     "text": "Notre entreprise s'engage à respecter les plus hauts standards d'éthique, d'intégrité et de respect. "
+             "Tout comportement discriminatoire, harcèlement ou corruption est strictement interdit. Les employés "
+             "doivent déclarer tout conflit d'intérêts potentiel. Pour toute question, contactez le référent éthique."},
+    {"id": "pol-manuel", "title": "Manuel de l'employé", "audience": [ALL],
+     "text": "Le manuel de l'employé regroupe les règles de vie au bureau : horaires (plages fixes 10h-16h), "
+             "utilisation des salles de réunion, règles de courtoisie en open space, et accès aux locaux. "
+             "Le port du badge est obligatoire en tout temps."},
+    {"id": "pol-procedures", "title": "Procédures internes et achats", "audience": ["MANAGER", "DIRECTION", "ADMIN"],
+     "text": "Toute dépense supérieure à 500€ doit faire l'objet d'un bon de commande validé par le N+1. "
+             "Les achats IT doivent être pré-approuvés par le service informatique. La délégation de signature "
+             "est définie dans la grille d'autorité financière disponible sur l'intranet."},
+    {"id": "pol-securite-it", "title": "Sécurité informatique (IT)", "audience": [ALL],
+     "text": "La politique de sécurité IT impose des mots de passe robustes (12 caractères, multi-facteurs). "
+             "L'utilisation d'une clé USB personnelle est interdite. Le VPN de l'entreprise est obligatoire "
+             "lors du travail à distance. Tout email suspect doit être signalé au support IT (Phishing)."},
+    {"id": "pol-harcelement", "title": "Politique anti-harcèlement", "audience": [ALL],
+     "text": "Le harcèlement moral ou sexuel n'a pas sa place chez nous. Tout collaborateur victime ou "
+             "témoin doit alerter immédiatement les RH ou la ligne d'écoute anonyme externe au 0800-XXX-XXX. "
+             "Des mesures conservatoires seront prises sans délai."},
+    {"id": "pol-avantages", "title": "Avantages sociaux (Mutuelle, CSE)", "audience": [ALL],
+     "text": "La mutuelle d'entreprise (couverture familiale en option) est prise en charge à 70% par l'employeur. "
+             "Le CSE propose des chèques vacances, des réductions billetterie, et subventionne les abonnements "
+             "sportifs à hauteur de 200€ par an."},
+    {"id": "pol-diversite", "title": "Politique d'Inclusion et Diversité", "audience": [ALL],
+     "text": "L'entreprise promeut l'égalité des chances à l'embauche et au quotidien. Nous visons la parité "
+             "hommes-femmes et soutenons l'emploi des personnes en situation de handicap via des aménagements "
+             "spécifiques de poste."},
+    {"id": "comp-presentation", "title": "Présentation de l'entreprise Waminey Tech", "audience": [ALL],
+     "text": "Waminey Tech est une startup d'ingénierie marocaine fondée en 2025 à Casablanca par une équipe "
+             "d'étudiants et jeunes diplômés passionnés par l'IA et la transformation digitale. "
+             "Notre mission : concevoir et déployer des solutions numériques accessibles, modernes et utiles, "
+             "en plaçant l'innovation, la sécurité, l'inclusion et la proximité au cœur de chaque projet. "
+             "Synapse Digital est notre produit phare. L'équipe réunit des compétences en développement web/mobile, "
+             "UX design, data, gestion de projet et stratégie digitale. Nous croyons en la capacité de la jeunesse "
+             "marocaine à inventer des solutions audacieuses, responsables et adaptées à la réalité du pays pour "
+             "faire de chaque projet un levier d'impact positif pour la société et l'économie locale. "
+             "Notre vision : 'Simplifier la vie au travail grâce à la technologie, tout en valorisant les entreprises.' "
+             "Notre slogan : 'Vos talents, notre intelligence.'"}
 ]
 
 
