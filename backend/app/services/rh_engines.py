@@ -24,6 +24,7 @@ _ENGINE_BY_TYPE = {
     "generation": "E2",
     "parcours": "E3",
     "predictive": "E4",
+    "sensible": "E5",
 }
 
 SYSTEM_PROMPT_GENERATION = (
@@ -46,6 +47,13 @@ SYSTEM_PROMPT_ANALYTICS = (
     "Donne une lecture factuelle et prudente (pas de diagnostic individuel définitif, "
     "aucune donnée médicale). N'invente aucun chiffre absent du contexte."
 )
+SYSTEM_PROMPT_SENSIBLE = (
+    "Tu es l'assistant RH de « Synapse Digital » habilité à consulter les données "
+    "sensibles (rémunérations, paie). Réponds à la question de l'utilisateur "
+    "UNIQUEMENT à partir des informations fournies ci-dessous. Si l'utilisateur demande "
+    "les salaires globaux, donne-lui le résumé de la masse salariale. "
+    "N'invente aucun chiffre."
+)
 
 
 def select(type_rh: str | None) -> str | None:
@@ -62,6 +70,8 @@ def build(db, user, message: str, type_rh: str) -> dict:
         return _parcours(db, user)
     if engine == "E4":
         return _analytics(db)
+    if engine == "E5":
+        return _sensible(db, user, message)
     return {}  # garde : le pipeline n'appelle build() que si select() != None
 
 
@@ -121,3 +131,21 @@ def _analytics(db) -> dict:
     context = "Indicateurs RH :\n" + "\n".join(ind_lines) + "\n\n" + risk_line
     sources = [{"id": k, "title": f"indicateur {k}", "score": 1.0} for k in indic]
     return {"engine": "E4", "system": SYSTEM_PROMPT_ANALYTICS, "context": context, "sources": sources}
+
+
+# ── E5 · Module données sensibles (Salaires) ──
+def _sensible(db, user, message: str) -> dict:
+    ms = repo.salary_mass(db)
+    total = ms.get("total", 0)
+    lines = [f"- Site {item['site']} : {item['montant']} €" for item in ms.get("by_site", [])]
+    
+    context = (
+        f"Base de données de rémunération Waminey Tech :\n"
+        f"Masse salariale totale : {total} €\n"
+        f"Répartition :\n" + "\n".join(lines) + "\n\n"
+        f"Note : La base contient plus de 1000 employés. La liste nominative complète des fiches "
+        f"de rémunération ne peut pas être générée dans le chat. Demandez à l'utilisateur "
+        f"d'utiliser le module de gestion de la paie pour télécharger les fiches individuelles."
+    )
+    sources = [{"id": "db_salaires", "title": "Base de données des rémunérations", "score": 1.0}]
+    return {"engine": "E5", "system": SYSTEM_PROMPT_SENSIBLE, "context": context, "sources": sources}

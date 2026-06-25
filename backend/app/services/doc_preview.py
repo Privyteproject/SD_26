@@ -117,3 +117,121 @@ def render(doc_type: str, emp: dict, additional: dict | None = None) -> tuple[st
     except Exception:
         html = _fallback_html(label, emp, additional)
     return document_name, html, _html_to_text(html)
+import io
+import re
+from pypdf import PdfReader, PdfWriter
+from docx import Document
+from jinja2 import Template
+
+def resolve_context_value(ctx, key):
+    # key e.g., "employee.nom", "employee_nom", "nom_complet"
+    key = key.strip().lower()
+    
+    # Handle specific computed fields like nom_complet
+    if "nom_complet" in key:
+        emp = ctx.get("employee", {})
+        return f"{emp.get('prenom', '')} {emp.get('nom', '')}".strip()
+        
+    parts = key.replace('_', '.').split('.')
+    val = ctx
+    for p in parts:
+        if isinstance(val, dict):
+            # Case insensitive key search
+            found = False
+            for k, v in val.items():
+                if k.lower() == p:
+                    val = v
+                    found = True
+                    break
+            if not found:
+                return ""
+        else:
+            return ""
+    return str(val) if val is not None else ""
+
+def fill_docx_template(binary_content, ctx):
+    doc = Document(io.BytesIO(binary_content))
+    
+    def process_runs(runs):
+        text = "".join(run.text for run in runs)
+        if "{{" in text and "}}" in text:
+            template = Template(text)
+            rendered = template.render(**ctx)
+            if runs:
+                runs[0].text = rendered
+                for run in runs[1:]:
+                    run.text = ""
+                    
+    for paragraph in doc.paragraphs:
+        process_runs(paragraph.runs)
+        
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    process_runs(paragraph.runs)
+                    
+    out = io.BytesIO()
+    doc.save(out)
+    return out.getvalue()
+
+def fill_pdf_template(binary_content, ctx):
+    reader = PdfReader(io.BytesIO(binary_content))
+    writer = PdfWriter()
+    
+    # Get form fields
+    fields = reader.get_fields()
+    field_updates = {}
+    if fields:
+        for field_name in fields.keys():
+            val = resolve_context_value(ctx, field_name)
+            if val:
+                field_updates[field_name] = val
+                
+    for page in reader.pages:
+        writer.add_page(page)
+        
+    if field_updates:
+        writer.update_page_form_field_values(
+            writer.pages[0], field_updates, auto_regenerate=False
+        )
+        
+    # Flatten PDF to prevent further editing
+    for page in writer.pages:
+        if "/Annots" in page:
+            for annot in page["/Annots"]:
+                annot_obj = annot.get_object()
+                if annot_obj.get("/Subtype") == "/Widget":
+                    annot_obj.update({
+                        # Set readonly flag (bit 1)
+                        "/Ff": 1
+                    })
+
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+def docx_to_html_preview(binary_content, document_name):
+    doc = Document(io.BytesIO(binary_content))
+    html = [
+        f"<div style='font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:20px;background:white;box-shadow:0 0 10px rgba(0,0,0,0.1);'>",
+        f"<h3 style='text-align:center;color:#333;margin-bottom:20px;'>Aperçu du document : {document_name}</h3>"
+    ]
+    
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if text:
+            html.append(f"<p style='margin-bottom:10px;line-height:1.5;'>{text}</p>")
+            
+    for table in doc.tables:
+        html.append("<table style='width:100%;border-collapse:collapse;margin-bottom:15px;'>")
+        for row in table.rows:
+            html.append("<tr>")
+            for cell in row.cells:
+                html.append(f"<td style='border:1px solid #ddd;padding:8px;'>{cell.text.strip()}</td>")
+            html.append("</tr>")
+        html.append("</table>")
+        
+    html.append("</div>")
+    return "\n".join(html)
+

@@ -45,8 +45,8 @@ export default function Documents() {
   };
 
   const download = async (d) => {
-    if (d.download_url) { window.open(d.download_url, "_blank"); return; }
-    try { await downloadDocument(d.id); } catch (e) { setMsg((e && (e.payload?.detail || e.message)) || t("common.error")); }
+    try { await downloadDocument(d.id); } 
+    catch (e) { setMsg((e && (e.payload?.detail || e.message)) || t("common.error")); }
   };
 
   const th = { padding: "12px 16px", fontSize: 12, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "left" };

@@ -17,12 +17,15 @@ function qs(params) {
 async function parse(res) { try { return await res.json(); } catch { return null; } }
 
 async function request(path, { method = "GET", body, params, _retry = false } = {}) {
-  const headers = { "Content-Type": "application/json" };
+  const isFormData = body instanceof FormData;
+  const headers = {};
+  if (!isFormData) headers["Content-Type"] = "application/json";
+  
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${path}${qs(params)}`, {
-    method, headers, body: body !== undefined ? JSON.stringify(body) : undefined,
+    method, headers, body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
   });
 
   // 401 : tenter un refresh silencieux UNE fois, puis rejouer la requête
@@ -193,6 +196,15 @@ export const getDocumentModeles = (params) => request("/documents/modeles", { pa
 export const createDocumentModele = (data) => request("/documents/modeles", { method: "POST", body: data });
 export const updateDocumentModele = (code, data) => request(`/documents/modeles/${code}`, { method: "PUT", body: data });
 export const deleteDocumentModele = (code) => request(`/documents/modeles/${code}`, { method: "DELETE" });
+export async function uploadDocumentModeleFile(code, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  return request(`/documents/modeles/${code}/upload`, { method: "POST", body: fd });
+}
+export const getPreviewPdfUrl = (token) => {
+  const t = getAccessToken();
+  return `${BASE}/documents/preview/pdf?token=${encodeURIComponent(token)}`;
+}
 export const createDocument = (data) => request("/documents", { method: "POST", body: data });
 // Types de documents disponibles (filtrés par rôle) : champs requis/optionnels + validation RH.
 export const getDocumentTypes = () => request("/documents/types");

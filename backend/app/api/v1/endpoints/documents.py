@@ -85,6 +85,38 @@ def update_modele(code: str, payload: ModeleDocumentUpdate, _: CurrentUser = Dep
     return envelope(m.to_dict())
 
 
+from fastapi import UploadFile, File
+import json
+import base64
+
+@router.post("/modeles/{code}/upload")
+async def upload_modele(code: str, file: UploadFile = File(...), _: CurrentUser = Depends(_VALIDATE), db: Session = Depends(get_db)):
+    from app.db.models import ModeleDocument
+    m = db.get(ModeleDocument, code)
+    if not m:
+        raise HTTPException(404, detail="Modèle introuvable")
+    
+    content = await file.read()
+    ext = file.filename.split(".")[-1].lower()
+    if ext not in ("docx", "pdf"):
+        raise HTTPException(400, detail="Format non supporté (.docx, .pdf)")
+        
+    minio_key = f"templates/{code}.{ext}"
+    if storage.available():
+        storage.put_bytes(minio_key, content)
+    
+    gabarit_data = {
+        "is_binary": True,
+        "format": ext,
+        "filename": file.filename,
+        "minio_key": minio_key,
+        "content_b64": base64.b64encode(content).decode("utf-8")
+    }
+    m.gabarit = json.dumps(gabarit_data)
+    db.commit()
+    return envelope(m.to_dict())
+
+
 @router.delete("/modeles/{code}")
 def delete_modele(code: str, _: CurrentUser = Depends(_VALIDATE), db: Session = Depends(get_db)):
     res = repo.delete_modele_document(db, code)
@@ -179,11 +211,14 @@ def preview_document(
     payload: DocumentPreviewRequest, user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Génère un APERÇU (rien n'est sauvegardé). Les données minimales sont mises en
-    cache Redis (TTL court) sous un jeton signé HMAC. Aucune donnée perso en clair :
-    on ne stocke que le type, le matricule et les champs additionnels."""
-    if not dtypes.can_generate(user.role, payload.type):
+    from app.db.models import ModeleDocument
+    import json
+    
+    # Allow custom models from DB or static types
+    modele = db.get(ModeleDocument, payload.type)
+    if not modele and not dtypes.can_generate(user.role, payload.type):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Type de document non autorisé pour votre rôle")
+        
     matricule = payload.employee_id
     if user.role not in _ELEVATED or not matricule:
         matricule = _own_matricule(db, user)
@@ -193,25 +228,76 @@ def preview_document(
     if emp is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
 
-    document_name, html_preview, _ = doc_preview.render(payload.type, _emp_dict(emp), payload.additional_data)
+    # Check if binary template
+    is_binary = False
+    gabarit_data = {}
+    if modele and modele.gabarit and modele.gabarit.strip().startswith("{"):
+        try:
+            parsed = json.loads(modele.gabarit)
+            if parsed.get("is_binary"):
+                is_binary = True
+                gabarit_data = parsed
+        except Exception:
+            pass
+
+    document_name = None
+    html_preview = None
+    
+    if is_binary:
+        document_name = gabarit_data.get("filename", f"document.{gabarit_data.get('format', 'pdf')}")
+        html_preview = ""
+        # If it's docx, we can still generate an HTML preview from it
+        if gabarit_data.get("format") == "docx":
+            import base64
+            bin_content = base64.b64decode(gabarit_data.get("content_b64", ""))
+            try:
+                # Pre-fill template in memory to show html preview with values
+                filled_docx = doc_preview.fill_docx_template(bin_content, {"employee": _emp_dict(emp), **payload.additional_data})
+                html_preview = doc_preview.docx_to_html_preview(filled_docx, document_name)
+            except Exception as e:
+                html_preview = f"<p>Aperçu indisponible : {str(e)}</p>"
+    else:
+        document_name, html_preview, _ = doc_preview.render(payload.type, _emp_dict(emp), payload.additional_data)
+        
     token, nonce = doc_preview.make_token()
     redis_cache.set(f"docpreview:{nonce}", {
         "type": payload.type, "matricule": matricule,
         "additional_data": payload.additional_data, "user_email": user.email,
+        "is_binary": is_binary, "gabarit_data": gabarit_data, "document_name": document_name
     }, ttl=settings.DOC_PREVIEW_TTL)
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=settings.DOC_PREVIEW_TTL)).isoformat()
     return envelope({"preview_token": token, "html_preview": html_preview,
-                     "document_name": document_name, "expires_at": expires_at})
+                     "document_name": document_name, "expires_at": expires_at, "is_binary": is_binary, "format": gabarit_data.get("format")})
 
+@router.get("/preview/pdf")
+def preview_pdf(token: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    nonce = doc_preview.verify_token(token)
+    if nonce is None:
+        raise HTTPException(400, detail="Jeton de prévisualisation invalide")
+    data = redis_cache.get(f"docpreview:{nonce}")
+    if not data or not data.get("is_binary"):
+        raise HTTPException(400, detail="Aperçu expiré ou type incorrect")
+        
+    emp = repo.get_employee(db, data["matricule"])
+    ctx = {"employee": _emp_dict(emp), **data.get("additional_data", {})}
+    gabarit_data = data["gabarit_data"]
+    
+    import base64
+    bin_content = base64.b64decode(gabarit_data.get("content_b64", ""))
+    
+    if gabarit_data.get("format") == "pdf":
+        filled = doc_preview.fill_pdf_template(bin_content, ctx)
+        return Response(content=filled, media_type="application/pdf")
+    else:
+        # For docx, we just return the filled docx file
+        filled = doc_preview.fill_docx_template(bin_content, ctx)
+        return Response(content=filled, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 @router.post("/submit", status_code=status.HTTP_201_CREATED)
 def submit_preview(
     payload: DocumentSubmitRequest, user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Confirme l'aperçu : vérifie le jeton (HMAC + Redis), génère le fichier,
-    l'upload dans MinIO, crée le document en statut 'pending', invalide le jeton
-    (usage unique) et journalise l'action."""
     nonce = doc_preview.verify_token(payload.preview_token)
     if nonce is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Jeton de prévisualisation invalide")
@@ -219,26 +305,52 @@ def submit_preview(
     data = redis_cache.get(key)
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Aperçu expiré, recommencez")
-    # Propriété : un collaborateur ne peut soumettre que son propre aperçu.
     if user.role not in _ELEVATED and data.get("user_email") != user.email:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Accès non autorisé")
-    # Re-contrôle du rôle au moment de la confirmation.
-    if not dtypes.can_generate(user.role, data.get("type", "")):
+
+    from app.db.models import ModeleDocument
+    modele = db.get(ModeleDocument, data["type"])
+    if not modele and not dtypes.can_generate(user.role, data.get("type", "")):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Type de document non autorisé pour votre rôle")
 
     emp = repo.get_employee(db, data["matricule"])
     if emp is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
-    document_name, _, text = doc_preview.render(data["type"], _emp_dict(emp), data.get("additional_data"))
-
-    doc = repo.create_submitted_document(db, matricule=emp.matricule, document_name=document_name,
-                                         contenu=text, type_doc=data["type"], code_modele=None)
+        
     uid = emp.id_utilisateur or emp.matricule
-    object_name = f"hr-documents/{uid}/{doc.id_document}/{document_name}"
-    if storage.put_bytes(object_name, text.encode("utf-8")):
-        repo.set_document_minio(db, doc.id_document, object_name)
+    
+    if data.get("is_binary"):
+        import base64
+        gabarit_data = data["gabarit_data"]
+        bin_content = base64.b64decode(gabarit_data.get("content_b64", ""))
+        ctx = {"employee": _emp_dict(emp), **data.get("additional_data", {})}
+        
+        if gabarit_data.get("format") == "pdf":
+            filled_binary = doc_preview.fill_pdf_template(bin_content, ctx)
+            document_name = data["document_name"]
+            type_doc = "pdf"
+            ct = "application/pdf"
+        else:
+            filled_binary = doc_preview.fill_docx_template(bin_content, ctx)
+            document_name = data["document_name"]
+            type_doc = "docx"
+            ct = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            
+        doc = repo.create_submitted_document(db, matricule=emp.matricule, document_name=document_name,
+                                             contenu=None, type_doc=data["type"], code_modele=data["type"])
+                                             
+        object_name = f"hr-documents/{uid}/{doc.id_document}/{document_name}"
+        if storage.available() and storage.put_bytes(object_name, filled_binary, content_type=ct):
+            repo.set_document_minio(db, doc.id_document, object_name)
+    else:
+        document_name, _, text = doc_preview.render(data["type"], _emp_dict(emp), data.get("additional_data"))
+        doc = repo.create_submitted_document(db, matricule=emp.matricule, document_name=document_name,
+                                             contenu=text, type_doc=data["type"], code_modele=None)
+        object_name = f"hr-documents/{uid}/{doc.id_document}/{document_name}"
+        if storage.put_bytes(object_name, text.encode("utf-8")):
+            repo.set_document_minio(db, doc.id_document, object_name)
 
-    redis_cache.delete(key)  # usage unique
+    redis_cache.delete(key)
     repo.log_audit(db, action="DOCUMENT_SUBMITTED", type_entite="document",
                    id_entite=doc.id_document, user_email=user.email)
     return envelope({"document_id": doc.id_document, "status": _TO_SPEC.get(doc.statut, doc.statut),
@@ -288,6 +400,19 @@ def download_document(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Document introuvable")
     if user.role not in _ELEVATED and doc.matricule != _own_matricule(db, user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Accès non autorisé")
+
+    # Si on a la cle_minio, on peut la servir directement !
+    if doc.cle_minio and storage.available():
+        bytes_data = storage.get_bytes(doc.cle_minio)
+        if bytes_data:
+            ext = doc.cle_minio.rsplit(".", 1)[-1].lower() if "." in doc.cle_minio else "pdf"
+            ct = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" if ext == "docx" else "application/pdf"
+            filename = doc.nom_fichier or f"document_{document_id}.{ext}"
+            return Response(
+                content=bytes_data,
+                media_type=ct,
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
 
     emp = repo.get_employee(db, doc.matricule)
     nom_complet = f"{emp.prenom} {emp.nom}" if emp else doc.matricule
