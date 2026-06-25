@@ -63,6 +63,20 @@ def put_bytes(object_name: str, data: bytes, content_type: str = "text/plain; ch
         return False
 
 
+def get_bytes(object_name: str) -> bytes | None:
+    c = _get()
+    if c is None:
+        return None
+    try:
+        response = c.get_object(settings.MINIO_BUCKET, object_name)
+        data = response.read()
+        response.close()
+        response.release_conn()
+        return data
+    except Exception:
+        return None
+
+
 def presigned_get(object_name: str, expires_seconds: int | None = None) -> str | None:
     """URL de téléchargement signée (via l'endpoint public), valable `expires_seconds`."""
     if _get() is None or _public is None:

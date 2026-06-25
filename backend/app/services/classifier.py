@@ -34,7 +34,7 @@ _DANGEREUX = ["arme", "explosif", "bombe", "drogue", "fabriquer une", "tuer",
 _RH = ["conge", "absence", "teletravail", "rtt", "salaire", "paie", "bulletin",
        "attestation", "contrat", "onboarding", "offboarding", "integration", "depart",
        "prime", "demission", "arret maladie", "rh", "entretien", "anciennete",
-       "solde de tout compte", "mutuelle", "formation",
+       "solde de tout compte", "mutuelle", "formation", "waminey", "synapse", "entreprise", "startup", "histoire",
        # déclencheurs des moteurs spécialisés (génération E2 / prédictif E4)
        "document", "generer", "certificat", "dossier",
        "turnover", "risque", "burnout", "desengagement", "absenteisme",

@@ -496,9 +496,27 @@ def _document_to_dict(self: Document) -> dict:
 
 
 def _modele_document_to_dict(self: ModeleDocument) -> dict:
+    import json
+    gabarit = self.gabarit
+    is_binary = False
+    format_doc = None
+    filename = None
+    if gabarit and gabarit.strip().startswith("{"):
+        try:
+            parsed = json.loads(gabarit)
+            if parsed.get("is_binary"):
+                is_binary = True
+                format_doc = parsed.get("format")
+                filename = parsed.get("filename")
+                # Ne pas renvoyer le lourd gabarit (qui contient content_b64)
+                gabarit = None
+        except Exception:
+            pass
+
     return {
         "code": self.code_modele, "libelle": self.libelle,
-        "categorie": self.categorie, "gabarit": self.gabarit,
+        "categorie": self.categorie, "gabarit": gabarit,
+        "is_binary": is_binary, "format": format_doc, "filename": filename,
         "actif": bool(self.actif) if self.actif is not None else True,
     }
 

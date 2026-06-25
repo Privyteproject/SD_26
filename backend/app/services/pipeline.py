@@ -44,20 +44,23 @@ def _lang_directive(message: str) -> tuple[str, str | None]:
 
 # ── Deux system prompts distincts (un par branche de routage) ──
 SYSTEM_PROMPT_RH = (
-    "Tu es l'assistant RH de « Synapse Digital ». Réponds de façon concise "
-    "et professionnelle.\n"
-    "1) Pour les informations PROPRES À L'ENTREPRISE (politiques internes, procédures, "
-    "soldes de congés, dossiers individuels, montants), appuie-toi UNIQUEMENT sur les "
-    "documents fournis ci-dessous. Si l'information n'y figure pas, dis-le clairement et "
-    "invite à contacter un responsable RH. N'invente JAMAIS de donnée interne.\n"
-    "2) Pour les questions GÉNÉRALES de connaissance RH ou de droit du travail (par ex. "
-    "définitions : CDI, CDD, période d'essai, préavis, congés légaux…), tu PEUX répondre "
-    "à partir de tes connaissances générales, de manière factuelle et concise, en "
-    "précisant qu'il s'agit d'une information générale et non d'un conseil juridique.\n"
-    "Ne donne pas de conseil médical. "
-    "Si la question concerne une situation humaine sensible ou urgente (harcèlement, "
-    "discrimination, détresse…), n'essaie pas d'y répondre seul : invite la personne à "
-    "contacter un référent RH (la plateforme ouvre alors automatiquement un ticket)."
+    "Tu es l'assistant RH de l'entreprise « Waminey Tech » (qui édite la plateforme « Synapse Digital »). Ton rôle est d'assister les collaborateurs, les managers et les RH en répondant strictement à partir du contexte fourni.\n\n"
+    "## RÈGLES FONDAMENTALES\n"
+    "1. **Source de Vérité:** Appuie-toi UNIQUEMENT sur les documents et données fournis dans le contexte. Si l'information n'y figure pas, dis-le clairement (ex: 'Je ne dispose pas de ces données'). N'invente JAMAIS de données internes.\n"
+    "2. **Identité:** L'entreprise est TOUJOURS « Waminey Tech » et l'application « Synapse Digital ».\n"
+    "3. **Contrôle d'Accès:** Respecte strictement les rôles. Si tu dois refuser un accès pour des raisons de droits, dis \"Vous n'avez pas l'autorisation d'accéder à ces informations.\"\n"
+    "4. **Confidentialité & Secret Médical:** Ne divulgue jamais les informations personnelles ou salariales d'autres employés sauf si autorisé. Ne donne JAMAIS de raisons médicales d'absence (protégées par le secret médical) sauf au rôle `medecine_travail`.\n"
+    "5. **Pas d'ID Internes:** N'affiche JAMAIS d'ID de base de données à l'utilisateur.\n\n"
+    "## ACTIONS ET GUIDAGE\n"
+    "Tu es un assistant conversationnel et tu ne peux pas exécuter d'actions techniques directement (pas d'outils). Si un utilisateur veut faire une action :\n"
+    "- **Documents:** Si un RH veut générer un document, oriente-le vers le module « Documents » pour utiliser les modèles (Word/PDF). Si un collaborateur veut un document personnel (ex: attestation de travail), informe-le qu'il peut formuler la demande via l'onglet dédié.\n"
+    "- **Congés/Tickets/Absences:** Oriente l'utilisateur vers les formulaires interactifs de l'interface de Synapse Digital.\n\n"
+    "## COMMENT RÉPONDRE\n"
+    "- **Réponds directement:** Ne dis pas « D'après le contexte... ». Donne juste la réponse avec les vraies valeurs.\n"
+    "- **Formatage:** Utilise des listes à puces (`-`), du **gras** pour les valeurs clés et des émojis professionnels. N'utilise JAMAIS de tableaux Markdown car ils s'affichent mal.\n"
+    "- **Risques (Désengagement/Burnout):** Ne divulgue JAMAIS le nom d'employés à risque. Donne uniquement des statistiques agrégées (par département) en invoquant la politique de confidentialité.\n"
+    "- **Culture générale RH:** Pour les définitions générales (CDI, préavis...), tu peux utiliser tes connaissances générales.\n"
+    "En cas de situation humaine sensible (harcèlement, détresse), invite la personne à contacter immédiatement un référent RH."
 )
 SYSTEM_PROMPT_GENERAL = (
     "Tu es un assistant polyvalent dans le cadre d'une plateforme RH. "
@@ -142,7 +145,7 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
         raise RateLimited()
 
     # 2) Sécurité : injection / attaque
-    attack, _ = security_filter.detect_injection(message)
+    attack, _ = security_filter.detect_injection(message, user.role)
     if attack:
         meta.update({"perimetre": classifier.PERIMETRE_DANGEREUX, "blocked": "injection"})
         res = _refusal("Votre requête a été bloquée pour des raisons de sécurité.", meta)
@@ -273,7 +276,7 @@ def generate(db, user: CurrentUser, message: str, history: list, *, mode: Mode,
         masked, mapping = (pii.mask(message) if settings.PII_MASKING else (message, {}))
         meta["pii_masked"] = bool(mapping)
         out = ai_service.complete(SYSTEM_PROMPT_GENERAL + suffix, masked, history)
-        return _finalize(db, user, message, out, meta, want_judge, ck, SYSTEM_PROMPT_GENERAL)
+        return _finalize(db, user, message, out, meta, want_judge, ck, SYSTEM_PROMPT_GENERAL, mapping)
 
     # ── Branche 4A : routage vers le bon moteur RH selon le type de demande ──
     # E2 génération documentaire / E3 onboarding-offboarding / E4 prédictif analytics
@@ -289,7 +292,7 @@ def generate(db, user: CurrentUser, message: str, history: list, *, mode: Mode,
         masked, mapping = (pii.mask(enriched) if settings.PII_MASKING else (enriched, {}))
         meta["pii_masked"] = bool(mapping)
         out = ai_service.complete(eng["system"] + suffix, masked, history)
-        return _finalize(db, user, message, out, meta, want_judge, ck, eng["system"])
+        return _finalize(db, user, message, out, meta, want_judge, ck, eng["system"], mapping)
 
     # ── E1 · RAG documentaire : récupération filtrée par rôle + reranking (ChromaDB) ──
     meta["engine"] = "E1"
@@ -311,10 +314,10 @@ def generate(db, user: CurrentUser, message: str, history: list, *, mode: Mode,
     meta["pii_masked"] = bool(mapping)
 
     out = ai_service.complete(SYSTEM_PROMPT_RH + suffix, masked, history)
-    return _finalize(db, user, message, out, meta, want_judge, ck, SYSTEM_PROMPT_RH)
+    return _finalize(db, user, message, out, meta, want_judge, ck, SYSTEM_PROMPT_RH, mapping)
 
 
-def _finalize(db, user, message, out, meta, want_judge, ck, system_prompt) -> dict:
+def _finalize(db, user, message, out, meta, want_judge, ck, system_prompt, mapping=None) -> dict:
     """Post-filtrage → juge → conformité (reformulation) → cache → audit."""
     reply = (out.get("reply") or "").strip()
     meta["fallback_used"] = out.get("fallback_used", False)
@@ -329,6 +332,9 @@ def _finalize(db, user, message, out, meta, want_judge, ck, system_prompt) -> di
             refined = ai_service.refine(message, reply, judge.get("justification", ""), system_prompt)
             reply = (refined.get("reply") or reply).strip()
             out["model"] = refined.get("model", out["model"])
+
+    if mapping:
+        reply = pii.unmask(reply, mapping)
 
     result = {"reply": reply, "model": out["model"], "degraded": out.get("degraded", False),
               "usage": out.get("usage", {}), "judge": judge, "meta": meta}

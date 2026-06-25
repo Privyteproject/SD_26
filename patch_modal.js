@@ -1,31 +1,14 @@
-import { useState, useEffect } from "react";
+const fs = require('fs');
+const path = './frontend/src/features/documents/pages/DocumentPreviewModal.jsx';
+let content = fs.readFileSync(path, 'utf8');
+
+const newImports = `import { useState, useEffect } from "react";
 import { X, Send, Clock, Download } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
-import { getPreviewPdfUrl } from "../../../lib/api";
+import { getPreviewPdfUrl } from "../../../lib/api";`;
+content = content.replace(/import \{ useState, useEffect \} from "react";\nimport \{ X, Send, Clock \} from "lucide-react";\nimport \{ useI18n \} from "\.\.\/\.\.\/\.\.\/app\/providers\/I18nProvider";/, newImports);
 
-// Modal d'aperçu : affiche le HTML généré, un compte à rebours d'expiration du
-// preview_token, et confirme la soumission.
-export default function DocumentPreviewModal({ preview, onConfirm, onClose, busy }) {
-  const { t } = useI18n();
-  const [left, setLeft] = useState(0);
-
-  useEffect(() => {
-    if (!preview?.expires_at) return;
-    const end = new Date(preview.expires_at).getTime();
-    const tick = () => setLeft(Math.max(0, Math.floor((end - Date.now()) / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [preview]);
-
-  const expired = left <= 0;
-  const m = Math.floor(left / 60);
-  const s = left % 60;
-  const mmss = `${m}:${s < 10 ? "0" : ""}${s}`;
-
-  if (!preview) return null;
-
-  return (
+const newRender = `  return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", height: "100vh", maxWidth: 840, background: "var(--surface)", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 0 20px rgba(0,0,0,0.2)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 22px", borderBottom: "1px solid var(--line)" }}>
@@ -64,5 +47,7 @@ export default function DocumentPreviewModal({ preview, onConfirm, onClose, busy
         </div>
       </div>
     </div>
-  );
-}
+  );`;
+
+content = content.replace(/  return \([\s\S]*\);\n\}/, newRender + "\n}");
+fs.writeFileSync(path, content);
