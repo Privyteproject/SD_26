@@ -42,6 +42,20 @@ def _job_batch_score():
         db.close()
 
 
+def _job_purge_logs():
+    from app.core.config import settings
+    from app.db.base import SessionLocal
+    from app.db import repository as repo
+    db = SessionLocal()
+    try:
+        res = repo.purge_ia_logs(db, days=settings.LOG_RETENTION_DAYS)
+        log.info("Job purge logs IA : %s", res)
+    except Exception as exc:
+        log.exception("Job purge_logs échoué : %s", exc)
+    finally:
+        db.close()
+
+
 def start() -> None:
     """Démarre l'ordonnanceur (idempotent). À appeler au démarrage de l'app."""
     global _scheduler
@@ -70,6 +84,9 @@ def start() -> None:
     sch.add_job(_job_batch_score, IntervalTrigger(hours=24),
                 id="batch_score", replace_existing=True, max_instances=1,
                 next_run_time=datetime.now(_tz.utc) + timedelta(minutes=2))
+    # Purge des journaux IA au-delà de la rétention (RGPD) — tous les jours à 03:30.
+    sch.add_job(_job_purge_logs, CronTrigger(hour=3, minute=30),
+                id="purge_logs", replace_existing=True, max_instances=1)
     sch.start()
     _scheduler = sch
     log.info("Ordonnanceur démarré. Jobs : %s", [j.id for j in sch.get_jobs()])

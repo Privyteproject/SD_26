@@ -66,7 +66,14 @@ export default function Assistant({ audience = "collaborateur" }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 64px - 110px)" }}>
-      <h1 className="font-display" style={{ fontSize: 24, fontWeight: 600, color: "var(--ink)", margin: "0 0 14px" }}>{title}</h1>
+      <h1 className="font-display" style={{ fontSize: 24, fontWeight: 600, color: "var(--ink)", margin: "0 0 10px" }}>{title}</h1>
+
+      {/* Transparence (§4.1) : information sur la journalisation des échanges. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--muted)",
+        background: "var(--field)", border: "1px solid var(--line)", borderRadius: 9, padding: "8px 12px", margin: "0 0 14px" }}>
+        <ShieldCheck size={14} style={{ color: "var(--gold-deep)", flexShrink: 0 }} />
+        <span>{t("chat.privacyNotice")}</span>
+      </div>
 
       <div style={{ display: "flex", gap: 14, flex: 1, minHeight: 0 }}>
         {/* Colonne gauche : historique */}

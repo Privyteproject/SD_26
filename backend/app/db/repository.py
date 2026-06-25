@@ -253,11 +253,14 @@ def dashboard_counts(db) -> dict:
 # ───────────── Journalisation IA (table interaction_ia) ─────────────
 def log_ia_interaction(db, *, user_email, prompt, reponse, tokens, model, sensible=False, conversation_id=None):
     from app.db.models import InteractionIA
+    from app.services import crypto
     u = db.scalar(select(Utilisateur).where(Utilisateur.email == user_email))
     if u is None:
         return None  # pas de compte rattaché -> pas de log (FK obligatoire)
     it = InteractionIA(
-        prompt=prompt, reponse=reponse, tokens_used=tokens, model_name=model,
+        # Chiffrement au repos (§3.3) : contenu illisible en base sans la clé.
+        prompt=crypto.encrypt(prompt), reponse=crypto.encrypt(reponse),
+        tokens_used=tokens, model_name=model,
         statut="ok", sensible=sensible, id_utilisateur=u.id_utilisateur,
         id_conversation=conversation_id,
     )
@@ -652,6 +655,7 @@ def list_ia_interactions(db, *, limit: int = 100) -> list[dict]:
     longueur indicative (`prompt_len`) ; le détail est accessible via un endpoint
     dédié et tracé. Les e-mails sont pseudonymisés (partiellement masqués)."""
     from app.db.models import InteractionIA
+    from app.services import crypto
     rows = db.execute(
         select(InteractionIA, Utilisateur)
         .join(Utilisateur, InteractionIA.id_utilisateur == Utilisateur.id_utilisateur, isouter=True)
@@ -665,7 +669,7 @@ def list_ia_interactions(db, *, limit: int = 100) -> list[dict]:
             "date": it.date_creation.isoformat() if it.date_creation else None,
             "user": _mask_email(u.email) if u else None,
             "role": u.code_role if u else None,
-            "prompt_len": len(it.prompt or ""),
+            "prompt_len": len(crypto.decrypt(it.prompt) or ""),  # longueur réelle (déchiffrée côté serveur)
             "statut": it.statut,
             "sensible": it.sensible,
             "tokens": it.tokens_used,
@@ -685,6 +689,7 @@ def _mask_email(email: str | None) -> str | None:
 def ia_interaction_detail(db, id_interaction, *, viewer_email=None) -> dict | None:
     """Contenu complet d'un échange IA — accès réservé et TRACÉ (audit)."""
     from app.db.models import InteractionIA, Utilisateur
+    from app.services import crypto
     it = db.get(InteractionIA, id_interaction)
     if it is None:
         return None
@@ -695,9 +700,26 @@ def ia_interaction_detail(db, id_interaction, *, viewer_email=None) -> dict | No
         "id": it.id_interaction,
         "date": it.date_creation.isoformat() if it.date_creation else None,
         "user": u.email if u else None, "role": u.code_role if u else None,
-        "prompt": it.prompt, "reponse": it.reponse,
+        # Déchiffrement à la volée — accès exceptionnel, réservé ADMIN et tracé ci-dessus.
+        "prompt": crypto.decrypt(it.prompt), "reponse": crypto.decrypt(it.reponse),
         "sensible": it.sensible, "tokens": it.tokens_used, "model": it.model_name,
     }
+
+
+def purge_ia_logs(db, days: int = 90) -> dict:
+    """Purge des journaux d'interactions IA au-delà de la rétention (RGPD / §4.4).
+    Supprime aussi les liens source_ia associés pour respecter l'intégrité."""
+    from datetime import timedelta, timezone
+    from app.db.models import InteractionIA, SourceIA
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    old_ids = list(db.scalars(
+        select(InteractionIA.id_interaction).where(InteractionIA.date_creation < cutoff)))
+    if not old_ids:
+        return {"purged": 0, "retention_days": days}
+    db.execute(sa_delete(SourceIA).where(SourceIA.id_interaction.in_(old_ids)))
+    db.execute(sa_delete(InteractionIA).where(InteractionIA.id_interaction.in_(old_ids)))
+    db.commit()
+    return {"purged": len(old_ids), "retention_days": days}
 
 
 def ia_interactions_stats(db) -> dict:

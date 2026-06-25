@@ -98,6 +98,11 @@ class Settings:
     DOC_PREVIEW_TTL: int = int(os.getenv("DOC_PREVIEW_TTL", "600"))  # 10 min
     DOC_DOWNLOAD_TTL: int = int(os.getenv("DOC_DOWNLOAD_TTL", "86400"))  # 24 h
 
+    # --- Journalisation IA : rétention + chiffrement au repos (RGPD / §4.4) ---
+    LOG_RETENTION_DAYS: int = int(os.getenv("LOG_RETENTION_DAYS", "90"))  # purge auto au-delà
+    LOG_ENCRYPTION_SECRET: str = os.getenv(
+        "LOG_ENCRYPTION_SECRET", os.getenv("DOC_PREVIEW_SECRET", "dev-doc-preview-secret"))
+
     # --- CORS (serveur Vite) ---
     CORS_ORIGINS: list[str] = _csv(os.getenv("CORS_ORIGINS", "http://localhost:5173"))
 
