@@ -1,10 +1,25 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bell, ShieldAlert, Calendar, Info, LifeBuoy } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Bell, ShieldAlert, Calendar, Info, LifeBuoy, CheckCheck } from "lucide-react";
 import { useI18n } from "../../app/providers/I18nProvider";
-import { getNotifications, markNotificationRead } from "../../lib/api";
+import { useSession } from "../../app/providers/SessionProvider";
+import { RH_SPACE_ROLES } from "../../lib/constants";
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from "../../lib/api";
 
 const ICON = { securite: ShieldAlert, absence: Calendar, escalade: LifeBuoy };
 const COLOR = { high: "var(--danger)", mid: "var(--gold-deep)", low: "var(--muted)" };
+
+// Source à ouvrir au clic, selon la catégorie de la notification (espace RH).
+const ROUTE_BY_CAT = {
+  risque_eleve: "/rh/desengagement",
+  parcours_retard: "/rh/onboarding",
+  escalade: "/rh/alertes",
+  securite: "/rh/alertes",
+  acces_refuse: "/rh/alertes",
+  acces_refuse_repete: "/rh/alertes",
+  fuite_donnees: "/rh/alertes",
+  absence: "/rh/demandes",
+};
 
 function ago(iso, lang) {
   if (!iso) return "";
@@ -19,6 +34,9 @@ function ago(iso, lang) {
 // Cloche de notifications : polling 30 s, badge non-lues, menu déroulant.
 export default function NotificationBell() {
   const { t, lang } = useI18n();
+  const { role } = useSession();
+  const navigate = useNavigate();
+  const isElevated = [...RH_SPACE_ROLES].includes(role);
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -44,9 +62,18 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const onRead = async (n) => {
-    if (n.lue) return;
-    try { await markNotificationRead(n.id); load(); } catch { /* ignore */ }
+  // Clic sur une notification : marque comme lue, ferme le menu, redirige vers la source.
+  const onOpen = async (n) => {
+    if (!n.lue) { try { await markNotificationRead(n.id); } catch { /* ignore */ } }
+    setOpen(false);
+    const target = isElevated ? (ROUTE_BY_CAT[n.categorie] || "/rh/alertes")
+                              : (n.categorie === "absence" ? "/app/demandes" : "/app");
+    navigate(target);
+    load();
+  };
+
+  const clearAll = async () => {
+    try { await markAllNotificationsRead(); load(); } catch { /* ignore */ }
   };
 
   return (
@@ -62,13 +89,20 @@ export default function NotificationBell() {
 
       {open && (
         <div style={{ position: "absolute", right: 0, top: 46, width: 320, maxHeight: 420, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, boxShadow: "var(--shadow)", zIndex: 40, padding: 6 }}>
-          <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, padding: "8px 10px" }}>{t("notif.title")}</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px" }}>
+            <span style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>{t("notif.title")}</span>
+            {items.length > 0 && (
+              <button type="button" onClick={clearAll} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: "none", color: "var(--gold-deep)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+                <CheckCheck size={14} /> {t("notif.clearAll")}
+              </button>
+            )}
+          </div>
           {items.length === 0 ? (
             <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--muted)" }}>{t("notif.empty")}</div>
           ) : items.map((n) => {
             const Icon = ICON[n.categorie] || Info;
             return (
-              <button key={n.id} onClick={() => onRead(n)} style={{ width: "100%", display: "flex", gap: 9, padding: "9px 10px", borderRadius: 8, border: "none", background: n.lue ? "transparent" : "var(--gold-tint)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
+              <button key={n.id} onClick={() => onOpen(n)} style={{ width: "100%", display: "flex", gap: 9, padding: "9px 10px", borderRadius: 8, border: "none", background: n.lue ? "transparent" : "var(--gold-tint)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
                 <Icon size={16} style={{ color: COLOR[n.gravite] || "var(--muted)", flexShrink: 0, marginTop: 2 }} />
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 13, color: "var(--ink)", lineHeight: 1.35 }}>{n.message}</span>

@@ -625,6 +625,23 @@ def list_alertes_for(db, *, user_email, role, limit=30):
     return [_alerte_to_dict(a) for a in rows], unread
 
 
+def mark_all_alertes_read(db, *, user_email, role) -> int:
+    """Marque comme lues toutes les notifications visibles par l'utilisateur (« clear all »).
+    Même périmètre que la lecture (anti-IDOR)."""
+    from app.db.models import Alerte
+    uid = _uid(db, user_email)
+    conds = []
+    if uid is not None:
+        conds.append(Alerte.id_destinataire == uid)
+    if role in _ALERT_BROADCAST_ROLES:
+        conds.append(Alerte.id_destinataire.is_(None))
+    if not conds:
+        return 0
+    res = db.execute(sa_update(Alerte).where(or_(*conds), Alerte.lue.is_(False)).values(lue=True))
+    db.commit()
+    return res.rowcount or 0
+
+
 def mark_alerte_read(db, *, id_alerte, user_email, role) -> bool:
     from app.db.models import Alerte
     a = db.get(Alerte, id_alerte)
@@ -720,6 +737,60 @@ def purge_ia_logs(db, days: int = 90) -> dict:
     db.execute(sa_delete(InteractionIA).where(InteractionIA.id_interaction.in_(old_ids)))
     db.commit()
     return {"purged": len(old_ids), "retention_days": days}
+
+
+# ───────────── Accès données sensibles employé (moteur E5 / ABAC) ─────────────
+def _norm_txt(s: str) -> str:
+    """Normalise (sans accents, minuscules) pour la détection de noms dans un texte."""
+    import unicodedata
+    return unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode("ascii").lower()
+
+
+def find_employees_in_text(db, message: str, limit: int = 5) -> list:
+    """Détecte les employés nommés dans le message (scan nom/prénom/matricule normalisé).
+
+    Approche simple O(n) validée pour l'échelle actuelle ; indexable (pg_trgm) si > 10k.
+    Match sur le nom de famille, le « prénom nom » complet, ou le matricule.
+    """
+    import re
+    from app.db.models import Employe
+    msg = _norm_txt(message)
+    tokens = set(re.findall(r"[a-z0-9]+", msg))
+    out = []
+    for e in db.scalars(select(Employe)):
+        pn, nn = _norm_txt(e.prenom), _norm_txt(e.nom)
+        full = f"{pn} {nn}".strip()
+        if (len(nn) >= 3 and nn in tokens) or (full and full in msg) or (e.matricule or "").lower() in tokens:
+            out.append(e)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def get_latest_salary(db, matricule):
+    """Dernière ligne d'historique de salaire (ou None)."""
+    from app.db.models import HistoriqueSalaire
+    return db.scalars(
+        select(HistoriqueSalaire).where(HistoriqueSalaire.matricule == matricule)
+        .order_by(HistoriqueSalaire.date_effet.desc()).limit(1)).first()
+
+
+def get_dossier_confidentiel(db, matricule) -> dict | None:
+    """Dossier confidentiel (CIN, adresse) déchiffré à la volée (no-op si déjà en clair)."""
+    from app.db.models import DossierConfidentiel
+    from app.services import crypto
+    d = db.get(DossierConfidentiel, matricule)
+    if d is None:
+        return None
+    return {"matricule": d.matricule, "cin": crypto.decrypt(d.cin), "adresse": crypto.decrypt(d.adresse)}
+
+
+def get_employee_documents(db, matricule, types=("CONTRAT", "FICHE_PAIE")) -> list:
+    """Documents d'un employé filtrés par type métier (contrats, fiches de paie…)."""
+    from app.db.models import Document
+    return list(db.scalars(
+        select(Document).where(Document.matricule == matricule, Document.type_doc.in_(list(types)))
+        .order_by(Document.date_creation.desc())))
 
 
 def ia_interactions_stats(db) -> dict:

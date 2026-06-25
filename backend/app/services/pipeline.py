@@ -285,7 +285,14 @@ def generate(db, user: CurrentUser, message: str, history: list, *, mode: Mode,
     if engine_id:
         eng = rh_engines.build(db, user, message, type_rh)
         meta["engine"] = eng["engine"]
-        meta["sources"] = eng["sources"]
+        meta["sources"] = eng.get("sources", [])
+        # Réponse DÉTERMINISTE (E5 données sensibles) : aucune PII vers le LLM externe,
+        # pas de mise en cache. Le contenu (chiffré au repos) est journalisé pour l'audit.
+        if eng.get("direct_answer"):
+            res = {"reply": eng["reply"], "model": "rh-engine", "degraded": False,
+                   "usage": {}, "judge": None, "meta": meta}
+            _audit(db, user, message, res)
+            return res
         enriched = (f"Contexte utilisateur : rôle={user.role}.\n"
                     f"Données internes autorisées :\n{eng['context']}\n\n"
                     f"Question : {message}")

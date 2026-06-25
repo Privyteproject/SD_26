@@ -16,7 +16,7 @@ const fmt = (iso, lang) => (iso ? new Date(iso).toLocaleString(lang === "fr" ? "
 export default function Alerts() {
   const { t, lang } = useI18n();
   const { data, loading, error, reload } = useAsync(async () => {
-    const res = await getPrioritizedAlertes({ include_resolved: true });
+    const res = await getPrioritizedAlertes({ include_resolved: false });
     return (res && res.data) || [];
   });
   const alertes = data || [];
@@ -151,10 +151,10 @@ export default function Alerts() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {planOptions.map(option => (
-                  <label key={option} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14.5, color: "var(--ink)", padding: "10px 14px", border: "1px solid var(--line)", borderRadius: 8, transition: "0.2s", background: selectedPlans.includes(option) ? "var(--field)" : "transparent", borderColor: selectedPlans.includes(option) ? "var(--primary)" : "var(--line)" }}>
-                    <input 
-                      type="checkbox" 
-                      style={{ width: 16, height: 16, accentColor: "var(--primary)", cursor: "pointer" }}
+                  <label key={option} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14.5, color: "var(--ink)", padding: "10px 14px", border: "1px solid var(--line)", borderRadius: 8, transition: "0.2s", background: selectedPlans.includes(option) ? "var(--gold-tint)" : "transparent", borderColor: selectedPlans.includes(option) ? "var(--gold)" : "var(--line)" }}>
+                    <input
+                      type="checkbox"
+                      style={{ width: 16, height: 16, accentColor: "var(--gold)", cursor: "pointer" }}
                       checked={selectedPlans.includes(option)} 
                       onChange={(e) => {
                         if (e.target.checked) setSelectedPlans(p => [...p, option]);
@@ -176,9 +176,9 @@ export default function Alerts() {
                 {t("al.cancel")}
               </button>
               <button 
-                disabled={selectedPlans.length === 0 || busy === "submit-plan"} 
-                onClick={submitPlan} 
-                style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: "var(--primary)", color: "#fff", cursor: selectedPlans.length === 0 ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 14, opacity: selectedPlans.length === 0 ? 0.5 : 1, display: "flex", alignItems: "center", gap: 8 }}
+                disabled={selectedPlans.length === 0 || busy === "submit-plan"}
+                onClick={submitPlan}
+                style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: "var(--gold)", color: "var(--on-gold)", cursor: selectedPlans.length === 0 ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 14, opacity: selectedPlans.length === 0 ? 0.5 : 1, display: "flex", alignItems: "center", gap: 8 }}
               >
                 {busy === "submit-plan" ? t("al.submitting") : t("al.submitPlan")}
               </button>

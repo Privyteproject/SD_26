@@ -180,6 +180,7 @@ export async function downloadReport() {
 // ---- Notifications (cloche) ----
 export const getNotifications = () => request("/notifications");
 export const markNotificationRead = (id) => request(`/notifications/${id}/read`, { method: "PATCH" });
+export const markAllNotificationsRead = () => request("/notifications/read-all", { method: "PATCH" });
 
 // ---- Worklist priorisée (alertes RH/sécurité) ----
 export const getPrioritizedAlertes = (params) => request("/alertes/prioritized", { params });

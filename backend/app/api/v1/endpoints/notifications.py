@@ -22,6 +22,13 @@ def list_notifications(user: CurrentUser = Depends(get_current_user), db: Sessio
     return envelope(items, meta={"total": len(items), "unread": unread})
 
 
+@router.patch("/read-all")
+def mark_all_read(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """« Clear all » : marque toutes les notifications de l'utilisateur comme lues."""
+    n = repo.mark_all_alertes_read(db, user_email=user.email, role=user.role)
+    return envelope({"updated": n})
+
+
 @router.patch("/{id_alerte}/read")
 def mark_read(id_alerte: int, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     if not repo.mark_alerte_read(db, id_alerte=id_alerte, user_email=user.email, role=user.role):

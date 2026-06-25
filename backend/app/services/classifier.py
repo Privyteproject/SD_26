@@ -42,11 +42,14 @@ _RH = ["conge", "absence", "teletravail", "rtt", "salaire", "paie", "bulletin",
 
 _SALUTATIONS = {"bonjour", "salut", "merci", "ok", "hello", "coucou"}
 
+# Ordre = priorité : « sensible » (données personnelles : contrat, dossier, paie…) est
+# évalué AVANT « generation » pour qu'une demande de consultation parte vers E5 (ABAC).
 _TYPES = {
-    "generation": ["attestation", "document", "bulletin", "certificat", "contrat", "generer"],
-    "parcours": ["onboarding", "offboarding", "integration", "depart", "arrivee"],
-    "sensible": ["salaire", "paie", "prime", "dossier", "cin", "medical", "sante", "handicap", "remuneration"],
+    "sensible": ["salaire", "paie", "prime", "dossier", "cin", "medical", "sante", "handicap",
+                 "remuneration", "contrat", "clause", "fiche", "personnel"],
     "predictive": ["turnover", "risque", "burnout", "desengagement", "prevision", "tendance", "absenteisme"],
+    "parcours": ["onboarding", "offboarding", "integration", "depart", "arrivee"],
+    "generation": ["attestation", "document", "certificat", "generer", "bulletin"],
 }
 
 

@@ -133,19 +133,104 @@ def _analytics(db) -> dict:
     return {"engine": "E4", "system": SYSTEM_PROMPT_ANALYTICS, "context": context, "sources": sources}
 
 
-# ── E5 · Module données sensibles (Salaires) ──
-def _sensible(db, user, message: str) -> dict:
+# ── E5 · Module données sensibles (paie, contrat, dossier) avec ABAC ──
+def _direct_e5(text: str, sources: list | None = None) -> dict:
+    """Réponse DÉTERMINISTE : le pipeline la renvoie telle quelle, sans appeler le LLM
+    externe (la donnée personnelle ne quitte jamais le système — loi 09-08)."""
+    return {"engine": "E5", "direct_answer": True, "reply": text, "sources": sources or []}
+
+
+def _sensible_aggregate(db) -> dict:
+    """Repli : masse salariale AGRÉGÉE (aucune donnée personnelle) — passe par le LLM."""
     ms = repo.salary_mass(db)
     total = ms.get("total", 0)
     lines = [f"- Site {item['site']} : {item['montant']} €" for item in ms.get("by_site", [])]
-    
-    context = (
-        f"Base de données de rémunération Waminey Tech :\n"
-        f"Masse salariale totale : {total} €\n"
-        f"Répartition :\n" + "\n".join(lines) + "\n\n"
-        f"Note : La base contient plus de 1000 employés. La liste nominative complète des fiches "
-        f"de rémunération ne peut pas être générée dans le chat. Demandez à l'utilisateur "
-        f"d'utiliser le module de gestion de la paie pour télécharger les fiches individuelles."
-    )
+    context = (f"Masse salariale totale : {total} €\nRépartition par site :\n" + "\n".join(lines) +
+               "\n\nPour une fiche individuelle, l'utilisateur doit nommer le collaborateur concerné.")
     sources = [{"id": "db_salaires", "title": "Base de données des rémunérations", "score": 1.0}]
     return {"engine": "E5", "system": SYSTEM_PROMPT_SENSIBLE, "context": context, "sources": sources}
+
+
+def _sensible(db, user, message: str) -> dict:
+    """E5 — données sensibles individuelles avec contrôle d'accès attributaire (ABAC).
+
+    Conformité loi 09-08 :
+    - la donnée personnelle (salaire, CIN, adresse, documents) n'est JAMAIS envoyée au LLM
+      externe : la réponse est construite de façon DÉTERMINISTE côté serveur ;
+    - RH/Direction/Admin : accès à tout employé ; Manager : uniquement ses collaborateurs directs ;
+    - chaque accès autorisé est journalisé (audit), chaque refus génère une alerte ;
+    - sans employé nommé : repli sur la masse salariale agrégée.
+    """
+    role = (user.role or "").upper()
+    actor = _employe(db, user)
+    targets = repo.find_employees_in_text(db, message)
+
+    if not targets:
+        return _sensible_aggregate(db)
+
+    if len(targets) > 1:
+        noms = ", ".join(f"{t.prenom} {t.nom} ({t.matricule})" for t in targets[:5])
+        return _direct_e5(f"Plusieurs collaborateurs correspondent : {noms}. "
+                          f"Merci de préciser le nom complet ou le matricule.")
+
+    emp = targets[0]
+
+    # ── ABAC : périmètre d'accès ──
+    allowed = role in ("RH", "DIRECTION", "ADMIN")
+    if not allowed and role == "MANAGER":
+        allowed = bool(actor and emp.matricule_manager == actor.matricule)
+
+    if not allowed:
+        try:
+            repo.create_alerte(
+                db, message=(f"Accès refusé (ABAC) aux données de {emp.matricule} par "
+                             f"{user.email} — hors périmètre."),
+                categorie="acces_refuse", gravite="mid",
+                id_destinataire=None, matricule=(actor.matricule if actor else None))
+        except Exception:
+            db.rollback()
+        return _direct_e5(
+            f"Accès refusé : {emp.prenom} {emp.nom} ne fait pas partie de votre périmètre. "
+            f"Seules les données de vos collaborateurs directs sont accessibles (ou via un compte RH).")
+
+    # ── Accès autorisé : réponse déterministe (aucune PII vers le LLM) ──
+    sal = repo.get_latest_salary(db, emp.matricule)
+    docs = repo.get_employee_documents(db, emp.matricule)
+    # Le dossier (CIN/adresse) reste réservé RH/Direction/Admin, pas aux managers.
+    dossier = repo.get_dossier_confidentiel(db, emp.matricule) if role in ("RH", "DIRECTION", "ADMIN") else None
+
+    parts = [f"Données de {emp.prenom} {emp.nom} ({emp.matricule}) — poste : {emp.poste or '—'}, "
+             f"statut : {emp.statut}."]
+    if sal:
+        parts.append(f"Dernier salaire connu : {float(sal.montant):,.0f} MAD (effet "
+                     f"{sal.date_effet.isoformat() if sal.date_effet else '—'}, motif {sal.motif or '—'}).")
+    else:
+        parts.append("Aucun historique de salaire enregistré.")
+
+    if docs:
+        dl = []
+        for d in docs:
+            datec = d.date_creation.strftime("%d/%m/%Y") if d.date_creation else "—"
+            if d.contenu:  # document texte -> on restitue le contenu (clauses, détail)
+                dl.append(f"  • [{d.type_doc}] {d.nom_fichier} ({datec}) :\n{d.contenu}")
+            elif d.cle_minio:  # PDF binaire -> non restitué dans le chat
+                dl.append(f"  • [{d.type_doc}] {d.nom_fichier} ({datec}) — PDF à télécharger via le module Documents")
+            else:
+                dl.append(f"  • [{d.type_doc}] {d.nom_fichier} ({datec})")
+        parts.append("Documents :\n" + "\n".join(dl))
+    else:
+        parts.append("Aucun contrat ni fiche de paie enregistré.")
+
+    if dossier and (dossier.get("cin") or dossier.get("adresse")):
+        parts.append(f"Dossier confidentiel — CIN : {dossier.get('cin') or '—'}, "
+                     f"adresse : {dossier.get('adresse') or '—'}.")
+
+    # Journalisation de l'accès (traçabilité loi 09-08).
+    try:
+        repo.log_audit(db, action="SENSITIVE_DATA_VIEW", type_entite="employe",
+                       id_entite=emp.matricule, user_email=user.email)
+    except Exception:
+        db.rollback()
+
+    return _direct_e5("\n".join(parts),
+                      sources=[{"id": emp.matricule, "title": f"Dossier {emp.matricule}", "score": 1.0}])

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, KeyRound, AlertCircle, LogIn } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, LogIn } from "lucide-react";
 import Logo from "../../../components/Logo";
 import LanguageToggle from "../../../components/LanguageToggle";
 import ThemeToggle from "../../../components/ThemeToggle";
@@ -93,10 +93,6 @@ export default function Login() {
 
             <button type="submit" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", height: 48, borderRadius: 9, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit" }}>
               {loading ? "…" : t("login.submit")} <ArrowRight size={18} />
-            </button>
-
-            <button type="button" disabled title="Keycloak — à venir" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", color: "var(--muted)", height: 44, borderRadius: 9, fontSize: 13.5, fontWeight: 600, border: "1px solid var(--line)", cursor: "not-allowed", fontFamily: "inherit" }}>
-              <KeyRound size={16} /> {t("login.sso")}
             </button>
           </div>
 
