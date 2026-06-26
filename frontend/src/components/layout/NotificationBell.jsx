@@ -76,6 +76,9 @@ export default function NotificationBell() {
     try { await markAllNotificationsRead(); load(); } catch { /* ignore */ }
   };
 
+  // La cloche n'affiche que les notifications NON LUES (l'historique complet est sur la page Alertes).
+  const shown = items.filter((n) => !n.lue);
+
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button aria-label="Notifications" onClick={() => setOpen((v) => !v)} style={{ position: "relative", width: 38, height: 38, borderRadius: 9, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -91,15 +94,15 @@ export default function NotificationBell() {
         <div style={{ position: "absolute", right: 0, top: 46, width: 320, maxHeight: 420, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, boxShadow: "var(--shadow)", zIndex: 40, padding: 6 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px" }}>
             <span style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", fontWeight: 600 }}>{t("notif.title")}</span>
-            {items.length > 0 && (
+            {shown.length > 0 && (
               <button type="button" onClick={clearAll} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: "none", color: "var(--gold-deep)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
                 <CheckCheck size={14} /> {t("notif.clearAll")}
               </button>
             )}
           </div>
-          {items.length === 0 ? (
+          {shown.length === 0 ? (
             <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--muted)" }}>{t("notif.empty")}</div>
-          ) : items.map((n) => {
+          ) : shown.map((n) => {
             const Icon = ICON[n.categorie] || Info;
             return (
               <button key={n.id} onClick={() => onOpen(n)} style={{ width: "100%", display: "flex", gap: 9, padding: "9px 10px", borderRadius: 8, border: "none", background: n.lue ? "transparent" : "var(--gold-tint)", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>

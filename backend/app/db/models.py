@@ -225,6 +225,179 @@ class Feedback(Base):
         }
 
 
+# ───────────────────────── Carrières & Compétences ─────────────────────────
+# Niveaux d'évolution standard d'un poste (du moins au plus avancé).
+NIVEAUX_CARRIERE = ["Junior", "Opérationnel", "Confirmé", "Senior", "Expert"]
+
+
+class Metier(Base):
+    """Métier du référentiel (regroupe des postes et des trajectoires).
+    `id_departement` (optionnel) permet de scoper l'accès des managers à leur périmètre."""
+    __tablename__ = "metier"
+    id_metier: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    nom: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    missions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    responsabilites: Mapped[str | None] = mapped_column(Text, nullable=True)
+    id_departement: Mapped[int | None] = mapped_column(
+        ForeignKey("departement.id_departement"), nullable=True, index=True)
+
+    def to_dict(self) -> dict:
+        return {"id": self.id_metier, "nom": self.nom, "description": self.description,
+                "missions": self.missions, "responsabilites": self.responsabilites,
+                "id_departement": self.id_departement}
+
+
+class Competence(Base):
+    """Compétence du référentiel (hard / soft), avec méthode d'évaluation."""
+    __tablename__ = "competence"
+    id_competence: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    nom: Mapped[str] = mapped_column(String(120), index=True)
+    categorie: Mapped[str] = mapped_column(String(10))  # "hard" / "soft"
+    sous_categorie: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    methode_evaluation: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    proposee: Mapped[bool] = mapped_column(Boolean, default=False)  # proposée par un collaborateur
+
+    def to_dict(self) -> dict:
+        return {"id": self.id_competence, "nom": self.nom, "categorie": self.categorie,
+                "sous_categorie": self.sous_categorie, "description": self.description,
+                "methode_evaluation": self.methode_evaluation, "proposee": bool(self.proposee)}
+
+
+class CompetenceRequise(Base):
+    """Niveau de maîtrise attendu d'une compétence pour un métier à un niveau donné
+    (= la « fiche de poste par niveau »)."""
+    __tablename__ = "competence_requise"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id_metier: Mapped[int] = mapped_column(ForeignKey("metier.id_metier"), index=True)
+    niveau: Mapped[str] = mapped_column(String(20))  # Junior..Expert
+    id_competence: Mapped[int] = mapped_column(ForeignKey("competence.id_competence"), index=True)
+    niveau_attendu: Mapped[int] = mapped_column(Integer)  # 1..5
+
+    competence: Mapped[Competence] = relationship()
+
+    def to_dict(self) -> dict:
+        c = self.competence
+        return {"id": self.id, "id_metier": self.id_metier, "niveau": self.niveau,
+                "id_competence": self.id_competence, "niveau_attendu": self.niveau_attendu,
+                "competence": c.nom if c else None,
+                "categorie": c.categorie if c else None,
+                "sous_categorie": c.sous_categorie if c else None}
+
+
+class EvaluationCompetence(Base):
+    """Évaluation d'une compétence pour un collaborateur : auto-évaluation (1-5) puis
+    validation par un expert/manager/RH (niveau officiel)."""
+    __tablename__ = "evaluation_competence"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+    id_competence: Mapped[int] = mapped_column(ForeignKey("competence.id_competence"), index=True)
+    niveau_auto: Mapped[int | None] = mapped_column(Integer, nullable=True)     # auto-éval 1-5
+    niveau_expert: Mapped[int | None] = mapped_column(Integer, nullable=True)   # validé 1-5
+    statut: Mapped[str] = mapped_column(String(12), default="auto")             # auto / valide
+    commentaire: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evaluateur: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    date_evaluation: Mapped[date] = mapped_column(Date, index=True)
+
+    competence: Mapped[Competence] = relationship()
+
+    def to_dict(self) -> dict:
+        c = self.competence
+        niveau = self.niveau_expert if self.niveau_expert is not None else self.niveau_auto
+        return {"id": self.id, "employee_id": self.matricule, "id_competence": self.id_competence,
+                "competence": c.nom if c else None, "categorie": c.categorie if c else None,
+                "niveau_auto": self.niveau_auto, "niveau_expert": self.niveau_expert,
+                "niveau": niveau, "statut": self.statut, "commentaire": self.commentaire,
+                "evaluateur": self.evaluateur,
+                "date_evaluation": self.date_evaluation.isoformat() if self.date_evaluation else None}
+
+
+# ───────────────────────── Objectifs (OKR) & Bilans ─────────────────────────
+class Objectif(Base):
+    """Objectif trimestriel (OKR) d'un collaborateur — projet ou développement."""
+    __tablename__ = "objectif"
+    id_objectif: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+    periode: Mapped[str] = mapped_column(String(12), index=True)   # ex. 2026-Q2
+    type_obj: Mapped[str] = mapped_column(String(20))              # projet / developpement
+    titre: Mapped[str] = mapped_column(String(160))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    statut: Mapped[str] = mapped_column(String(12), default="actif")  # actif / clos
+    date_creation: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    key_results: Mapped[list[KeyResult]] = relationship(
+        back_populates="objectif", cascade="all, delete-orphan")
+
+    def to_dict(self) -> dict:
+        krs = list(self.key_results or [])
+        taux = round(sum(k.progression or 0 for k in krs) / len(krs)) if krs else 0
+        return {"id": self.id_objectif, "employee_id": self.matricule, "periode": self.periode,
+                "type": self.type_obj, "titre": self.titre, "description": self.description,
+                "statut": self.statut, "taux_realisation": taux,
+                "key_results": [k.to_dict() for k in krs],
+                "date_creation": self.date_creation.isoformat() if self.date_creation else None}
+
+
+class KeyResult(Base):
+    """Résultat clé mesurable d'un objectif (progression 0-100 %)."""
+    __tablename__ = "key_result"
+    id_kr: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id_objectif: Mapped[int] = mapped_column(ForeignKey("objectif.id_objectif"), index=True)
+    libelle: Mapped[str] = mapped_column(String(200))
+    cible: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    progression: Mapped[int] = mapped_column(Integer, default=0)  # 0-100
+
+    objectif: Mapped[Objectif] = relationship(back_populates="key_results")
+
+    def to_dict(self) -> dict:
+        return {"id": self.id_kr, "id_objectif": self.id_objectif, "libelle": self.libelle,
+                "cible": self.cible, "progression": self.progression}
+
+
+class Bilan(Base):
+    """Bilan trimestriel ou de fin de projet d'un collaborateur."""
+    __tablename__ = "bilan"
+    id_bilan: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+    type_bilan: Mapped[str] = mapped_column(String(20))   # trimestriel / projet
+    periode: Mapped[str] = mapped_column(String(40))
+    synthese: Mapped[str | None] = mapped_column(Text, nullable=True)
+    points_forts: Mapped[str | None] = mapped_column(Text, nullable=True)
+    axes_amelioration: Mapped[str | None] = mapped_column(Text, nullable=True)
+    aspirations: Mapped[str | None] = mapped_column(Text, nullable=True)
+    auteur: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    date_bilan: Mapped[date] = mapped_column(Date, index=True)
+
+    def to_dict(self) -> dict:
+        return {"id": self.id_bilan, "employee_id": self.matricule, "type": self.type_bilan,
+                "periode": self.periode, "synthese": self.synthese, "points_forts": self.points_forts,
+                "axes_amelioration": self.axes_amelioration, "aspirations": self.aspirations,
+                "auteur": self.auteur,
+                "date_bilan": self.date_bilan.isoformat() if self.date_bilan else None}
+
+
+# ───────────────────────── Humeur / climat (engagement hebdo) ─────────────────────────
+class Humeur(Base):
+    """Humeur hebdomadaire VOLONTAIRE d'un collaborateur (1 insatisfait / 2 neutre / 3 satisfait).
+
+    Éthique (loi 09-08, §4.1) : exploitée UNIQUEMENT de façon agrégée/anonymisée pour le
+    climat social ; jamais exposée nominativement aux managers. Une saisie par semaine ISO."""
+    __tablename__ = "humeur"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+    semaine: Mapped[str] = mapped_column(String(8), index=True)  # ex. 2026-W26
+    niveau: Mapped[int] = mapped_column(Integer)                 # 1 / 2 / 3
+    commentaire: Mapped[str | None] = mapped_column(Text, nullable=True)
+    anonyme: Mapped[bool] = mapped_column(Boolean, default=True)  # commentaire anonyme (défaut) ou nominatif (consentement)
+    date_saisie: Mapped[date] = mapped_column(Date, index=True)
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "semaine": self.semaine, "niveau": self.niveau,
+                "commentaire": self.commentaire, "anonyme": bool(self.anonyme),
+                "date_saisie": self.date_saisie.isoformat() if self.date_saisie else None}
+
+
 # ───────────────────────── Demandes RH ─────────────────────────
 class Demande(Base):
     """Demande RH générique. Les ABSENCES sont des demandes dont le
@@ -243,6 +416,8 @@ class Demande(Base):
     statut: Mapped[str] = mapped_column(String(12), default="pending", index=True)
     date_decision: Mapped[date | None] = mapped_column(Date, nullable=True)
     commentaire: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Cycle de vie spécifique aux tickets (code_type=TICKET_ASSISTANCE) : Nouveau/En cours/Résolu.
+    ticket_statut: Mapped[str | None] = mapped_column(String(20), nullable=True)
     matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
     code_type: Mapped[str] = mapped_column(ForeignKey("type_demande.code_type"), index=True)
     id_decideur: Mapped[int | None] = mapped_column(
@@ -442,6 +617,7 @@ def _demande_to_dict(self: Demande) -> dict:
         "start_date": self.date_debut.isoformat() if self.date_debut else None,
         "end_date": self.date_fin.isoformat() if self.date_fin else None,
         "status": self.statut,
+        "ticket_statut": self.ticket_statut,
         "reason": self.detail,
         "commentaire": self.commentaire,
         "date_decision": self.date_decision.isoformat() if self.date_decision else None,

@@ -15,6 +15,13 @@ import Onboarding from "../../features/onboarding/pages/Onboarding";
 import OffboardingPerso from "../../features/offboarding/pages/OffboardingPerso";
 import Requests from "../../features/misc/pages/Requests";
 import Profile from "../../features/misc/pages/Profile";
+import MySkills from "../../features/skills/pages/MySkills";
+import SkillsRh from "../../features/skills/pages/SkillsRh";
+import MyObjectives from "../../features/okr/pages/MyObjectives";
+import ObjectivesRh from "../../features/okr/pages/ObjectivesRh";
+import MyMood from "../../features/mood/pages/MyMood";
+import Climate from "../../features/mood/pages/Climate";
+import Tickets from "../../features/tickets/pages/Tickets";
 
 // Espace RH / Manager / Direction
 import DashboardRh from "../../features/dashboard/pages/DashboardRh";
@@ -53,6 +60,10 @@ export default function AppRoutes() {
         <Route path="/app/onboarding" element={<Onboarding />} />
         <Route path="/app/offboarding" element={<OffboardingPerso />} />
         <Route path="/app/demandes" element={<Requests />} />
+        <Route path="/app/competences" element={<MySkills />} />
+        <Route path="/app/objectifs" element={<MyObjectives />} />
+        <Route path="/app/humeur" element={<MyMood />} />
+        <Route path="/app/tickets" element={<Tickets />} />
         <Route path="/app/profil" element={<Profile />} />
 
         {/* Espace RH / Manager / Direction / Médecine */}
@@ -63,6 +74,10 @@ export default function AppRoutes() {
         <Route path="/rh/analytique/predictif" element={<RoleGuard roles={RH_SPACE_ROLES}><PredictiveAnalytics /></RoleGuard>} />
         <Route path="/rh/analytique/masse-salariale" element={<RoleGuard roles={RH_SPACE_ROLES}><Payroll /></RoleGuard>} />
         <Route path="/rh/desengagement" element={<RoleGuard roles={RH_SPACE_ROLES}><Disengagement /></RoleGuard>} />
+        <Route path="/rh/competences" element={<RoleGuard roles={RH_SPACE_ROLES}><SkillsRh /></RoleGuard>} />
+        <Route path="/rh/objectifs" element={<RoleGuard roles={RH_SPACE_ROLES}><ObjectivesRh /></RoleGuard>} />
+        <Route path="/rh/climat" element={<RoleGuard roles={RH_SPACE_ROLES}><Climate /></RoleGuard>} />
+        <Route path="/rh/tickets" element={<RoleGuard roles={RH_SPACE_ROLES}><Tickets /></RoleGuard>} />
         <Route path="/rh/onboarding" element={<RoleGuard roles={RH_SPACE_ROLES}><OnboardingRh /></RoleGuard>} />
         <Route path="/rh/offboarding" element={<RoleGuard roles={RH_SPACE_ROLES}><Offboarding /></RoleGuard>} />
         <Route path="/rh/collaborateurs" element={<RoleGuard roles={RH_SPACE_ROLES}><Employees /></RoleGuard>} />

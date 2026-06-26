@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import FloatingAssistant from "../components/FloatingAssistant";
 
 export default function AppLayout() {
   return (
@@ -14,6 +15,7 @@ export default function AppLayout() {
         </main>
         <Footer />
       </div>
+      <FloatingAssistant />
     </div>
   );
 }

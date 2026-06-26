@@ -62,8 +62,12 @@ JUDGE_PROMPT = (
 
 
 # ───────────── Cœur HTTP ─────────────
-def _chat(model: str, messages: list[dict], max_tokens: int) -> dict:
-    body = json.dumps({"model": model, "max_tokens": max_tokens, "messages": messages}).encode("utf-8")
+def _chat(model: str, messages: list[dict], max_tokens: int, tools: list | None = None) -> dict:
+    payload = {"model": model, "max_tokens": max_tokens, "messages": messages}
+    if tools:
+        payload["tools"] = tools
+        payload["tool_choice"] = "auto"  # le modèle décide d'appeler l'outil (function calling)
+    body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         f"{settings.OPENROUTER_BASE_URL}/chat/completions",
         data=body, method="POST",
@@ -81,11 +85,13 @@ def _chat(model: str, messages: list[dict], max_tokens: int) -> dict:
         detail = exc.read().decode("utf-8", "ignore")
         raise RuntimeError(f"OpenRouter {exc.code} ({model}): {detail[:300]}") from exc
     choice = (data.get("choices") or [{}])[0]
-    text = (choice.get("message") or {}).get("content", "") or ""
+    msg = choice.get("message") or {}
+    text = msg.get("content", "") or ""
     usage = data.get("usage") or {}
     return {
         "text": text.strip(),
         "model": data.get("model", model),
+        "tool_calls": msg.get("tool_calls") or [],
         "usage": {"input_tokens": usage.get("prompt_tokens"),
                   "output_tokens": usage.get("completion_tokens")},
     }
@@ -121,13 +127,14 @@ def _stub_judge() -> dict:
 
 
 # ───────────── API publique ─────────────
-def complete(system_prompt: str, message: str, history: list | None = None) -> dict:
+def complete(system_prompt: str, message: str, history: list | None = None, tools: list | None = None) -> dict:
     """Appel générique agent + repli sur FALLBACK_MODEL en cas d'erreur.
-    Renvoie {reply, model, degraded, usage, fallback_used}."""
+    Si `tools` est fourni (function calling), le modèle peut renvoyer des `tool_calls`.
+    Renvoie {reply, model, degraded, usage, fallback_used, tool_calls}."""
     if not settings.OPENROUTER_API_KEY:
         s = _stub_reply(message, "")
         return {"reply": s["reply"], "model": "stub", "degraded": True,
-                "usage": {}, "fallback_used": False}
+                "usage": {}, "fallback_used": False, "tool_calls": []}
     messages = [{"role": "system", "content": system_prompt}]
     for t in (history or []):
         role = getattr(t, "role", None) or t.get("role")
@@ -135,13 +142,13 @@ def complete(system_prompt: str, message: str, history: list | None = None) -> d
         messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": message})
     try:
-        out = _chat(settings.AGENT_MODEL, messages, settings.AI_MAX_TOKENS)
+        out = _chat(settings.AGENT_MODEL, messages, settings.AI_MAX_TOKENS, tools=tools)
         return {"reply": out["text"], "model": out["model"], "degraded": False,
-                "usage": out["usage"], "fallback_used": False}
+                "usage": out["usage"], "fallback_used": False, "tool_calls": out.get("tool_calls", [])}
     except RuntimeError:
-        out = _chat(settings.FALLBACK_MODEL, messages, settings.AI_MAX_TOKENS)
+        out = _chat(settings.FALLBACK_MODEL, messages, settings.AI_MAX_TOKENS, tools=tools)
         return {"reply": out["text"], "model": out["model"], "degraded": False,
-                "usage": out["usage"], "fallback_used": True}
+                "usage": out["usage"], "fallback_used": True, "tool_calls": out.get("tool_calls", [])}
 
 
 def refine(question: str, previous_answer: str, feedback: str, system_prompt: str) -> dict:

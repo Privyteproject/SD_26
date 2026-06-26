@@ -25,11 +25,30 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _run_migrations() -> None:
+    """Migrations légères idempotentes (create_all n'ajoute pas de colonne à une table existante).
+    Ajoute les colonnes neuves sur les tables déjà créées (ex. ticket_statut sur demande)."""
+    from sqlalchemy import text
+    stmts = [
+        "ALTER TABLE demande ADD COLUMN IF NOT EXISTS ticket_statut VARCHAR(20)",
+        "ALTER TABLE metier ADD COLUMN IF NOT EXISTS id_departement INTEGER",
+        "ALTER TABLE competence ADD COLUMN IF NOT EXISTS proposee BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE humeur ADD COLUMN IF NOT EXISTS anonyme BOOLEAN DEFAULT TRUE",
+    ]
+    with engine.begin() as conn:
+        for s in stmts:
+            try:
+                conn.execute(text(s))
+            except Exception:
+                pass  # SQLite / colonne déjà présente : sans gravité
+
+
 def init_db() -> None:
     """Crée les tables (et sème les données de démo si demandé)."""
     from app.db import models  # noqa: F401  (enregistre les modèles sur Base)
 
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
 
     if settings.DB_SEED:
         from app.db.seed import seed_if_empty

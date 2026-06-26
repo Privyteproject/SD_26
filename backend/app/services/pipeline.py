@@ -11,6 +11,7 @@ Chaque brique lourde (embeddings/ChromaDB, NER PII, classifieur LLM) est isolée
 dans son module `app/services/*` et remplaçable sans toucher à cet orchestrateur.
 """
 
+import json
 from typing import Literal
 
 from app.core.config import settings
@@ -128,6 +129,89 @@ def _audit(db, user, message, result):
         db.rollback()
 
 
+# ───────────── Tickets d'assistance (l'IA agit via function calling) ─────────────
+_TICKET_TRIGGERS = ["ticket", "bug", "panne", "probleme", "souci", "ne marche pas", "marche plus",
+                    "ne fonctionne", "fonctionne pas", "plante", "erreur", "bloque", "bloqu",
+                    "n arrive pas", "impossible de", "en panne", "casse"]
+_TICKET_SPECIFICS = ["pc", "ordinateur", "imprimante", "wifi", "reseau", "connexion", "connecter",
+                     "compte", "mot de passe", "ecran", "logiciel", "email", "mail", "vpn", "acces",
+                     "application", "serveur", "clavier", "souris", "telephone", "outlook", "teams", "badge"]
+
+CREATE_TICKET_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "create_ticket",
+        "description": "Crée un ticket d'assistance IT/RH pour le collaborateur courant lorsqu'il décrit un problème concret.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sujet": {"type": "string", "description": "Titre court et clair du problème"},
+                "description": {"type": "string", "description": "Description détaillée du problème"},
+            },
+            "required": ["sujet", "description"],
+        },
+    },
+}
+TICKET_SYSTEM = (
+    "Tu es l'assistant support. Si l'utilisateur décrit un problème IT ou RH concret, "
+    "appelle l'outil create_ticket avec un sujet court et une description claire. "
+    "Si la demande est trop vague, n'appelle pas l'outil."
+)
+
+
+def _is_ticket_intent(message: str) -> bool:
+    from app.services.text_utils import normalize
+    t = normalize(message)
+    return any(k in t for k in _TICKET_TRIGGERS)
+
+
+def _ticket_vague(message: str) -> bool:
+    """Trop vague si aucun élément concret (outil/équipement) et message très court."""
+    from app.services.text_utils import normalize
+    t = normalize(message)
+    return (not any(s in t for s in _TICKET_SPECIFICS)) and len(t) < 32
+
+
+def _handle_ticket(db, user: CurrentUser, message: str, history: list, meta: dict) -> dict:
+    meta["engine"] = "TICKET"
+    emp = repo.find_employee_by_email(db, user.email)
+    if emp is None:
+        res = {"reply": "Je ne peux pas créer de ticket : profil collaborateur introuvable.",
+               "model": "policy", "degraded": False, "usage": {}, "judge": None, "meta": meta}
+        _audit(db, user, message, res)
+        return res
+    # Demande trop vague -> demander des précisions AVANT toute création.
+    if _ticket_vague(message):
+        res = {"reply": "Pouvez-vous préciser la nature du problème (quel outil/équipement, message "
+               "d'erreur…) afin que je puisse créer un ticket complet ?",
+               "model": "policy", "degraded": False, "usage": {}, "judge": None, "meta": meta}
+        _audit(db, user, message, res)
+        return res
+    # Extraction sujet/description : function calling si dispo, sinon repli heuristique.
+    sujet, description = None, message
+    try:
+        out = ai_service.complete(TICKET_SYSTEM, message, history, tools=[CREATE_TICKET_TOOL])
+        for call in (out.get("tool_calls") or []):
+            fn = call.get("function") or {}
+            if fn.get("name") == "create_ticket":
+                args = json.loads(fn.get("arguments") or "{}")
+                sujet = args.get("sujet") or sujet
+                description = args.get("description") or description
+                break
+    except Exception:
+        pass
+    if not sujet:
+        s = message.strip()
+        sujet = (s[:60] + "…") if len(s) > 60 else (s or "Demande d'assistance")
+    t = repo.create_ticket(db, matricule=emp.matricule, sujet=sujet, description=description)
+    meta["ticket_id"] = t.id_demande
+    res = {"reply": f"C'est fait ✅ Votre ticket #{t.id_demande} « {sujet} » a été créé avec succès. "
+           f"Le support le prendra en charge.",
+           "model": "rh-engine", "degraded": False, "usage": {}, "judge": None, "meta": meta}
+    _audit(db, user, message, res)
+    return res
+
+
 def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: bool,
              conversation_id: int | None = None, audience: str = "collaborateur") -> dict:
     # L'assistant RH n'est « copilote » que pour un rôle réellement habilité (RBAC inchangé).
@@ -182,6 +266,10 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
         except Exception:
             db.rollback()
         return res
+
+    # 2ter) Tickets : l'assistant AGIT (création d'un ticket d'assistance via function calling).
+    if _is_ticket_intent(message):
+        return _handle_ticket(db, user, message, history, meta)
 
     # 3) Classification
     cls = classifier.classify(message)

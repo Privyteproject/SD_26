@@ -19,8 +19,12 @@ export function navForRole(role, status) {
       { key: "nav.assistantRh", to: "/rh/assistant", icon: "Bot" },
       { key: "nav.team", to: "/rh/equipe", icon: "Users" },
       { key: "nav.alerts", to: "/rh/alertes", icon: "Bell" },
+      { key: "nav.tickets", to: "/rh/tickets", icon: "Ticket" },
       { key: "nav.analytics", to: "/rh/analytique/predictif", icon: "TrendingUp" },
       { key: "nav.disengagement", to: "/rh/desengagement", icon: "Activity" },
+      { key: "nav.climate", to: "/rh/climat", icon: "Smile" },
+      { key: "nav.skills", to: "/rh/competences", icon: "Award" },
+      { key: "nav.objectives", to: "/rh/objectifs", icon: "Target" },
       { key: "nav.onboarding", to: "/rh/onboarding", icon: "UserPlus" },
       { key: "nav.offboarding", to: "/rh/offboarding", icon: "UserMinus" },
       { key: "nav.reports", to: "/rh/rapports", icon: "FileBarChart" },
@@ -38,6 +42,7 @@ export function navForRole(role, status) {
       return [
         { key: "nav.dashboard", to: "/rh", icon: "LayoutDashboard" },
         { key: "nav.disengagement", to: "/rh/desengagement", icon: "Activity" },
+        { key: "nav.climate", to: "/rh/climat", icon: "Smile" },
       ];
     }
     return items;
@@ -54,6 +59,10 @@ export function navForRole(role, status) {
   if (status === STATUS.LEAVING) {
     items.push({ key: "nav.offboarding", to: "/app/offboarding", icon: "LogOut" });
   }
+  items.push({ key: "nav.myTickets", to: "/app/tickets", icon: "Ticket" });
+  items.push({ key: "nav.myMood", to: "/app/humeur", icon: "Smile" });
+  items.push({ key: "nav.myObjectives", to: "/app/objectifs", icon: "Target" });
+  items.push({ key: "nav.mySkills", to: "/app/competences", icon: "Award" });
   items.push({ key: "nav.requests", to: "/app/demandes", icon: "Inbox" });
   items.push({ key: "nav.profile", to: "/app/profil", icon: "User" });
   return items;

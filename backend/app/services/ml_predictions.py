@@ -33,7 +33,8 @@ _PROTECTED = ["age", "genre", "site", "contrat"]
 F_TURNOVER = ["delai_augm_mois", "evol_satisfaction", "nb_maladie_12m", "nb_absences_12m", "note_perf",
               "anciennete_mois", "charge", "equilibre", "recon", "feedback_moyen"]
 F_BURNOUT = ["charge", "equilibre", "recon", "nb_maladie_12m", "anciennete_mois", "feedback_moyen"]
-F_DESENGAGEMENT = ["charge", "equilibre", "evol_satisfaction", "nb_absences_12m", "note_perf", "feedback_moyen"]
+F_DESENGAGEMENT = ["charge", "equilibre", "evol_satisfaction", "nb_absences_12m", "note_perf",
+                   "feedback_moyen", "competence_moyenne"]
 
 # Libellés lisibles + sens « métier » du facteur (pour l'explicabilité par prédiction).
 FEATURE_LABELS = {
@@ -47,6 +48,7 @@ FEATURE_LABELS = {
     "equilibre": "Équilibre pro/perso",
     "recon": "Reconnaissance perçue",
     "feedback_moyen": "Feedbacks internes (moyenne)",
+    "competence_moyenne": "Niveau de compétences (moyenne)",
 }
 
 
@@ -57,10 +59,16 @@ def _months(d1: date, d2: date) -> int:
 def _build_dataset(db) -> list[dict]:
     """Construit une ligne de features + cibles par employé (agrégation en mémoire)."""
     from app.db.models import (Demande, Employe, EnqueteEngagement, EntretienAnnuel,
-                               Feedback, HistoriqueSalaire)
+                               EvaluationCompetence, Feedback, HistoriqueSalaire)
 
     employees = list(db.scalars(select(Employe)))
-    enquetes, entretiens, salaires, maladies, feedbacks = {}, {}, {}, {}, {}
+    enquetes, entretiens, salaires, maladies, feedbacks, competences = {}, {}, {}, {}, {}, {}
+    for m, auto, exp in db.execute(select(
+            EvaluationCompetence.matricule, EvaluationCompetence.niveau_auto,
+            EvaluationCompetence.niveau_expert)).all():
+        lvl = exp if exp is not None else auto
+        if lvl is not None:
+            competences.setdefault(m, []).append(lvl)
     for m, dt, note in db.execute(select(
             Feedback.matricule, Feedback.date_feedback, Feedback.note_1_5)).all():
         if note is not None:
@@ -87,11 +95,11 @@ def _build_dataset(db) -> list[dict]:
         mat = e.matricule
         rows.append(_features_for(e, enquetes.get(mat, []), entretiens.get(mat, []),
                                   salaires.get(mat, []), maladies.get(mat, []),
-                                  feedbacks.get(mat, [])))
+                                  feedbacks.get(mat, []), competences.get(mat, [])))
     return rows
 
 
-def _features_for(e, enq, entr, sal, mal, fbk=None) -> dict:
+def _features_for(e, enq, entr, sal, mal, fbk=None, comp=None) -> dict:
     age = _months(TODAY, e.date_naissance) // 12 if e.date_naissance else 40
     anciennete = _months(TODAY, e.date_embauche) if e.date_embauche else 0
 
@@ -122,6 +130,10 @@ def _features_for(e, enq, entr, sal, mal, fbk=None) -> dict:
     recent_fbk = [n for d, n in fbk if d and _months(TODAY, d) <= 12]
     feedback_moyen = (sum(recent_fbk) / len(recent_fbk)) if recent_fbk else 3.0
 
+    # Niveau de compétences moyen (validé sinon auto) ; neutre (3) si non évalué.
+    comp = comp or []
+    competence_moyenne = (sum(comp) / len(comp)) if comp else 3.0
+
     return {
         "matricule": e.matricule,
         # Attributs protégés — AUDIT D'ÉQUITÉ UNIQUEMENT, jamais en entrée du modèle.
@@ -139,6 +151,7 @@ def _features_for(e, enq, entr, sal, mal, fbk=None) -> dict:
         "equilibre": float(equilibre),
         "recon": float(recon),
         "feedback_moyen": float(feedback_moyen),
+        "competence_moyenne": float(competence_moyenne),
         # Cibles
         "y_turnover": 1 if e.statut == "LEAVING" else 0,
         "y_burnout": 1 if nb_maladie_12m >= 3 and charge >= 7 and equilibre <= 5 else 0,

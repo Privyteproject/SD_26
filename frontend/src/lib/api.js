@@ -155,6 +155,47 @@ export const getSchedulerStatus = () => request("/predict/scheduler-status");
 // Feedback interne sur un collaborateur (signal pour le ML désengagement).
 export const createFeedback = (data) => request("/feedback", { method: "POST", body: data });
 export const getFeedbacks = (params) => request("/feedback", { params });
+
+// ---- Carrières & Compétences ----
+export const getMetiers = () => request("/competences/metiers");
+export const getMetierRequises = (id, niveau) => request(`/competences/metiers/${id}/requises`, { params: niveau ? { niveau } : undefined });
+export const getCompetences = (categorie) => request("/competences", { params: categorie ? { categorie } : undefined });
+export const getMyRequiredCompetences = (niveau) => request("/competences/me/required", { params: niveau ? { niveau } : undefined });
+export const getEvaluations = (matricule) => request(`/competences/evaluations/${matricule}`);
+export const selfEvaluate = (data) => request("/competences/me/evaluations", { method: "POST", body: data });
+export const addCustomCompetence = (data) => request("/competences/me/custom", { method: "POST", body: data });
+export const getPendingEvaluations = () => request("/competences/pending");
+export const validateEvaluation = (id, niveau_expert) => request(`/competences/evaluations/${id}/validate`, { method: "PATCH", body: { niveau_expert } });
+export const getCompetenceRadar = (matricule, niveau) => request(`/competences/radar/${matricule}`, { params: niveau ? { niveau } : undefined });
+export const getTrajectoire = (matricule) => request(`/competences/trajectoire/${matricule}`);
+// Gestion du référentiel (RH/manager)
+export const createMetier = (data) => request("/competences/metiers", { method: "POST", body: data });
+export const updateMetier = (id, data) => request(`/competences/metiers/${id}`, { method: "PUT", body: data });
+export const deleteMetier = (id) => request(`/competences/metiers/${id}`, { method: "DELETE" });
+export const createCompetence = (data) => request("/competences", { method: "POST", body: data });
+export const addCompetenceRequise = (id, data) => request(`/competences/metiers/${id}/requises`, { method: "POST", body: data });
+export const deleteCompetenceRequise = (id) => request(`/competences/requises/${id}`, { method: "DELETE" });
+export const getProposedCompetences = () => request("/competences/proposees");
+export const getMissingPostes = () => request("/competences/postes/manquants");
+export const syncPostes = () => request("/competences/postes/sync", { method: "POST" });
+
+// ---- Objectifs (OKR) & Bilans ----
+export const getObjectifs = (matricule, periode) => request(`/okr/${matricule}`, { params: periode ? { periode } : undefined });
+export const createObjectif = (data) => request("/okr", { method: "POST", body: data });
+export const updateKeyResult = (id, data) => request(`/okr/kr/${id}`, { method: "PATCH", body: data });
+export const setObjectifStatus = (id, statut) => request(`/okr/${id}/status`, { method: "PATCH", params: { statut } });
+export const getBilans = (matricule) => request(`/okr/bilans/${matricule}`);
+export const createBilan = (data) => request("/okr/bilans", { method: "POST", body: data });
+
+// ---- Humeur / climat social ----
+export const submitHumeur = (data) => request("/humeur", { method: "POST", body: data });
+export const getMyHumeur = () => request("/humeur/me");
+export const getHumeurStats = (weeks) => request("/humeur/stats", { params: weeks ? { weeks } : undefined });
+export const getHumeurComments = (semaine) => request("/humeur/comments", { params: semaine ? { semaine } : undefined });
+
+// ---- Tickets d'assistance ----
+export const getTickets = () => request("/tickets");
+export const setTicketStatus = (id, statut) => request(`/tickets/${id}/status`, { method: "PATCH", body: { statut } });
 // Projection / simulation de scénario (effectifs + masse salariale).
 export const getProjection = (params) => request("/dashboard/projection", { params });
 

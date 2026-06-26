@@ -37,7 +37,7 @@ Carte des endpoints réellement consommés par le front intégré :
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import employees, absences, demandes, parcours, documents, rag, dashboard, ai, audit, search, chat, notifications, predict, rapports, alertes, integration, feedback
+from app.api.v1.endpoints import employees, absences, demandes, parcours, documents, rag, dashboard, ai, audit, search, chat, notifications, predict, rapports, alertes, integration, feedback, competences, okr, humeur, tickets
 
 # Routeur agrégateur de la v1 : monté sous /api/v1 dans main.py
 api_router = APIRouter()
@@ -59,5 +59,9 @@ api_router.include_router(rapports.router, prefix="/rapports", tags=["rapports"]
 api_router.include_router(alertes.router, prefix="/alertes", tags=["alertes"])
 api_router.include_router(integration.router, prefix="/webhooks", tags=["integration"])
 api_router.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
+api_router.include_router(competences.router, prefix="/competences", tags=["competences"])
+api_router.include_router(okr.router, prefix="/okr", tags=["okr"])
+api_router.include_router(humeur.router, prefix="/humeur", tags=["humeur"])
+api_router.include_router(tickets.router, prefix="/tickets", tags=["tickets"])
 
 __all__ = ["api_router"]
