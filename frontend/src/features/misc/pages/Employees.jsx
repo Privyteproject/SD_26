@@ -27,17 +27,14 @@ export default function Employees() {
 
   const applySearch = (e) => { e.preventDefault(); setPage(1); setQuery(search.trim()); };
 
-  const field = { height: 38, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", fontSize: 14, fontFamily: "inherit", outline: "none" };
-  const navBtn = (disabled) => ({ height: 34, padding: "0 16px", borderRadius: 8, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit", opacity: disabled ? 0.5 : 1 });
-
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 18px", flexWrap: "wrap" }}>
         <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{t("emp.title")}</h1>
         {total > 0 && <Badge tone="gold">{total}</Badge>}
         <form onSubmit={applySearch} style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("emp.search")} style={{ ...field, width: 240 }} />
-          <button type="submit" style={navBtn(false)}>{t("emp.searchBtn")}</button>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("emp.search")} className="sd-field" style={{ width: 240 }} />
+          <button type="submit" className="sd-btn sd-btn--gold sd-btn--sm">{t("emp.searchBtn")}</button>
         </form>
       </div>
 
@@ -65,9 +62,9 @@ export default function Employees() {
 
         {/* Pagination */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginTop: 16 }}>
-          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1 || loading} style={navBtn(page <= 1 || loading)}>{t("emp.prev")}</button>
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1 || loading} className="sd-btn sd-btn--gold sd-btn--sm">{t("emp.prev")}</button>
           <span style={{ fontSize: 13.5, color: "var(--muted)" }}>{t("emp.page")} {page} / {pages}</span>
-          <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages || loading} style={navBtn(page >= pages || loading)}>{t("emp.next")}</button>
+          <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages || loading} className="sd-btn sd-btn--gold sd-btn--sm">{t("emp.next")}</button>
         </div>
       </AsyncBoundary>
     </div>

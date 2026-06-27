@@ -150,7 +150,6 @@ export default function SkillsRh() {
       ? (a.nom_complet || "").localeCompare(b.nom_complet || "")
       : (b.date_evaluation || "").localeCompare(a.date_evaluation || ""));
   const radarData = (radar?.items || []).map((i) => ({ competence: i.competence, attendu: i.attendu, actuel: i.actuel }));
-  const field = { height: 36, borderRadius: 8, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 10px", fontSize: 13.5, fontFamily: "inherit", outline: "none" };
   const reqByNiveau = {};
   for (const r of (metierReq?.rows || [])) (reqByNiveau[r.niveau] = reqByNiveau[r.niveau] || []).push(r);
   const goldBtn = { height: 36, padding: "0 14px", borderRadius: 8, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 };
@@ -167,7 +166,7 @@ export default function SkillsRh() {
               <BadgeCheck size={17} color="var(--gold-deep)" /> {t("skills.queue")} <Badge tone="gold">{pending.length}</Badge>
               <label style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
                 {t("skills.sortBy")}
-                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ ...field, height: 30 }}>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="sd-field">
                   <option value="date">{t("skills.sortDate")}</option>
                   <option value="nom">{t("skills.sortName")}</option>
                 </select>
@@ -187,7 +186,7 @@ export default function SkillsRh() {
                     <span style={{ fontSize: 12, color: "var(--muted)" }}>{t("skills.self")} : {e.niveau_auto}/5</span>
                     <span style={{ fontSize: 12, color: "var(--muted)" }}>{t("skills.expert")} :</span>
                     <Stars value={exp[e.id] || 0} onChange={(n) => setExp({ ...exp, [e.id]: n })} />
-                    <button onClick={() => validate(e.id)} disabled={!exp[e.id] || busy === e.id} style={{ ...goldBtn, opacity: !exp[e.id] ? 0.6 : 1 }}>{t("skills.validate")}</button>
+                    <button onClick={() => validate(e.id)} disabled={!exp[e.id] || busy === e.id} className="sd-btn sd-btn--gold sd-btn--sm">{t("skills.validate")}</button>
                   </div>
                 ))}
               </div>
@@ -205,7 +204,7 @@ export default function SkillsRh() {
               <span style={{ fontSize: 12.5, color: "var(--muted)", flex: 1, minWidth: 200 }}>
                 {missing.slice(0, 6).join(", ")}{missing.length > 6 ? "…" : ""}
               </span>
-              <button onClick={runSync} disabled={busy === "sync"} style={goldBtn}>
+              <button onClick={runSync} disabled={busy === "sync"} className="sd-btn sd-btn--gold sd-btn--sm">
                 <Plus size={15} /> {t("skills.createMissing")} ({missing.length})
               </button>
             </div>
@@ -220,8 +219,8 @@ export default function SkillsRh() {
               <Layers size={17} color="var(--gold-deep)" /> {t("skills.manageRef")}
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <input value={newMetier.nom} onChange={(e) => setNewMetier({ ...newMetier, nom: e.target.value })} placeholder={t("skills.metierName")} style={{ ...field, flex: 1 }} />
-              <button onClick={addMetier} disabled={busy === "metier" || !newMetier.nom.trim()} style={{ ...goldBtn, opacity: !newMetier.nom.trim() ? 0.6 : 1 }}><Plus size={15} /> {t("skills.addMetier")}</button>
+              <input value={newMetier.nom} onChange={(e) => setNewMetier({ ...newMetier, nom: e.target.value })} placeholder={t("skills.metierName")} className="sd-field" style={{ flex: 1 }} />
+              <button onClick={addMetier} disabled={busy === "metier" || !newMetier.nom.trim()} className="sd-btn sd-btn--gold sd-btn--sm"><Plus size={15} /> {t("skills.addMetier")}</button>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
               {(data?.metiers || []).map((m) => (
@@ -248,10 +247,10 @@ export default function SkillsRh() {
                     </div>
                   ))}
                 <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <select value={newReq.niveau} onChange={(e) => setNewReq({ ...newReq, niveau: e.target.value })} style={{ ...field, width: 130 }}>
+                  <select value={newReq.niveau} onChange={(e) => setNewReq({ ...newReq, niveau: e.target.value })} className="sd-field" style={{ width: 130 }}>
                     {NIVEAUX.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
-                  <select value={newReq.id_competence} onChange={(e) => setNewReq({ ...newReq, id_competence: e.target.value })} style={{ ...field, flex: 1, minWidth: 140 }}>
+                  <select value={newReq.id_competence} onChange={(e) => setNewReq({ ...newReq, id_competence: e.target.value })} className="sd-field" style={{ flex: 1, minWidth: 140 }}>
                     <option value="">{t("skills.pickCompetence")}</option>
                     {catalogue.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
                   </select>
@@ -261,8 +260,8 @@ export default function SkillsRh() {
               </div>
             )}
             <div style={{ borderTop: "1px solid var(--line)", marginTop: 12, paddingTop: 12, display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <input value={newComp.nom} onChange={(e) => setNewComp({ ...newComp, nom: e.target.value })} placeholder={t("skills.newCompetence")} style={{ ...field, flex: 1, minWidth: 140 }} />
-              <select value={newComp.categorie} onChange={(e) => setNewComp({ ...newComp, categorie: e.target.value })} style={{ ...field, width: 110 }}>
+              <input value={newComp.nom} onChange={(e) => setNewComp({ ...newComp, nom: e.target.value })} placeholder={t("skills.newCompetence")} className="sd-field" style={{ flex: 1, minWidth: 140 }} />
+              <select value={newComp.categorie} onChange={(e) => setNewComp({ ...newComp, categorie: e.target.value })} className="sd-field" style={{ width: 110 }}>
                 <option value="hard">Hard</option><option value="soft">Soft</option>
               </select>
               <button onClick={addComp} disabled={busy === "comp" || !newComp.nom.trim()} style={{ ...goldBtn, opacity: !newComp.nom.trim() ? 0.6 : 1 }}><Plus size={15} /></button>
@@ -279,9 +278,9 @@ export default function SkillsRh() {
             <form onSubmit={doSearch} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
               <div style={{ position: "relative", flex: 1 }}>
                 <Search size={15} color="var(--muted)" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-                <input value={empSearch} onChange={(e) => setEmpSearch(e.target.value)} placeholder={t("skills.searchCollab")} style={{ ...field, width: "100%", paddingLeft: 32, boxSizing: "border-box" }} />
+                <input value={empSearch} onChange={(e) => setEmpSearch(e.target.value)} placeholder={t("skills.searchCollab")} className="sd-field" style={{ paddingLeft: 32 }} />
               </div>
-              <button type="submit" style={goldBtn}>{t("skills.searchBtn")}</button>
+              <button type="submit" className="sd-btn sd-btn--gold sd-btn--sm">{t("skills.searchBtn")}</button>
             </form>
             <div style={{ border: "1px solid var(--line)", borderRadius: 10, marginBottom: 12, overflow: "hidden" }}>
               <div style={{ maxHeight: 220, overflowY: "auto" }}>
@@ -302,9 +301,9 @@ export default function SkillsRh() {
                 })}
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderTop: "1px solid var(--line)", background: "var(--field)" }}>
-                <button onClick={() => setEmpPage((p) => Math.max(1, p - 1))} disabled={empPage <= 1 || emp.loading} style={{ ...goldBtn, height: 30, opacity: empPage <= 1 ? 0.5 : 1 }}>{t("skills.prev")}</button>
+                <button onClick={() => setEmpPage((p) => Math.max(1, p - 1))} disabled={empPage <= 1 || emp.loading} className="sd-btn sd-btn--gold sd-btn--sm">{t("skills.prev")}</button>
                 <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("skills.page")} {empPage} / {empPages}</span>
-                <button onClick={() => setEmpPage((p) => Math.min(empPages, p + 1))} disabled={empPage >= empPages || emp.loading} style={{ ...goldBtn, height: 30, opacity: empPage >= empPages ? 0.5 : 1 }}>{t("skills.next")}</button>
+                <button onClick={() => setEmpPage((p) => Math.min(empPages, p + 1))} disabled={empPage >= empPages || emp.loading} className="sd-btn sd-btn--gold sd-btn--sm">{t("skills.next")}</button>
               </div>
             </div>
 

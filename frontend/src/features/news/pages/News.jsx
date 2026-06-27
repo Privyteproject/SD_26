@@ -44,7 +44,7 @@ export default function News() {
                 <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{a.auteur || "RH"}</span>
                 {!a.lu && (
                   <button onClick={() => markRead(a.id)} disabled={busy === a.id}
-                    style={{ marginLeft: "auto", height: 32, padding: "0 12px", borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--gold-deep)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    className="sd-btn sd-btn--outline sd-btn--sm" style={{ marginLeft: "auto" }}>
                     <Check size={14} /> {t("news.markRead")}
                   </button>
                 )}

@@ -44,7 +44,7 @@ function LifecycleCard({ icon: Icon, title, sub, progress, cta, tasks, onCta }) 
           );
         })}
       </div>
-      <button onClick={onCta} style={{ marginTop: 16, display: "inline-flex", alignItems: "center", gap: 7, background: "transparent", border: "none", color: "var(--gold-deep)", fontWeight: 600, fontSize: 13.5, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+      <button onClick={onCta} className="sd-btn sd-btn--ghost sd-btn--sm" style={{ marginTop: 16 }}>
         {cta} <ArrowRight size={16} />
       </button>
     </Card>
@@ -143,10 +143,10 @@ export default function DashboardPerso() {
             ))}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 16 }}>
-            <button onClick={() => navigate("/app/assistant")} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", height: 42, borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13.5, cursor: "pointer", paddingInline: 14, fontFamily: "inherit" }}>
+            <button onClick={() => navigate("/app/assistant")} className="sd-btn sd-btn--gold" style={{ width: "100%" }}>
               <MessageSquare size={17} /> {t("dash.askAi")}
             </button>
-            <button onClick={() => navigate("/app/documents")} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", height: 42, borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 13.5, cursor: "pointer", paddingInline: 14, fontFamily: "inherit" }}>
+            <button onClick={() => navigate("/app/documents")} className="sd-btn sd-btn--outline" style={{ width: "100%" }}>
               <FileText size={17} /> {t("dash.genDoc")}
             </button>
           </div>

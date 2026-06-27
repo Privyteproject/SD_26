@@ -19,7 +19,7 @@ export default function Header() {
   const initial = currentUser ? currentUser.name.charAt(0) : "?";
 
   return (
-    <header style={{ height: 64, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--bg)", display: "flex", alignItems: "center", gap: 14, padding: "0 22px", position: "sticky", top: 0, zIndex: 20 }}>
+    <header style={{ height: 66, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "color-mix(in srgb, var(--surface) 80%, transparent)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "flex", alignItems: "center", gap: 14, padding: "0 24px", position: "sticky", top: 0, zIndex: 20 }}>
       {/* Recherche globale (largeur fixe, ne s'étire pas) */}
       <GlobalSearchBar />
 

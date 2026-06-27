@@ -56,7 +56,7 @@ export default function Documents() {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{t("docs.title")}</h1>
-        <button onClick={() => setShowForm((v) => !v)} style={{ height: 42, padding: "0 16px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
+        <button onClick={() => setShowForm((v) => !v)} className="sd-btn sd-btn--gold">
           {showForm ? <X size={17} /> : <Plus size={17} />} {t("docs.newRequest")}
         </button>
       </div>

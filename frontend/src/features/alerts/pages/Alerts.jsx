@@ -92,12 +92,12 @@ export default function Alerts() {
                   )}
 
                   {!a.resolue && a.matricule && (
-                    <button onClick={() => loadPlan(a)} disabled={busy === a.id + "-plan"} title={t("al.viewPlan")} style={{ height: 36, padding: "0 12px", borderRadius: 8, border: "1px solid var(--gold)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
+                    <button onClick={() => loadPlan(a)} disabled={busy === a.id + "-plan"} title={t("al.viewPlan")} className="sd-btn sd-btn--outline sd-btn--sm">
                       <ClipboardList size={15} /> {t("dis.actionPlan")}
                     </button>
                   )}
                   {!a.resolue && !a.matricule && (
-                    <button onClick={() => resolve(a.id)} disabled={busy === a.id} title={t("al.markResolved")} style={{ height: 36, padding: "0 12px", borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--success, #2e8c57)", fontWeight: 600, fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
+                    <button onClick={() => resolve(a.id)} disabled={busy === a.id} title={t("al.markResolved")} className="sd-btn sd-btn--outline sd-btn--sm">
                       <Check size={15} /> {t("al.resolve")}
                     </button>
                   )}
@@ -169,16 +169,16 @@ export default function Alerts() {
 
             {/* Footer */}
             <div style={{ padding: "16px 24px", borderTop: "1px solid var(--line)", display: "flex", justifyContent: "flex-end", gap: 12, background: "var(--surface)", borderBottomLeftRadius: 16, borderBottomRightRadius: 16 }}>
-              <button 
-                onClick={() => setModalAlerte(null)} 
-                style={{ padding: "10px 18px", borderRadius: 8, border: "1px solid var(--line)", background: "transparent", cursor: "pointer", fontWeight: 600, color: "var(--ink)", fontSize: 14 }}
+              <button
+                onClick={() => setModalAlerte(null)}
+                className="sd-btn sd-btn--outline"
               >
                 {t("al.cancel")}
               </button>
-              <button 
+              <button
                 disabled={selectedPlans.length === 0 || busy === "submit-plan"}
                 onClick={submitPlan}
-                style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: "var(--gold)", color: "var(--on-gold)", cursor: selectedPlans.length === 0 ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 14, opacity: selectedPlans.length === 0 ? 0.5 : 1, display: "flex", alignItems: "center", gap: 8 }}
+                className="sd-btn sd-btn--gold"
               >
                 {busy === "submit-plan" ? t("al.submitting") : t("al.submitPlan")}
               </button>

@@ -56,9 +56,9 @@ export default function DocumentPreviewModal({ preview, onConfirm, onClose, busy
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 22px", borderTop: "1px solid var(--line)", background: "var(--surface)" }}>
-          <button onClick={onClose} style={{ height: 42, padding: "0 16px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--ink)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("docs.cancel")}</button>
-          
-          <button onClick={onConfirm} disabled={busy || expired} style={{ height: 42, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, cursor: busy || expired ? "not-allowed" : "pointer", opacity: busy || expired ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
+          <button onClick={onClose} className="sd-btn sd-btn--outline">{t("docs.cancel")}</button>
+
+          <button onClick={onConfirm} disabled={busy || expired} className="sd-btn sd-btn--gold">
             <Send size={16} /> {t("docs.confirm")}
           </button>
         </div>

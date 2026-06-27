@@ -28,7 +28,7 @@ export default function PredictiveAnalytics() {
     } catch (e) { /* ignore */ } finally { setBusy(false); }
   };
   const fmt = (n) => (n != null ? Number(n).toLocaleString("fr-FR") : "—");
-  const field = { height: 38, width: 110, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 10px", fontSize: 13.5, fontFamily: "inherit", outline: "none" };
+  const field = { width: 110 };
 
   const { data, loading, error, reload } = useAsync(async () => {
     const [t_res, b_res, d_res, emp_res, ind_res] = await Promise.all([
@@ -270,16 +270,16 @@ export default function PredictiveAnalytics() {
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>{t("pa.simTitle")}</div>
             <div style={{ display: "flex", gap: 14, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12 }}>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("an.simTurnover")}<br />
-                <input type="number" value={sim.turnover_pct} placeholder={"auto"} onChange={(e) => setSim({ ...sim, turnover_pct: e.target.value })} style={field} /></label>
+                <input type="number" value={sim.turnover_pct} placeholder={"auto"} onChange={(e) => setSim({ ...sim, turnover_pct: e.target.value })} className="sd-field" style={field} /></label>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("an.simHiring")}<br />
-                <input type="number" value={sim.hiring_per_month} onChange={(e) => setSim({ ...sim, hiring_per_month: e.target.value })} style={field} /></label>
+                <input type="number" value={sim.hiring_per_month} onChange={(e) => setSim({ ...sim, hiring_per_month: e.target.value })} className="sd-field" style={field} /></label>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("an.simRaise")}<br />
-                <input type="number" value={sim.raise_pct} onChange={(e) => setSim({ ...sim, raise_pct: e.target.value })} style={field} /></label>
+                <input type="number" value={sim.raise_pct} onChange={(e) => setSim({ ...sim, raise_pct: e.target.value })} className="sd-field" style={field} /></label>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("an.simAbsence")}<br />
-                <input type="number" value={sim.absenteisme_pct} placeholder="auto" onChange={(e) => setSim({ ...sim, absenteisme_pct: e.target.value })} style={field} /></label>
+                <input type="number" value={sim.absenteisme_pct} placeholder="auto" onChange={(e) => setSim({ ...sim, absenteisme_pct: e.target.value })} className="sd-field" style={field} /></label>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("an.simMobility")}<br />
-                <input type="number" value={sim.mobilite_pct} placeholder="auto" onChange={(e) => setSim({ ...sim, mobilite_pct: e.target.value })} style={field} /></label>
-              <button onClick={runSim} disabled={busy} style={{ height: 40, padding: "0 16px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
+                <input type="number" value={sim.mobilite_pct} placeholder="auto" onChange={(e) => setSim({ ...sim, mobilite_pct: e.target.value })} className="sd-field" style={field} /></label>
+              <button onClick={runSim} disabled={busy} className="sd-btn sd-btn--gold">
                 <Play size={16} /> {busy ? t("common.loading") : t("pa.simulate")}
               </button>
             </div>

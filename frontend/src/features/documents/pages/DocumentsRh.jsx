@@ -123,8 +123,6 @@ function DocTypesManager() {
 
   const copyVar = (v) => navigator.clipboard.writeText(v);
 
-  const field = { height: 40, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", outline: "none", fontFamily: "inherit", fontSize: 13.5 };
-
   return (
     <div style={{ marginTop: 28 }}>
       <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>{t("docs.types")}</div>
@@ -133,8 +131,8 @@ function DocTypesManager() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 20, marginBottom: 14 }}>
         <Card style={{ margin: 0 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "center", marginBottom: 15 }}>
-            <input value={libelle} onChange={(e) => setLibelle(e.target.value)} placeholder={t("docs.typeName")} style={field} />
-            <input value={categorie} onChange={(e) => setCategorie(e.target.value)} placeholder={t("docs.category")} style={field} />
+            <input value={libelle} onChange={(e) => setLibelle(e.target.value)} placeholder={t("docs.typeName")} className="sd-field" />
+            <input value={categorie} onChange={(e) => setCategorie(e.target.value)} placeholder={t("docs.category")} className="sd-field" />
           </div>
           
           <div 
@@ -156,7 +154,7 @@ function DocTypesManager() {
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 15 }}>
-            <button onClick={add} disabled={busy || !libelle.trim() || !file} style={{ height: 40, padding: "0 16px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, cursor: busy || !libelle.trim() || !file ? "not-allowed" : "pointer", opacity: busy || !libelle.trim() || !file ? 0.6 : 1, display: "flex", alignItems: "center", gap: 7, fontFamily: "inherit" }}><Plus size={16} /> {t("docs.add")}</button>
+            <button onClick={add} disabled={busy || !libelle.trim() || !file} className="sd-btn sd-btn--gold"><Plus size={16} /> {t("docs.add")}</button>
           </div>
         </Card>
 

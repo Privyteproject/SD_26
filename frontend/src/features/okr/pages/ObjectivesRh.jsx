@@ -116,10 +116,6 @@ export default function ObjectivesRh() {
     } catch (e) { window.alert((e && (e.payload?.detail || e.message)) || "Erreur"); } finally { setBusy(false); }
   };
 
-  const field = { height: 38, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
-  const area = { ...field, height: "auto", minHeight: 60, padding: 10, width: "100%", resize: "vertical" };
-  const goldBtn = (disabled) => ({ height: 36, padding: "0 16px", borderRadius: 8, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13.5, cursor: "pointer", opacity: disabled ? 0.6 : 1, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 });
-
   return (
     <div>
       <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: "0 0 18px" }}>{t("okr.rhTitle")}</h1>
@@ -129,7 +125,7 @@ export default function ObjectivesRh() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Users size={17} color="var(--gold-deep)" />
             <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{t("okr.bulkTitle")}</span>
-            <button onClick={() => setBulkOpen((v) => !v)} style={{ marginLeft: "auto", height: 30, padding: "0 12px", borderRadius: 7, border: "1px solid var(--line)", background: "transparent", color: "var(--ink)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={() => setBulkOpen((v) => !v)} className="sd-btn sd-btn--outline sd-btn--sm" style={{ marginLeft: "auto" }}>
               {bulkOpen ? t("okr.bulkHide") : t("okr.bulkShow")}
             </button>
           </div>
@@ -140,7 +136,7 @@ export default function ObjectivesRh() {
               <div>
                 <div style={{ position: "relative", marginBottom: 8 }}>
                   <Search size={15} color="var(--muted)" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-                  <input value={bulkSearch} onChange={(e) => setBulkSearch(e.target.value)} placeholder={t("okr.bulkSearch")} style={{ ...field, width: "100%", paddingLeft: 32 }} />
+                  <input value={bulkSearch} onChange={(e) => setBulkSearch(e.target.value)} placeholder={t("okr.bulkSearch")} className="sd-field" style={{ paddingLeft: 32 }} />
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                   <button onClick={toggleAll} style={{ background: "none", border: "none", color: "var(--gold-deep)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
@@ -164,13 +160,13 @@ export default function ObjectivesRh() {
               {/* Définition de l'objectif commun */}
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>{t("okr.bulkObjTitle")}</div>
-                <select value={bulkObj.type} onChange={(e) => setBulkObj({ ...bulkObj, type: e.target.value })} style={{ ...field, width: "100%", marginBottom: 8 }}>
+                <select value={bulkObj.type} onChange={(e) => setBulkObj({ ...bulkObj, type: e.target.value })} className="sd-field" style={{ marginBottom: 8 }}>
                   <option value="projet">{t("okr.type.projet")}</option>
                   <option value="developpement">{t("okr.type.developpement")}</option>
                 </select>
-                <input value={bulkObj.titre} onChange={(e) => setBulkObj({ ...bulkObj, titre: e.target.value })} placeholder={t("okr.objTitle")} style={{ ...field, width: "100%", marginBottom: 8 }} />
-                <input value={bulkObj.kr} onChange={(e) => setBulkObj({ ...bulkObj, kr: e.target.value })} placeholder={t("okr.krLabel")} style={{ ...field, width: "100%", marginBottom: 10 }} />
-                <button onClick={submitBulk} disabled={busy || !bulkObj.titre.trim() || bulkSel.size === 0} style={goldBtn(busy || !bulkObj.titre.trim() || bulkSel.size === 0)}>
+                <input value={bulkObj.titre} onChange={(e) => setBulkObj({ ...bulkObj, titre: e.target.value })} placeholder={t("okr.objTitle")} className="sd-field" style={{ marginBottom: 8 }} />
+                <input value={bulkObj.kr} onChange={(e) => setBulkObj({ ...bulkObj, kr: e.target.value })} placeholder={t("okr.krLabel")} className="sd-field" style={{ marginBottom: 10 }} />
+                <button onClick={submitBulk} disabled={busy || !bulkObj.titre.trim() || bulkSel.size === 0} className="sd-btn sd-btn--gold sd-btn--sm">
                   <Plus size={15} /> {t("okr.bulkAssign")} ({bulkSel.size})
                 </button>
                 <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 8 }}>{t("okr.bulkHint")}</div>
@@ -182,7 +178,7 @@ export default function ObjectivesRh() {
         {/* Sélection d'un collaborateur (vue détaillée) */}
         <Card style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{t("okr.pickCollab")}</label>
-          <select value={sel} onChange={(e) => onSelect(e.target.value)} style={{ ...field, width: "100%", marginTop: 6 }}>
+          <select value={sel} onChange={(e) => onSelect(e.target.value)} className="sd-field" style={{ marginTop: 6 }}>
             <option value="">—</option>
             {employees.map((e) => (
               <option key={e.id} value={e.id}>{empName(e)} — {e.poste || "—"}</option>
@@ -204,7 +200,7 @@ export default function ObjectivesRh() {
                         <span style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{o.titre}</span>
                         <Badge tone={o.type === "developpement" ? "info" : "gold"}>{t(`okr.type.${o.type}`)}</Badge>
                         {o.statut === "clos" ? <Badge tone="success">{t("okr.closed")}</Badge> :
-                          <button onClick={() => close(o.id)} style={{ marginLeft: "auto", height: 28, padding: "0 10px", borderRadius: 7, border: "1px solid var(--line)", background: "transparent", color: "var(--muted)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{t("okr.close")}</button>}
+                          <button onClick={() => close(o.id)} className="sd-btn sd-btn--outline sd-btn--sm" style={{ marginLeft: "auto" }}>{t("okr.close")}</button>}
                         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", marginLeft: o.statut === "clos" ? "auto" : 8 }}>{o.taux_realisation}%</span>
                       </div>
                       {o.key_results.map((k) => (
@@ -218,14 +214,14 @@ export default function ObjectivesRh() {
               <Card>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 10 }}>{t("okr.define")}</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <select value={obj.type} onChange={(e) => setObj({ ...obj, type: e.target.value })} style={{ ...field, width: 160 }}>
+                  <select value={obj.type} onChange={(e) => setObj({ ...obj, type: e.target.value })} className="sd-field" style={{ width: 160 }}>
                     <option value="projet">{t("okr.type.projet")}</option>
                     <option value="developpement">{t("okr.type.developpement")}</option>
                   </select>
-                  <input value={obj.titre} onChange={(e) => setObj({ ...obj, titre: e.target.value })} placeholder={t("okr.objTitle")} style={{ ...field, flex: 1, minWidth: 180 }} />
+                  <input value={obj.titre} onChange={(e) => setObj({ ...obj, titre: e.target.value })} placeholder={t("okr.objTitle")} className="sd-field" style={{ flex: 1, minWidth: 180 }} />
                 </div>
-                <input value={obj.kr} onChange={(e) => setObj({ ...obj, kr: e.target.value })} placeholder={t("okr.krLabel")} style={{ ...field, width: "100%", marginTop: 8 }} />
-                <button onClick={addObj} disabled={busy || !obj.titre.trim()} style={{ ...goldBtn(busy || !obj.titre.trim()), marginTop: 10 }}><Plus size={15} /> {t("okr.create")}</button>
+                <input value={obj.kr} onChange={(e) => setObj({ ...obj, kr: e.target.value })} placeholder={t("okr.krLabel")} className="sd-field" style={{ marginTop: 8 }} />
+                <button onClick={addObj} disabled={busy || !obj.titre.trim()} className="sd-btn sd-btn--gold sd-btn--sm" style={{ marginTop: 10 }}><Plus size={15} /> {t("okr.create")}</button>
               </Card>
             </div>
 
@@ -233,14 +229,14 @@ export default function ObjectivesRh() {
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <Card>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 10 }}><ClipboardCheck size={16} color="var(--gold-deep)" /> {t("okr.newBilan")}</div>
-                <select value={bil.type} onChange={(e) => setBil({ ...bil, type: e.target.value })} style={{ ...field, width: "100%", marginBottom: 8 }}>
+                <select value={bil.type} onChange={(e) => setBil({ ...bil, type: e.target.value })} className="sd-field" style={{ marginBottom: 8 }}>
                   <option value="trimestriel">{t("okr.bilan.trimestriel")}</option>
                   <option value="projet">{t("okr.bilan.projet")}</option>
                 </select>
-                <textarea value={bil.synthese} onChange={(e) => setBil({ ...bil, synthese: e.target.value })} placeholder={t("okr.synthese")} style={area} />
-                <textarea value={bil.points_forts} onChange={(e) => setBil({ ...bil, points_forts: e.target.value })} placeholder={t("okr.strengths")} style={{ ...area, marginTop: 8 }} />
-                <textarea value={bil.axes_amelioration} onChange={(e) => setBil({ ...bil, axes_amelioration: e.target.value })} placeholder={t("okr.improve")} style={{ ...area, marginTop: 8 }} />
-                <button onClick={addBilan} disabled={busy || !bil.synthese.trim()} style={{ ...goldBtn(busy || !bil.synthese.trim()), marginTop: 10 }}>{t("okr.saveBilan")}</button>
+                <textarea value={bil.synthese} onChange={(e) => setBil({ ...bil, synthese: e.target.value })} placeholder={t("okr.synthese")} className="sd-field" />
+                <textarea value={bil.points_forts} onChange={(e) => setBil({ ...bil, points_forts: e.target.value })} placeholder={t("okr.strengths")} className="sd-field" style={{ marginTop: 8 }} />
+                <textarea value={bil.axes_amelioration} onChange={(e) => setBil({ ...bil, axes_amelioration: e.target.value })} placeholder={t("okr.improve")} className="sd-field" style={{ marginTop: 8 }} />
+                <button onClick={addBilan} disabled={busy || !bil.synthese.trim()} className="sd-btn sd-btn--gold sd-btn--sm" style={{ marginTop: 10 }}>{t("okr.saveBilan")}</button>
               </Card>
               {detail.bilans.length > 0 && (
                 <Card>

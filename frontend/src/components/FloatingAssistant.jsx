@@ -49,11 +49,6 @@ export default function FloatingAssistant() {
 
   return (
     <>
-      <style>{`
-        @keyframes sd-fab-pulse { 0%{box-shadow:0 0 0 0 rgba(184,134,11,.45)} 70%{box-shadow:0 0 0 14px rgba(184,134,11,0)} 100%{box-shadow:0 0 0 0 rgba(184,134,11,0)} }
-        @keyframes sd-fab-bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
-      `}</style>
-
       {/* Panneau mini-chat */}
       {open && (
         <div style={{ position: "fixed", right: 22, bottom: 92, zIndex: 60, width: 340, maxWidth: "calc(100vw - 32px)",
@@ -102,16 +97,14 @@ export default function FloatingAssistant() {
           onClick={() => setOpen((v) => !v)}
           onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
           style={{
-            position: "relative", width: 58, height: 58, borderRadius: "50%", border: "none", cursor: "pointer",
-            background: "linear-gradient(145deg, var(--gold), var(--gold-deep))", color: "var(--on-gold)",
+            width: 54, height: 54, borderRadius: "50%", border: "none", cursor: "pointer",
+            background: "var(--grad-gold)", color: "var(--on-gold)",
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            boxShadow: "0 8px 22px rgba(0,0,0,.22)",
-            animation: open ? "none" : "sd-fab-pulse 2.6s infinite, sd-fab-bob 3s ease-in-out infinite",
-            transform: hover ? "scale(1.08)" : "scale(1)", transition: "transform .15s ease",
+            boxShadow: hover ? "0 14px 28px -10px rgba(169,119,47,.6)" : "0 8px 20px -10px rgba(169,119,47,.5)",
+            transform: hover ? "translateY(-2px)" : "none", transition: "transform .18s ease, box-shadow .18s ease",
           }}
         >
-          {open ? <X size={24} /> : <Bot size={26} />}
-          {!open && <span style={{ position: "absolute", top: 6, right: 8, width: 11, height: 11, borderRadius: "50%", background: "#2e8c57", border: "2px solid var(--on-gold)" }} />}
+          {open ? <X size={22} /> : <Bot size={24} />}
         </button>
       </div>
     </>

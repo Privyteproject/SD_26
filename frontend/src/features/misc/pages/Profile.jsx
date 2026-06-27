@@ -17,8 +17,6 @@ function Row({ icon: Icon, label, value }) {
     </div>
   );
 }
-const inp = { height: 42, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", fontSize: 14, fontFamily: "inherit", outline: "none", width: "100%", marginTop: 6, boxSizing: "border-box" };
-
 export default function Profile() {
   const { t, lang } = useI18n();
   const { currentUser, updateUser } = useSession();
@@ -117,11 +115,11 @@ export default function Profile() {
                 )}
               </div>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("profile.phone")}</label>
-              <input style={inp} value={f.telephone} onChange={(e) => { setForm({ ...f, telephone: e.target.value }); setSaved(false); }} placeholder={t("profile.phonePlaceholder")} />
+              <input className="sd-field" style={{ marginTop: 6 }} value={f.telephone} onChange={(e) => { setForm({ ...f, telephone: e.target.value }); setSaved(false); }} placeholder={t("profile.phonePlaceholder")} />
               <label style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 12, display: "block" }}>{t("profile.bio")}</label>
-              <textarea style={{ ...inp, height: "auto", minHeight: 80, padding: 10, resize: "vertical" }} value={f.bio} onChange={(e) => { setForm({ ...f, bio: e.target.value }); setSaved(false); }} placeholder={t("profile.bioPlaceholder")} />
+              <textarea className="sd-field" style={{ marginTop: 6, minHeight: 80 }} value={f.bio} onChange={(e) => { setForm({ ...f, bio: e.target.value }); setSaved(false); }} placeholder={t("profile.bioPlaceholder")} />
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
-                <button onClick={saveInfo} disabled={busy} style={gold}>{busy ? "…" : t("profile.save")}</button>
+                <button onClick={saveInfo} disabled={busy} className="sd-btn sd-btn--gold">{busy ? "…" : t("profile.save")}</button>
                 {saved && <span style={{ fontSize: 13, color: "#2e8c57", fontWeight: 600 }}>{t("profile.saved")}</span>}
               </div>
             </Card>
@@ -134,13 +132,13 @@ export default function Profile() {
                   <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{t("profile.changePwd")}</div>
                 </div>
                 <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("profile.current")}</label>
-                <input style={inp} type="password" value={cur} onChange={(e) => { setCur(e.target.value); setMsg(null); }} />
+                <input className="sd-field" style={{ marginTop: 6 }} type="password" value={cur} onChange={(e) => { setCur(e.target.value); setMsg(null); }} />
                 <label style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 12, display: "block" }}>{t("profile.new")}</label>
-                <input style={inp} type="password" value={nw} onChange={(e) => { setNw(e.target.value); setMsg(null); }} />
+                <input className="sd-field" style={{ marginTop: 6 }} type="password" value={nw} onChange={(e) => { setNw(e.target.value); setMsg(null); }} />
                 <label style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 12, display: "block" }}>{t("profile.confirm")}</label>
-                <input style={inp} type="password" value={cf} onChange={(e) => { setCf(e.target.value); setMsg(null); }} />
+                <input className="sd-field" style={{ marginTop: 6 }} type="password" value={cf} onChange={(e) => { setCf(e.target.value); setMsg(null); }} />
                 {msg && <div style={{ marginTop: 10, fontSize: 13, color: msg.ok ? "#2e8c57" : "var(--danger)" }}>{msg.text}</div>}
-                <button onClick={changePwd} style={{ ...gold, marginTop: 14, height: 44 }}>{t("profile.save")}</button>
+                <button onClick={changePwd} className="sd-btn sd-btn--gold" style={{ marginTop: 14 }}>{t("profile.save")}</button>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, fontSize: 12.5, color: "var(--muted)" }}>
                   <ShieldCheck size={15} color="var(--gold-deep)" /> {t("profile.securityHint")}
                 </div>

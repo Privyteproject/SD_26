@@ -89,7 +89,7 @@ export default function Login() {
               </div>
             )}
 
-            <button type="submit" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", height: 48, borderRadius: 9, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+            <button type="submit" className="sd-btn sd-btn--gold sd-btn--lg" style={{ width: "100%" }}>
               {loading ? "…" : t("login.submit")} <ArrowRight size={18} />
             </button>
           </div>
@@ -114,7 +114,7 @@ export default function Login() {
                     <div style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ROLE_LABELS[a.role][lang]}</div>
                     <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{a.email}</div>
                   </div>
-                  <button type="button" onClick={() => useAccount(a)} style={{ flexShrink: 0, height: 32, padding: "0 12px", borderRadius: 8, border: "1px solid var(--gold)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>{t("login.use")}</button>
+                  <button type="button" onClick={() => useAccount(a)} className="sd-btn sd-btn--ghost sd-btn--sm" style={{ flexShrink: 0 }}>{t("login.use")}</button>
                 </div>
               ))}
             </div>
@@ -139,7 +139,7 @@ export default function Login() {
                     <div style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ROLE_LABELS[a.role][lang]}</div>
                     <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{a.email}</div>
                   </div>
-                  <button type="button" onClick={() => useAccount(a)} style={{ flexShrink: 0, height: 32, padding: "0 12px", borderRadius: 8, border: "1px solid var(--gold)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>{t("login.use")}</button>
+                  <button type="button" onClick={() => useAccount(a)} className="sd-btn sd-btn--ghost sd-btn--sm" style={{ flexShrink: 0 }}>{t("login.use")}</button>
                 </div>
               ))}
             </div>

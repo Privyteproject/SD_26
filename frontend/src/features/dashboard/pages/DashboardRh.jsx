@@ -101,7 +101,7 @@ export default function DashboardRh() {
         <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{t("nav.dashboard")}</h1>
         <Badge tone="gold">{isManager ? t("scope.team") : t("scope.org")}</Badge>
         {(isExec || isMed) && (
-          <button onClick={recalc} disabled={calc} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8, height: 40, padding: "0 16px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 14, cursor: calc ? "wait" : "pointer", opacity: calc ? 0.6 : 1, fontFamily: "inherit" }}>
+          <button onClick={recalc} disabled={calc} className="sd-btn sd-btn--outline" style={{ marginLeft: "auto" }}>
             <Sparkles size={16} /> {calc ? t("common.loading") : t("rh.recalcRisk")}
           </button>
         )}
@@ -227,10 +227,10 @@ export default function DashboardRh() {
           <Card style={{ marginTop: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{t("ml.title")}</div>
-              <button onClick={trainMl} disabled={training} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, height: 36, padding: "0 14px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 13.5, cursor: training ? "wait" : "pointer", opacity: training ? 0.6 : 1, fontFamily: "inherit" }}>
+              <button onClick={trainMl} disabled={training} className="sd-btn sd-btn--outline sd-btn--sm" style={{ marginLeft: "auto" }}>
                 <Sparkles size={15} /> {training ? t("common.loading") : t("ml.train")}
               </button>
-              <button onClick={batchScore} disabled={batching} style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 36, padding: "0 14px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13.5, cursor: batching ? "wait" : "pointer", opacity: batching ? 0.6 : 1, fontFamily: "inherit" }}>
+              <button onClick={batchScore} disabled={batching} className="sd-btn sd-btn--gold sd-btn--sm">
                 <Sparkles size={15} /> {batching ? t("common.loading") : t("ml.batch")}
               </button>
             </div>
@@ -257,7 +257,7 @@ export default function DashboardRh() {
                 </table>
               </div>
             )}
-            <select value={selEmp} onChange={(e) => predictEmp(e.target.value)} style={{ width: "100%", maxWidth: 360, height: 42, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", fontSize: 14, fontFamily: "inherit", outline: "none" }}>
+            <select value={selEmp} onChange={(e) => predictEmp(e.target.value)} className="sd-field" style={{ maxWidth: 360 }}>
               <option value="">{t("ml.pickEmp")}</option>
               {(data?.employees || []).map((e) => (
                 <option key={e.id} value={e.id}>{`${e.prenom || ""} ${e.nom || ""}`.trim() || e.id} ({e.id})</option>

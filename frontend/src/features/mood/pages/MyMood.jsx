@@ -35,8 +35,6 @@ export default function MyMood() {
     catch (e) { /* ignore */ } finally { setBusy(false); }
   };
 
-  const area = { width: "100%", minHeight: 80, borderRadius: 10, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: 12, fontSize: 14, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" };
-
   return (
     <div>
       <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: "0 0 4px" }}>{t("mood.title")}</h1>
@@ -56,14 +54,14 @@ export default function MyMood() {
               );
             })}
           </div>
-          <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t("mood.commentPlaceholder")} style={area} />
+          <textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t("mood.commentPlaceholder")} className="sd-field" />
           <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 13, color: "var(--ink)", cursor: "pointer" }}>
             <input type="checkbox" checked={anonyme} onChange={(e) => setAnonyme(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--gold)", cursor: "pointer" }} />
             {t("mood.anon")}
           </label>
           <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 4 }}>{anonyme ? t("mood.anonOn") : t("mood.anonOff")}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
-            <button onClick={submit} disabled={busy || !niveau} style={{ height: 42, padding: "0 20px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14.5, cursor: "pointer", opacity: !niveau ? 0.6 : 1, fontFamily: "inherit" }}>
+            <button onClick={submit} disabled={busy || !niveau} className="sd-btn sd-btn--gold">
               {busy ? "…" : (data ? t("mood.update") : t("mood.send"))}
             </button>
             {done && <span style={{ fontSize: 13, color: "#2e8c57", fontWeight: 600 }}>{t("mood.thanks")}</span>}

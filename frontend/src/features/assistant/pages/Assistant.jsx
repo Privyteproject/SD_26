@@ -78,7 +78,7 @@ export default function Assistant({ audience = "collaborateur" }) {
       <div style={{ display: "flex", gap: 14, flex: 1, minHeight: 0 }}>
         {/* Colonne gauche : historique */}
         <div style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)", padding: 12, minHeight: 0 }}>
-          <button onClick={newSession} style={{ height: 40, borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13.5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontFamily: "inherit", flexShrink: 0 }}>
+          <button onClick={newSession} className="sd-btn sd-btn--gold" style={{ flexShrink: 0 }}>
             <Plus size={16} /> {t("chat.new")}
           </button>
           <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, margin: "14px 4px 8px" }}>{t("chat.conversations")}</div>
@@ -153,9 +153,8 @@ export default function Assistant({ audience = "collaborateur" }) {
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, border: "1px solid var(--line)", borderRadius: 12, background: "var(--field)", padding: "0 8px 0 14px", height: 52, flexShrink: 0 }}>
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} placeholder="Écrivez votre question…"
-              style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--ink)", fontSize: 14, fontFamily: "inherit" }} />
-            <button onClick={submit} disabled={isLoading || !input.trim()}
-              style={{ width: 38, height: 38, borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", cursor: isLoading || !input.trim() ? "not-allowed" : "pointer", opacity: isLoading || !input.trim() ? 0.6 : 1 }}>
+              className="sd-field" style={{ flex: 1, border: "none", background: "transparent" }} />
+            <button onClick={submit} disabled={isLoading || !input.trim()} className="sd-btn sd-btn--gold sd-btn--sm">
               <Send size={17} />
             </button>
           </div>

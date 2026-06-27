@@ -1,16 +1,8 @@
-export default function Card({ children, style = {}, ...rest }) {
+// Carte basée sur le kit officiel (.sd-card). `style` permet les surcharges ponctuelles
+// (padding 0, marges…) sans casser le design du kit.
+export default function Card({ children, style = {}, className = "", ...rest }) {
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: 16,
-        padding: 22,
-        boxShadow: "var(--shadow)",
-        ...style,
-      }}
-      {...rest}
-    >
+    <div className={`sd-card ${className}`.trim()} style={style} {...rest}>
       {children}
     </div>
   );

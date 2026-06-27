@@ -61,9 +61,6 @@ export default function NewsRh() {
     } catch (e) { window.alert((e && (e.payload?.detail || e.message)) || "Erreur"); } finally { setBusy(false); }
   };
 
-  const field = { height: 40, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", fontSize: 14, fontFamily: "inherit", outline: "none", width: "100%", boxSizing: "border-box" };
-  const gold = (d) => ({ height: 40, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", opacity: d ? 0.6 : 1, fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 8 });
-
   return (
     <div>
       <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: "0 0 18px" }}>{t("news.rhTitle")}</h1>
@@ -75,8 +72,8 @@ export default function NewsRh() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>
               <Megaphone size={17} color="var(--gold-deep)" /> {t("news.compose")}
             </div>
-            <input value={titre} onChange={(e) => setTitre(e.target.value)} placeholder={t("news.titlePh")} style={{ ...field, marginBottom: 10 }} />
-            <textarea value={contenu} onChange={(e) => setContenu(e.target.value)} placeholder={t("news.bodyPh")} style={{ ...field, height: "auto", minHeight: 120, padding: 10, resize: "vertical", marginBottom: 10 }} />
+            <input value={titre} onChange={(e) => setTitre(e.target.value)} placeholder={t("news.titlePh")} className="sd-field" style={{ marginBottom: 10 }} />
+            <textarea value={contenu} onChange={(e) => setContenu(e.target.value)} placeholder={t("news.bodyPh")} className="sd-field" style={{ minHeight: 120, marginBottom: 10 }} />
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: "var(--ink)", marginBottom: 12, cursor: "pointer" }}>
               <input type="checkbox" checked={epingle} onChange={(e) => setEpingle(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--gold)" }} />
               <Pin size={14} color="var(--gold-deep)" /> {t("news.pinIt")}
@@ -93,7 +90,7 @@ export default function NewsRh() {
                 <>
                   <div style={{ position: "relative", marginBottom: 8 }}>
                     <Search size={15} color="var(--muted)" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("news.searchEmp")} style={{ ...field, paddingLeft: 32 }} />
+                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("news.searchEmp")} className="sd-field" style={{ paddingLeft: 32 }} />
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                     <button onClick={toggleAll} style={{ background: "none", border: "none", color: "var(--gold-deep)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>{allSel ? t("news.unselectAll") : t("news.selectAll")} ({filtered.length})</button>
@@ -111,7 +108,7 @@ export default function NewsRh() {
                 </>
               )}
 
-              <button onClick={publish} disabled={busy || !canSend} style={{ ...gold(busy || !canSend), marginTop: 12 }}>
+              <button onClick={publish} disabled={busy || !canSend} className="sd-btn sd-btn--gold" style={{ marginTop: 12 }}>
                 <Send size={15} /> {t("news.publish")}{toAll ? "" : ` (${sel.size})`}
               </button>
             </div>

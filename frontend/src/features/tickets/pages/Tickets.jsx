@@ -50,7 +50,7 @@ export default function Tickets() {
                 </div>
                 {canManage ? (
                   <select value={st} disabled={busy === tk.id} onChange={(e) => change(tk.id, e.target.value)}
-                    style={{ height: 34, borderRadius: 8, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 10px", fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}>
+                    className="sd-field">
                     {STATUTS.map((s) => <option key={s} value={s}>{t(`tickets.st.${s}`)}</option>)}
                   </select>
                 ) : (

@@ -53,8 +53,6 @@ export default function Team() {
     }, {})
   );
 
-  const navBtn = (disabled) => ({ height: 34, padding: "0 16px", borderRadius: 8, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit", opacity: disabled ? 0.5 : 1 });
-
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -82,9 +80,9 @@ export default function Team() {
             </Card>
             {pages > 1 && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginTop: 16 }}>
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1 || loading} style={navBtn(page <= 1 || loading)}>{t("emp.prev")}</button>
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1 || loading} className="sd-btn sd-btn--gold sd-btn--sm">{t("emp.prev")}</button>
                 <span style={{ fontSize: 13.5, color: "var(--muted)" }}>{t("emp.page")} {page} / {pages}</span>
-                <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages || loading} style={navBtn(page >= pages || loading)}>{t("emp.next")}</button>
+                <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages || loading} className="sd-btn sd-btn--gold sd-btn--sm">{t("emp.next")}</button>
               </div>
             )}
           </>

@@ -89,7 +89,7 @@ export default function Climate() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <MessageSquareText size={17} color="var(--gold-deep)" />
                 <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{t("climate.comments")}</span>
-                <select value={week} onChange={(e) => setWeek(e.target.value)} style={{ marginLeft: "auto", height: 32, borderRadius: 8, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 10px", fontSize: 13, fontFamily: "inherit" }}>
+                <select value={week} onChange={(e) => setWeek(e.target.value)} className="sd-field" style={{ marginLeft: "auto", width: "auto" }}>
                   <option value="">{t("climate.allWeeks")}</option>
                   {(d.trend || []).map((x) => <option key={x.semaine} value={x.semaine}>{x.semaine}</option>)}
                 </select>

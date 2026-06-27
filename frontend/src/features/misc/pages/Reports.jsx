@@ -27,7 +27,7 @@ export default function Reports() {
           <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("rep.certifiedSub")}</div>
           {msg && <div style={{ fontSize: 13, color: "var(--danger)", marginTop: 4 }}>{msg}</div>}
         </div>
-        <button onClick={download} disabled={busy} style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 44, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1, fontFamily: "inherit" }}>
+        <button onClick={download} disabled={busy} className="sd-btn sd-btn--gold">
           <Download size={17} /> {busy ? t("common.loading") : t("rep.download")}
         </button>
       </Card>
@@ -37,7 +37,7 @@ export default function Reports() {
           <Card key={r.id}>
             <div style={{ width: 42, height: 42, borderRadius: 11, background: "var(--gold-tint)", color: "var(--gold-deep)", display: "flex", alignItems: "center", justifyContent: "center" }}><FileBarChart size={20} /></div>
             <div style={{ marginTop: 12, fontSize: 14.5, fontWeight: 600, color: "var(--ink)" }}>{r.name[lang]}</div>
-            <button style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 7, height: 38, padding: "0 14px", borderRadius: 8, border: "1px solid var(--gold)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+            <button className="sd-btn sd-btn--outline" style={{ marginTop: 14 }}>
               <Download size={15} color="var(--gold-deep)" /> {t("rep.export")}
             </button>
           </Card>

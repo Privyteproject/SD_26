@@ -155,16 +155,15 @@ export default function Disengagement() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>{t("dis.feedbackTitle")}</div>
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
                     <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("dis.feedbackNote")}</label>
-                    <select value={fb.note} onChange={(e) => setFb({ ...fb, note: e.target.value })}
-                      style={{ height: 36, borderRadius: 8, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 10px", fontFamily: "inherit" }}>
+                    <select value={fb.note} onChange={(e) => setFb({ ...fb, note: e.target.value })} className="sd-field">
                       {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
                   <textarea value={fb.comment} onChange={(e) => setFb({ ...fb, comment: e.target.value })}
                     placeholder={t("dis.feedbackComment")} rows={2}
-                    style={{ width: "100%", borderRadius: 8, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: 10, fontFamily: "inherit", fontSize: 13.5, resize: "vertical", boxSizing: "border-box" }} />
+                    className="sd-field" style={{ resize: "vertical", boxSizing: "border-box" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-                    <button onClick={sendFeedback} disabled={fbBusy} style={{ height: 38, padding: "0 14px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13.5, cursor: fbBusy ? "wait" : "pointer", opacity: fbBusy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "inherit" }}>
+                    <button onClick={sendFeedback} disabled={fbBusy} className="sd-btn sd-btn--gold">
                       <Send size={15} /> {t("dis.feedbackSend")}
                     </button>
                     {fbMsg && <span style={{ fontSize: 12.5, color: "var(--gold-deep)" }}>{fbMsg}</span>}

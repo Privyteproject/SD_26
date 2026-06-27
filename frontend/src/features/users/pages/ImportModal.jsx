@@ -65,8 +65,8 @@ export default function ImportModal({ onClose, onDone }) {
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--line)" }}>
-          <button onClick={onClose} style={{ height: 42, padding: "0 16px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--ink)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("imp.close")}</button>
-          <button onClick={submit} disabled={busy || !file} style={{ height: 42, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, cursor: busy || !file ? "not-allowed" : "pointer", opacity: busy || !file ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
+          <button onClick={onClose} className="sd-btn sd-btn--outline">{t("imp.close")}</button>
+          <button onClick={submit} disabled={busy || !file} className="sd-btn sd-btn--gold">
             <Upload size={16} /> {busy ? t("common.loading") : t("imp.run")}
           </button>
         </div>

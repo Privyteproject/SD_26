@@ -83,7 +83,6 @@ export default function MySkills() {
   };
 
   const radarData = (data?.radar?.items || []).map((i) => ({ competence: i.competence, attendu: i.attendu, actuel: i.actuel }));
-  const field = { height: 38, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", fontSize: 14, fontFamily: "inherit", outline: "none" };
 
   return (
     <div>
@@ -184,13 +183,13 @@ export default function MySkills() {
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>{t("skills.addFromCatalogue")}</div>
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>{t("skills.fromCatalogueHint")}</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <select value={pick.id_competence} onChange={(e) => setPick({ ...pick, id_competence: e.target.value })} style={{ ...field, flex: 1, minWidth: 220 }}>
+            <select value={pick.id_competence} onChange={(e) => setPick({ ...pick, id_competence: e.target.value })} className="sd-field" style={{ flex: 1, minWidth: 220 }}>
               <option value="">{t("skills.pickFromCatalogue")}</option>
               {available.map((c) => <option key={c.id} value={c.id}>{c.nom} ({c.categorie})</option>)}
             </select>
             <Stars value={pick.niveau_auto} onChange={(n) => setPick({ ...pick, niveau_auto: n })} />
             <button onClick={addFromCatalogue} disabled={busy || !pick.id_competence || !pick.niveau_auto}
-              style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", opacity: (!pick.id_competence || !pick.niveau_auto) ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
+              className="sd-btn sd-btn--gold sd-btn--sm">
               <Plus size={16} /> {t("skills.add")}
             </button>
           </div>
@@ -200,14 +199,14 @@ export default function MySkills() {
         <Card>
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 10 }}>{t("skills.addCustom")}</div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <input value={custom.nom} onChange={(e) => setCustom({ ...custom, nom: e.target.value })} placeholder={t("skills.skillName")} style={{ ...field, flex: 1, minWidth: 180 }} />
-            <select value={custom.categorie} onChange={(e) => setCustom({ ...custom, categorie: e.target.value })} style={{ ...field, width: 130 }}>
+            <input value={custom.nom} onChange={(e) => setCustom({ ...custom, nom: e.target.value })} placeholder={t("skills.skillName")} className="sd-field" style={{ flex: 1, minWidth: 180 }} />
+            <select value={custom.categorie} onChange={(e) => setCustom({ ...custom, categorie: e.target.value })} className="sd-field" style={{ width: 130 }}>
               <option value="hard">Hard skill</option>
               <option value="soft">Soft skill</option>
             </select>
             <Stars value={custom.niveau_auto} onChange={(n) => setCustom({ ...custom, niveau_auto: n })} />
             <button onClick={submitCustom} disabled={busy || !custom.nom.trim() || !custom.niveau_auto}
-              style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", opacity: (!custom.nom.trim() || !custom.niveau_auto) ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
+              className="sd-btn sd-btn--gold sd-btn--sm">
               <Plus size={16} /> {t("skills.add")}
             </button>
           </div>
