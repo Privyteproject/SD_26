@@ -12,6 +12,8 @@ export default function Badge({ children, tone = "gold" }) {
       display: "inline-flex", alignItems: "center", gap: 6,
       fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 20,
       background: c.bg, color: c.fg,
+      border: `1px solid color-mix(in srgb, ${c.fg} 22%, transparent)`,
+      whiteSpace: "nowrap",
     }}>
       {children}
     </span>

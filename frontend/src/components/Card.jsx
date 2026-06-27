@@ -6,6 +6,7 @@ export default function Card({ children, style = {}, ...rest }) {
         border: "1px solid var(--line)",
         borderRadius: 16,
         padding: 22,
+        boxShadow: "var(--shadow)",
         ...style,
       }}
       {...rest}

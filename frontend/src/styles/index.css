@@ -33,3 +33,28 @@ h1, h2, h3 { font-family: 'Bricolage Grotesque', sans-serif; }
 .font-display { font-family: 'Bricolage Grotesque', sans-serif; }
 .font-serif-brand { font-family: 'Fraunces', serif; }
 ::selection { background: var(--gold-tint); }
+
+/* ─────────── Polish global des interactions (appliqué à toute l'app) ─────────── */
+button { transition: filter .15s ease, transform .06s ease, box-shadow .15s ease, opacity .15s ease; }
+button:not(:disabled):hover { filter: brightness(1.06); }
+button:not(:disabled):active { transform: translateY(1px); }
+
+/* Anneau de focus doré cohérent (accessibilité + finition) */
+:where(button, a, input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 38%, transparent);
+}
+
+/* Champs : transition + anneau au focus, partout */
+input, select, textarea { transition: border-color .15s ease, box-shadow .15s ease; }
+:where(input, select, textarea):focus {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 16%, transparent);
+}
+
+/* Barre de défilement aux couleurs de la marque */
+* { scrollbar-width: thin; scrollbar-color: var(--gold-soft) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--gold-soft); border-radius: 999px; border: 2px solid var(--bg); }
+*::-webkit-scrollbar-thumb:hover { background: var(--gold); }
