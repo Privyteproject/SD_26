@@ -59,6 +59,12 @@ async function request(path, { method = "GET", body, params, _retry = false } = 
 export const getMe = () => request("/employees/me");
 export const updateMyProfile = (data) => request("/employees/me", { method: "PATCH", body: data });
 
+// ---- Actualités / Annonces ----
+export const createAnnonce = (data) => request("/annonces", { method: "POST", body: data });
+export const getAnnoncesAuthored = () => request("/annonces");
+export const getMyAnnonces = () => request("/annonces/me");
+export const markAnnonceRead = (id) => request(`/annonces/${id}/read`, { method: "PATCH" });
+
 // ---- Employés ----
 export const getEmployees = (params) => request("/employees", { params });
 export const getEmployee = (id) => request(`/employees/${id}`);

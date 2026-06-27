@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ShieldAlert, Calendar, Info, LifeBuoy, CheckCheck } from "lucide-react";
+import { Bell, ShieldAlert, Calendar, Info, LifeBuoy, CheckCheck, Megaphone } from "lucide-react";
 import { useI18n } from "../../app/providers/I18nProvider";
 import { useSession } from "../../app/providers/SessionProvider";
 import { RH_SPACE_ROLES } from "../../lib/constants";
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from "../../lib/api";
 
-const ICON = { securite: ShieldAlert, absence: Calendar, escalade: LifeBuoy };
+const ICON = { securite: ShieldAlert, absence: Calendar, escalade: LifeBuoy, annonce: Megaphone };
 const COLOR = { high: "var(--danger)", mid: "var(--gold-deep)", low: "var(--muted)" };
 
 // Source à ouvrir au clic, selon la catégorie de la notification (espace RH).
@@ -66,8 +66,10 @@ export default function NotificationBell() {
   const onOpen = async (n) => {
     if (!n.lue) { try { await markNotificationRead(n.id); } catch { /* ignore */ } }
     setOpen(false);
-    const target = isElevated ? (ROUTE_BY_CAT[n.categorie] || "/rh/alertes")
-                              : (n.categorie === "absence" ? "/app/demandes" : "/app");
+    // Une annonce mène toujours au fil d'actualités, quel que soit le rôle.
+    const target = n.categorie === "annonce" ? "/app/actualites"
+      : isElevated ? (ROUTE_BY_CAT[n.categorie] || "/rh/alertes")
+      : (n.categorie === "absence" ? "/app/demandes" : "/app");
     navigate(target);
     load();
   };

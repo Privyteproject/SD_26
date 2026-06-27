@@ -559,6 +559,39 @@ class Alerte(Base):
     )
 
 
+# ───────────────────────── Actualités / Annonces ─────────────────────────
+class Annonce(Base):
+    """Annonce publiée par le RH à destination d'une sélection de collaborateurs."""
+    __tablename__ = "annonce"
+    id_annonce: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    titre: Mapped[str] = mapped_column(String(160))
+    contenu: Mapped[str] = mapped_column(Text)
+    auteur: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    epingle: Mapped[bool] = mapped_column(Boolean, default=False)            # mise en avant
+    date_creation: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    destinataires: Mapped[list[AnnonceDestinataire]] = relationship(
+        back_populates="annonce", cascade="all, delete-orphan")
+
+    def to_dict(self) -> dict:
+        dests = list(self.destinataires or [])
+        return {"id": self.id_annonce, "titre": self.titre, "contenu": self.contenu,
+                "auteur": self.auteur, "epingle": bool(self.epingle),
+                "nb_destinataires": len(dests), "nb_lus": sum(1 for d in dests if d.lu),
+                "date_creation": self.date_creation.isoformat() if self.date_creation else None}
+
+
+class AnnonceDestinataire(Base):
+    """Destinataire d'une annonce + suivi de lecture individuel."""
+    __tablename__ = "annonce_destinataire"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id_annonce: Mapped[int] = mapped_column(ForeignKey("annonce.id_annonce"), index=True)
+    matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+    lu: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    annonce: Mapped[Annonce] = relationship(back_populates="destinataires")
+
+
 class ScoreRisque(Base):
     __tablename__ = "score_risque"
     id_score: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

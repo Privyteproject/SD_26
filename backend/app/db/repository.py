@@ -2084,3 +2084,68 @@ def latest_indicateurs(db) -> dict:
         if i.type not in seen:
             seen[i.type] = i.to_dict()
     return seen
+
+
+# ───────────── Actualités / Annonces ─────────────
+def create_annonce(db, *, titre, contenu, auteur, matricules, epingle=False) -> dict:
+    """Crée une annonce, l'adresse aux collaborateurs choisis et notifie chacun (cloche)."""
+    from app.db.models import Alerte, Annonce, AnnonceDestinataire, Employe
+    a = Annonce(titre=titre, contenu=contenu, auteur=auteur, epingle=bool(epingle))
+    db.add(a)
+    db.flush()
+    n = 0
+    for mat in dict.fromkeys(matricules):
+        emp = db.get(Employe, mat)
+        if emp is None:
+            continue
+        db.add(AnnonceDestinataire(id_annonce=a.id_annonce, matricule=mat, lu=False))
+        # Notification individuelle (apparaît dans la cloche du destinataire)
+        if emp.id_utilisateur:
+            db.add(Alerte(message=f"Annonce : {titre}", categorie="annonce", gravite="low",
+                          confidentielle=False, lue=False, resolue=False,
+                          id_destinataire=emp.id_utilisateur, matricule=mat))
+        n += 1
+    db.commit()
+    db.refresh(a)
+    return {"annonce": a.to_dict(), "destinataires": n}
+
+
+def list_annonces_authored(db, *, limit=100):
+    """Toutes les annonces publiées (vue RH/gestion), de la plus récente à la plus ancienne."""
+    from app.db.models import Annonce
+    return list(db.scalars(select(Annonce).order_by(Annonce.date_creation.desc()).limit(limit)))
+
+
+def list_annonces_for(db, matricule, *, limit=100) -> list[dict]:
+    """Fil d'actualités d'un collaborateur : annonces reçues + statut de lecture, épinglées en tête."""
+    from app.db.models import Annonce, AnnonceDestinataire
+    rows = db.execute(
+        select(Annonce, AnnonceDestinataire)
+        .join(AnnonceDestinataire, AnnonceDestinataire.id_annonce == Annonce.id_annonce)
+        .where(AnnonceDestinataire.matricule == matricule)
+        .order_by(Annonce.epingle.desc(), Annonce.date_creation.desc())
+        .limit(limit)).all()
+    out = []
+    for a, d in rows:
+        item = a.to_dict()
+        item["lu"] = bool(d.lu)
+        out.append(item)
+    return out
+
+
+def count_unread_annonces(db, matricule) -> int:
+    from app.db.models import AnnonceDestinataire
+    return db.scalar(select(func.count()).select_from(AnnonceDestinataire).where(
+        AnnonceDestinataire.matricule == matricule, AnnonceDestinataire.lu.is_(False))) or 0
+
+
+def mark_annonce_read(db, *, id_annonce, matricule) -> bool:
+    """Marque une annonce comme lue pour ce collaborateur (dans son fil d'actualités)."""
+    from app.db.models import AnnonceDestinataire
+    d = db.scalar(select(AnnonceDestinataire).where(
+        AnnonceDestinataire.id_annonce == id_annonce, AnnonceDestinataire.matricule == matricule))
+    if d is None:
+        return False
+    d.lu = True
+    db.commit()
+    return True

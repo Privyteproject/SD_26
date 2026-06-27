@@ -11,6 +11,8 @@ export function navForRole(role, status) {
       { key: "nav.alerts", to: "/admin/alertes", icon: "Bell" },
       { key: "nav.audit", to: "/admin/audit", icon: "ScrollText" },
       { key: "nav.config", to: "/admin/configuration", icon: "Settings" },
+      { key: "nav.newsPublish", to: "/rh/actualites", icon: "Megaphone" },
+      { key: "nav.news", to: "/app/actualites", icon: "Newspaper" },
       { key: "nav.profile", to: "/app/profil", icon: "User" },
     ];
   }
@@ -30,15 +32,17 @@ export function navForRole(role, status) {
       { key: "nav.offboarding", to: "/rh/offboarding", icon: "UserMinus" },
       { key: "nav.reports", to: "/rh/rapports", icon: "FileBarChart" },
       { key: "nav.reqReview", to: "/rh/demandes", icon: "Inbox" },
+      { key: "nav.news", to: "/app/actualites", icon: "Newspaper" },
       { key: "nav.myRequests", to: "/app/demandes", icon: "CalendarPlus" },
       { key: "nav.profile", to: "/app/profil", icon: "User" },
     ];
     if (role !== ROLES.MANAGER) {
       items.splice(7, 0, { key: "nav.employees", to: "/rh/collaborateurs", icon: "IdCard" });
     }
-    // Validation des documents : RH et Direction uniquement.
+    // Validation des documents + publication d'annonces : RH et Direction uniquement.
     if (role === ROLES.RH || role === ROLES.DIRECTION) {
       items.push({ key: "nav.docsReview", to: "/rh/documents", icon: "FileCheck" });
+      items.push({ key: "nav.newsPublish", to: "/rh/actualites", icon: "Megaphone" });
     }
     // Médecine du travail : vue restreinte (bien-être / signaux uniquement)
     if (role === ROLES.MEDECINE) {
@@ -46,6 +50,7 @@ export function navForRole(role, status) {
         { key: "nav.dashboard", to: "/rh", icon: "LayoutDashboard" },
         { key: "nav.disengagement", to: "/rh/desengagement", icon: "Activity" },
         { key: "nav.climate", to: "/rh/climat", icon: "Smile" },
+        { key: "nav.news", to: "/app/actualites", icon: "Newspaper" },
         { key: "nav.myRequests", to: "/app/demandes", icon: "CalendarPlus" },
         { key: "nav.profile", to: "/app/profil", icon: "User" },
       ];
@@ -69,6 +74,7 @@ export function navForRole(role, status) {
   items.push({ key: "nav.myObjectives", to: "/app/objectifs", icon: "Target" });
   items.push({ key: "nav.mySkills", to: "/app/competences", icon: "Award" });
   items.push({ key: "nav.requests", to: "/app/demandes", icon: "Inbox" });
+  items.push({ key: "nav.news", to: "/app/actualites", icon: "Newspaper" });
   items.push({ key: "nav.profile", to: "/app/profil", icon: "User" });
   return items;
 }
