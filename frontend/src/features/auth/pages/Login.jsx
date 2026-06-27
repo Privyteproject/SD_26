@@ -42,22 +42,20 @@ export default function Login() {
   const eyebrow = { fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--gold-deep)", fontWeight: 600 };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", padding: 24, background: "var(--bg)" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", padding: 24, background: "radial-gradient(1100px 560px at 50% -8%, var(--gold-tint), transparent 60%), var(--bg)" }}>
       <div style={{ position: "absolute", top: 24, right: 24, display: "flex", gap: 10 }}>
         <LanguageToggle /><ThemeToggle />
       </div>
 
       <div style={{ width: "100%", maxWidth: 412 }}>
-        <form onSubmit={submit} style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 20, padding: 30, boxShadow: "var(--shadow)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Logo />
-            <span style={{ lineHeight: 1 }}>
-              <span style={{ fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>Synapse</span>
-              <span style={{ display: "block", fontSize: 9, letterSpacing: 3, color: "var(--gold-deep)", fontWeight: 600, marginTop: 2 }}>DIGITAL</span>
-            </span>
-          </div>
+        {/* Marque mise en avant */}
+        <div style={{ position: "relative", display: "flex", justifyContent: "center", marginBottom: 22 }}>
+          <div className="ds-glow" style={{ position: "absolute", width: 230, height: 230, borderRadius: "50%", background: "radial-gradient(circle, var(--gold-tint), transparent 68%)", filter: "blur(6px)" }} />
+          <div style={{ position: "relative" }}><Logo size={66} layout="stack" animated /></div>
+        </div>
 
-          <div style={{ marginTop: 22 }}>
+        <form onSubmit={submit} style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 20, padding: 30, boxShadow: "var(--shadow)" }}>
+          <div style={{ marginTop: 0 }}>
             <p style={eyebrow}>{t("login.eyebrow")}</p>
             <h2 className="font-display" style={{ fontSize: 25, fontWeight: 600, marginTop: 6, color: "var(--ink)" }}>{t("login.title")}</h2>
             <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>{t("login.sub")}</p>
