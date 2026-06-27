@@ -23,7 +23,11 @@ from app.schemas.common import envelope
 
 router = APIRouter()
 
+# Gestion du référentiel (métiers/compétences) : RH = tout, manager = son périmètre.
 _VALIDATE = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER)
+# Confirmation des compétences d'un collaborateur : SEUL le manager (de son équipe) — pas le RH.
+# L'admin reste superviseur global.
+_CONFIRM = require_roles(ROLE_MANAGER, ROLE_ADMIN)
 _ELEVATED = {ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER}
 
 
@@ -33,7 +37,18 @@ def _own_matricule(db, user):
 
 
 def _can_view(db, user, matricule) -> bool:
-    return user.role in _ELEVATED or matricule == _own_matricule(db, user)
+    """Qui peut consulter les compétences d'un collaborateur :
+    - le collaborateur lui-même ;
+    - RH / Direction / Admin : tout le monde ;
+    - MANAGER : UNIQUEMENT les membres de son équipe (même département)."""
+    if matricule == _own_matricule(db, user):
+        return True
+    if user.role in (ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION):
+        return True
+    if user.role == ROLE_MANAGER:
+        emp = repo.get_employee(db, matricule)
+        return bool(emp and emp.id_departement is not None and emp.id_departement == _mgr_dept(db, user))
+    return False
 
 
 def _mgr_dept(db, user):
@@ -151,9 +166,9 @@ class Validate(BaseModel):
 
 
 @router.get("/pending")
-def pending(user: CurrentUser = Depends(_VALIDATE), db: Session = Depends(get_db)):
-    """File de validation : auto-évaluations en attente (manager = son équipe ; RH = tout),
-    enrichies du nom du collaborateur et d'un indicateur `proposee` (compétence hors référentiel)."""
+def pending(user: CurrentUser = Depends(_CONFIRM), db: Session = Depends(get_db)):
+    """File de validation, réservée au MANAGER (limitée à son équipe ; admin = tout).
+    Enrichie du nom du collaborateur et d'un indicateur `proposee` (compétence hors référentiel)."""
     rows = repo.pending_evaluations(db, dept=_mgr_dept(db, user))
     out = []
     for e in rows:
@@ -166,10 +181,18 @@ def pending(user: CurrentUser = Depends(_VALIDATE), db: Session = Depends(get_db
 
 
 @router.patch("/evaluations/{id_eval}/validate")
-def validate(id_eval: int, payload: Validate, user: CurrentUser = Depends(_VALIDATE), db: Session = Depends(get_db)):
-    e = repo.validate_evaluation(db, id_eval=id_eval, niveau_expert=payload.niveau_expert, evaluateur=user.email)
-    if e is None:
+def validate(id_eval: int, payload: Validate, user: CurrentUser = Depends(_CONFIRM), db: Session = Depends(get_db)):
+    """Confirme le niveau d'une compétence. Un MANAGER ne peut confirmer que pour les
+    membres de SON équipe (même département) ; l'admin n'est pas restreint."""
+    from app.db.models import EvaluationCompetence
+    ev = db.get(EvaluationCompetence, id_eval)
+    if ev is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Évaluation introuvable")
+    if user.role == ROLE_MANAGER:
+        emp = repo.get_employee(db, ev.matricule)
+        if not emp or emp.id_departement != _mgr_dept(db, user):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Hors de votre équipe")
+    e = repo.validate_evaluation(db, id_eval=id_eval, niveau_expert=payload.niveau_expert, evaluateur=user.email)
     return envelope(e.to_dict())
 
 

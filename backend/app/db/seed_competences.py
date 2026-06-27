@@ -178,12 +178,12 @@ def run():
                 continue
             for cid in comps_by_metier.get(metier.id_metier, []):
                 auto = random.choices([2, 3, 4, 5], weights=[20, 40, 30, 10])[0]
-                valid = random.random() < 0.4
+                # La base population est une RÉFÉRENCE établie (radar / ML) : déjà validée,
+                # pour ne pas noyer la file de validation avec des milliers d'auto-évaluations.
                 pop_rows.append(EvaluationCompetence(
                     matricule=e.matricule, id_competence=cid, niveau_auto=auto,
-                    niveau_expert=(auto if valid else None),
-                    statut=("valide" if valid else "auto"),
-                    evaluateur=("rh@demo" if valid else None), date_evaluation=today))
+                    niveau_expert=auto, statut="valide",
+                    evaluateur="système (référence)", date_evaluation=today))
         db.bulk_save_objects(pop_rows)
         db.commit()
 

@@ -140,6 +140,10 @@ class Employe(Base):
     type_contrat: Mapped[str | None] = mapped_column(String(20), nullable=True)       # CDI/CDD/Alternance
     genre: Mapped[str | None] = mapped_column(String(10), nullable=True)              # M/F/Autre
     statut: Mapped[str] = mapped_column(String(10), default="ACTIVE", index=True)
+    # Informations personnelles modifiables par le collaborateur lui-même
+    telephone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    photo: Mapped[str | None] = mapped_column(Text, nullable=True)                    # data URL (image base64)
     id_departement: Mapped[int | None] = mapped_column(
         ForeignKey("departement.id_departement"), nullable=True, index=True
     )
@@ -227,7 +231,7 @@ class Feedback(Base):
 
 # ───────────────────────── Carrières & Compétences ─────────────────────────
 # Niveaux d'évolution standard d'un poste (du moins au plus avancé).
-NIVEAUX_CARRIERE = ["Junior", "Opérationnel", "Confirmé", "Senior", "Expert"]
+NIVEAUX_CARRIERE = ["Junior", "Opérationnel", "Confirmé", "Senior"]
 
 
 class Metier(Base):
@@ -324,6 +328,7 @@ class Objectif(Base):
     titre: Mapped[str] = mapped_column(String(160))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     statut: Mapped[str] = mapped_column(String(12), default="actif")  # actif / clos
+    groupe_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)  # objectif partagé (multi-collab)
     date_creation: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     key_results: Mapped[list[KeyResult]] = relationship(
@@ -335,6 +340,7 @@ class Objectif(Base):
         return {"id": self.id_objectif, "employee_id": self.matricule, "periode": self.periode,
                 "type": self.type_obj, "titre": self.titre, "description": self.description,
                 "statut": self.statut, "taux_realisation": taux,
+                "groupe_id": self.groupe_id, "partage": bool(self.groupe_id),
                 "key_results": [k.to_dict() for k in krs],
                 "date_creation": self.date_creation.isoformat() if self.date_creation else None}
 
@@ -604,6 +610,15 @@ def _employe_to_dict(self: Employe) -> dict:
         "department_id": self.id_departement,
         "department": self.department.nom if self.department else None,
         "manager_matricule": self.matricule_manager,
+        "manager_nom": (f"{self.manager.prenom} {self.manager.nom}" if self.manager else None),
+        "date_embauche": self.date_embauche.isoformat() if self.date_embauche else None,
+        "date_naissance": self.date_naissance.isoformat() if self.date_naissance else None,
+        "site": self.site,
+        "type_contrat": self.type_contrat,
+        "genre": self.genre,
+        "telephone": self.telephone,
+        "bio": self.bio,
+        "photo": self.photo,
     }
 
 

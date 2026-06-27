@@ -11,6 +11,7 @@ export function navForRole(role, status) {
       { key: "nav.alerts", to: "/admin/alertes", icon: "Bell" },
       { key: "nav.audit", to: "/admin/audit", icon: "ScrollText" },
       { key: "nav.config", to: "/admin/configuration", icon: "Settings" },
+      { key: "nav.profile", to: "/app/profil", icon: "User" },
     ];
   }
   if (RH_SPACE_ROLES.includes(role)) {
@@ -29,6 +30,8 @@ export function navForRole(role, status) {
       { key: "nav.offboarding", to: "/rh/offboarding", icon: "UserMinus" },
       { key: "nav.reports", to: "/rh/rapports", icon: "FileBarChart" },
       { key: "nav.reqReview", to: "/rh/demandes", icon: "Inbox" },
+      { key: "nav.myRequests", to: "/app/demandes", icon: "CalendarPlus" },
+      { key: "nav.profile", to: "/app/profil", icon: "User" },
     ];
     if (role !== ROLES.MANAGER) {
       items.splice(7, 0, { key: "nav.employees", to: "/rh/collaborateurs", icon: "IdCard" });
@@ -43,6 +46,8 @@ export function navForRole(role, status) {
         { key: "nav.dashboard", to: "/rh", icon: "LayoutDashboard" },
         { key: "nav.disengagement", to: "/rh/desengagement", icon: "Activity" },
         { key: "nav.climate", to: "/rh/climat", icon: "Smile" },
+        { key: "nav.myRequests", to: "/app/demandes", icon: "CalendarPlus" },
+        { key: "nav.profile", to: "/app/profil", icon: "User" },
       ];
     }
     return items;

@@ -1,0 +1,49 @@
+<!-- @dsCard group="Composants" -->
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boutons — Synapse Digital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#F4ECDC;--surface:#FBF6EC;--ink:#2D2114;--muted:#6E5C46;--line:#E6D8BF;
+    --gold:#B8893E;--gold-deep:#946B2A;--gold-tint:#EFE2C6;--on-gold:#FFF;--danger:#B4402E}
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px;background:var(--bg);color:var(--ink);font-family:'Hanken Grotesk',sans-serif}
+  h1{font-family:'Bricolage Grotesque',sans-serif;font-size:22px;font-weight:600;margin:0 0 18px}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:22px 0 10px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:9px;font-weight:600;display:inline-flex;align-items:center;gap:7px}
+  .btn{height:40px;padding:0 18px;font-size:14px}
+  .sm{height:32px;padding:0 12px;font-size:13px}
+  .lg{height:46px;padding:0 22px;font-size:15px}
+  .gold{background:var(--gold);color:var(--on-gold)}
+  .outline{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .ghost{background:transparent;color:var(--gold-deep)}
+  .danger{background:var(--danger);color:#fff}
+  .disabled{opacity:.5;cursor:not-allowed}
+  .ic{width:15px;height:15px;border-radius:3px;background:currentColor;opacity:.85}
+</style></head>
+<body>
+  <h1 class="font-display">Boutons</h1>
+
+  <h2>Variantes</h2>
+  <div class="row">
+    <button class="btn gold">Valider</button>
+    <button class="btn outline">Annuler</button>
+    <button class="btn ghost">Voir plus</button>
+    <button class="btn danger">Supprimer</button>
+    <button class="btn gold disabled">Indisponible</button>
+  </div>
+
+  <h2>Tailles</h2>
+  <div class="row">
+    <button class="sm gold">Petit</button>
+    <button class="btn gold">Moyen</button>
+    <button class="lg gold">Grand</button>
+  </div>
+
+  <h2>Avec icône</h2>
+  <div class="row">
+    <button class="btn gold"><span class="ic"></span> Ajouter</button>
+    <button class="btn outline"><span class="ic"></span> Filtrer</button>
+  </div>
+</body></html>

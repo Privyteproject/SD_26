@@ -34,6 +34,10 @@ def _run_migrations() -> None:
         "ALTER TABLE metier ADD COLUMN IF NOT EXISTS id_departement INTEGER",
         "ALTER TABLE competence ADD COLUMN IF NOT EXISTS proposee BOOLEAN DEFAULT FALSE",
         "ALTER TABLE humeur ADD COLUMN IF NOT EXISTS anonyme BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE objectif ADD COLUMN IF NOT EXISTS groupe_id VARCHAR(40)",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS telephone VARCHAR(40)",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS bio TEXT",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS photo TEXT",
     ]
     with engine.begin() as conn:
         for s in stmts:

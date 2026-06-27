@@ -40,10 +40,12 @@ def list_absences(
     status_: str | None = Query(None, alias="status"),
     date_from: date | None = Query(None, alias="from"),
     date_to: date | None = Query(None, alias="to"),
+    mine: bool = Query(False),
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if user.role not in _ELEVATED:
+    # `mine` force le périmètre personnel même pour un rôle élevé (page « Mes demandes »).
+    if mine or user.role not in _ELEVATED:
         employee_id = _own_matricule(db, user)
     rows = repo.list_absences(db, employee_id=employee_id, status=status_,
                               date_from=date_from, date_to=date_to)

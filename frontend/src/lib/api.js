@@ -11,7 +11,12 @@ export class ApiError extends Error {
 function emit(name, detail) { try { window.dispatchEvent(new CustomEvent(name, { detail })); } catch { /* ignore */ } }
 function qs(params) {
   if (!params) return "";
-  const s = new URLSearchParams(params).toString();
+  // Ignore les valeurs null/undefined (URLSearchParams les sérialiserait en "undefined").
+  const clean = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null) clean[k] = v;
+  }
+  const s = new URLSearchParams(clean).toString();
   return s ? `?${s}` : "";
 }
 async function parse(res) { try { return await res.json(); } catch { return null; } }
@@ -52,6 +57,7 @@ async function request(path, { method = "GET", body, params, _retry = false } = 
 // ---- Authentification ----
 // (le login Keycloak passe par lib/keycloak.js ; getMe lit le profil connecté)
 export const getMe = () => request("/employees/me");
+export const updateMyProfile = (data) => request("/employees/me", { method: "PATCH", body: data });
 
 // ---- Employés ----
 export const getEmployees = (params) => request("/employees", { params });
@@ -182,7 +188,10 @@ export const syncPostes = () => request("/competences/postes/sync", { method: "P
 // ---- Objectifs (OKR) & Bilans ----
 export const getObjectifs = (matricule, periode) => request(`/okr/${matricule}`, { params: periode ? { periode } : undefined });
 export const createObjectif = (data) => request("/okr", { method: "POST", body: data });
+export const createObjectifsBulk = (data) => request("/okr/bulk", { method: "POST", body: data });
+export const getTeamObjectifs = (periode) => request("/okr/team/objectives", { params: periode ? { periode } : undefined });
 export const updateKeyResult = (id, data) => request(`/okr/kr/${id}`, { method: "PATCH", body: data });
+export const updateKeyResultGroup = (id, data) => request(`/okr/kr/${id}/group`, { method: "PATCH", body: data });
 export const setObjectifStatus = (id, statut) => request(`/okr/${id}/status`, { method: "PATCH", params: { statut } });
 export const getBilans = (matricule) => request(`/okr/bilans/${matricule}`);
 export const createBilan = (data) => request("/okr/bilans", { method: "POST", body: data });

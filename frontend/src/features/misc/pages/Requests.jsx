@@ -23,8 +23,8 @@ const fmt = (iso, lang) => (iso ? new Date(iso).toLocaleDateString(lang === "fr"
 
 export default function Requests() {
   const { t, lang } = useI18n();
-  // GET /absences -> le backend filtre déjà sur l'utilisateur courant (collaborateur).
-  const { data, loading, error, reload } = useAsync(() => getAbsences());
+  // Page personnelle : `mine` force le périmètre à l'utilisateur courant (même pour un rôle élevé).
+  const { data, loading, error, reload } = useAsync(() => getAbsences({ mine: true }));
   const items = (data && data.data) || [];
 
   const [showForm, setShowForm] = useState(false);

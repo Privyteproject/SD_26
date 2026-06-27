@@ -54,6 +54,7 @@ export default function MyObjectives() {
                 <Target size={18} color="var(--gold-deep)" />
                 <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{o.titre}</span>
                 <Badge tone={o.type === "developpement" ? "info" : "gold"}>{t(`okr.type.${o.type}`)}</Badge>
+                {o.partage && <Badge tone="info">{t("okr.shared")}</Badge>}
                 {o.statut === "clos" && <Badge tone="success">{t("okr.closed")}</Badge>}
                 <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{o.taux_realisation}%</span>
               </div>
@@ -64,12 +65,19 @@ export default function MyObjectives() {
                 {o.key_results.map((k) => (
                   <div key={k.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <span style={{ flex: 1, fontSize: 13.5, color: "var(--ink)" }}>{k.libelle}{k.cible ? <span style={{ color: "var(--muted)" }}> · {t("okr.target")}: {k.cible}</span> : null}</span>
-                    <input type="range" min="0" max="100" step="5" defaultValue={k.progression}
-                      onMouseUp={(e) => saveKr(k.id, e.target.value)} onTouchEnd={(e) => saveKr(k.id, e.target.value)}
-                      style={{ width: 160, accentColor: "var(--gold)" }} />
+                    {o.partage ? (
+                      <div style={{ width: 160, height: 8, background: "var(--gold-tint)", borderRadius: 6, overflow: "hidden" }}>
+                        <div style={{ width: `${k.progression}%`, height: "100%", background: "var(--gold)" }} />
+                      </div>
+                    ) : (
+                      <input type="range" min="0" max="100" step="5" defaultValue={k.progression}
+                        onMouseUp={(e) => saveKr(k.id, e.target.value)} onTouchEnd={(e) => saveKr(k.id, e.target.value)}
+                        style={{ width: 160, accentColor: "var(--gold)" }} />
+                    )}
                     <span style={{ width: 42, textAlign: "right", fontSize: 13, color: "var(--muted)" }}>{k.progression}%</span>
                   </div>
                 ))}
+                {o.partage && <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{t("okr.sharedReadonly")}</div>}
               </div>
             </Card>
           ))}

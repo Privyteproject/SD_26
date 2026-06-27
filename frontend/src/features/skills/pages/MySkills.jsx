@@ -8,7 +8,7 @@ import AsyncBoundary from "../../../components/AsyncBoundary";
 import { useAsync } from "../../../lib/useAsync";
 import {
   getMe, getMyRequiredCompetences, getEvaluations, getCompetenceRadar,
-  getTrajectoire, selfEvaluate, addCustomCompetence,
+  getTrajectoire, selfEvaluate, addCustomCompetence, getCompetences,
 } from "../../../lib/api";
 
 // Étoiles cliquables (0-5).
@@ -36,16 +36,18 @@ export default function MySkills() {
   const { data, loading, error, reload } = useAsync(async () => {
     const me = (await getMe()).data || {};
     const mat = me.id || me.matricule;
-    const [req, evals, radar, traj] = await Promise.all([
+    const [req, evals, radar, traj, cat] = await Promise.all([
       getMyRequiredCompetences(), getEvaluations(mat), getCompetenceRadar(mat), getTrajectoire(mat),
+      getCompetences(),
     ]);
     return { mat, required: (req && req.data) || [], reqMeta: (req && req.meta) || {},
              evals: (evals && evals.data) || [], radar: (radar && radar.data) || {},
-             traj: (traj && traj.data) || {} };
+             traj: (traj && traj.data) || {}, catalogue: (cat && cat.data) || [] };
   });
 
   const [busy, setBusy] = useState(false);
   const [custom, setCustom] = useState({ nom: "", categorie: "hard", niveau_auto: 0, commentaire: "" });
+  const [pick, setPick] = useState({ id_competence: "", niveau_auto: 0 });
 
   const reqMeta = data?.reqMeta || {};
   const required = data?.required || [];
@@ -53,10 +55,20 @@ export default function MySkills() {
   const byComp = {}; for (const e of evals) byComp[e.id_competence] = e;
   const requiredIds = new Set(required.map((r) => r.id_competence));
   const extras = evals.filter((e) => !requiredIds.has(e.id_competence)); // custom / transverses
+  // Compétences du catalogue (autres métiers) que le collaborateur n'a pas encore positionnées.
+  const catalogue = data?.catalogue || [];
+  const available = catalogue.filter((c) => !requiredIds.has(c.id) && !byComp[c.id]);
 
   const rate = async (id_competence, niveau_auto, commentaire) => {
     setBusy(true);
     try { await selfEvaluate({ id_competence, niveau_auto, commentaire }); reload(); }
+    catch (e) { /* ignore */ } finally { setBusy(false); }
+  };
+  const addFromCatalogue = async () => {
+    if (!pick.id_competence || !pick.niveau_auto) return;
+    setBusy(true);
+    try { await selfEvaluate({ id_competence: Number(pick.id_competence), niveau_auto: pick.niveau_auto });
+      setPick({ id_competence: "", niveau_auto: 0 }); reload(); }
     catch (e) { /* ignore */ } finally { setBusy(false); }
   };
   const submitCustom = async () => {
@@ -81,16 +93,27 @@ export default function MySkills() {
       <AsyncBoundary loading={loading} error={error} onRetry={reload}>
         {/* Métier + trajectoire */}
         <Card style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("skills.metier")}</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: "var(--ink)", marginTop: 2 }}>{reqMeta.metier || "—"} <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 400 }}>· {reqMeta.poste || ""}</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("skills.metier")}</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "var(--ink)", marginTop: 2 }}>{reqMeta.metier || "—"} <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 400 }}>· {reqMeta.poste || ""}</span></div>
+            </div>
+            <div style={{ marginLeft: "auto", textAlign: "right" }}>
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("skills.currentLevel")}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--gold-deep)", marginTop: 2 }}>{data?.traj?.niveau_actuel || data?.radar?.niveau_actuel || t("skills.levelNone")}</div>
+            </div>
+          </div>
           {(data?.traj?.niveaux || []).length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
-              {data.traj.niveaux.map((n, i) => (
-                <span key={n} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", background: "var(--gold-tint)", border: "1px solid var(--line)", borderRadius: 999, padding: "4px 12px" }}>{n}</span>
-                  {i < data.traj.niveaux.length - 1 && <ChevronRight size={15} color="var(--muted)" />}
-                </span>
-              ))}
+              {data.traj.niveaux.map((n, i) => {
+                const cur = n === (data?.traj?.niveau_actuel || data?.radar?.niveau_actuel);
+                return (
+                  <span key={n} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: cur ? 700 : 600, color: cur ? "var(--on-gold)" : "var(--ink)", background: cur ? "var(--gold)" : "var(--gold-tint)", border: `1px solid ${cur ? "var(--gold)" : "var(--line)"}`, borderRadius: 999, padding: "4px 12px" }}>{n}</span>
+                    {i < data.traj.niveaux.length - 1 && <ChevronRight size={15} color="var(--muted)" />}
+                  </span>
+                );
+              })}
             </div>
           )}
         </Card>
@@ -155,6 +178,23 @@ export default function MySkills() {
             </div>
           </Card>
         )}
+
+        {/* Ajouter une compétence existante (catalogue, issue d'un autre métier) */}
+        <Card style={{ marginBottom: 16, opacity: busy ? 0.7 : 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>{t("skills.addFromCatalogue")}</div>
+          <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>{t("skills.fromCatalogueHint")}</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <select value={pick.id_competence} onChange={(e) => setPick({ ...pick, id_competence: e.target.value })} style={{ ...field, flex: 1, minWidth: 220 }}>
+              <option value="">{t("skills.pickFromCatalogue")}</option>
+              {available.map((c) => <option key={c.id} value={c.id}>{c.nom} ({c.categorie})</option>)}
+            </select>
+            <Stars value={pick.niveau_auto} onChange={(n) => setPick({ ...pick, niveau_auto: n })} />
+            <button onClick={addFromCatalogue} disabled={busy || !pick.id_competence || !pick.niveau_auto}
+              style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", opacity: (!pick.id_competence || !pick.niveau_auto) ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
+              <Plus size={16} /> {t("skills.add")}
+            </button>
+          </div>
+        </Card>
 
         {/* Ajouter une compétence personnalisée */}
         <Card>

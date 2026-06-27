@@ -77,6 +77,19 @@ def find_employee_by_email(db, email: str) -> Employe | None:
     )
 
 
+def update_my_profile(db, matricule: str, patch: dict) -> Employe:
+    """Met à jour les champs personnels (téléphone, bio, photo) d'un collaborateur."""
+    emp = db.get(Employe, matricule)
+    if emp is None:
+        return None
+    for k in ("telephone", "bio", "photo"):
+        if k in patch:
+            setattr(emp, k, patch[k])
+    db.commit()
+    db.refresh(emp)
+    return emp
+
+
 def create_employee(db, data: dict) -> Employe:
     """Crée le compte (utilisateur) + la personne (employe) en cohérence avec le MLD."""
     u = Utilisateur(email=data["email"], actif=True, code_role=data.get("role") or "COLLABORATEUR")
@@ -978,13 +991,20 @@ def validate_evaluation(db, *, id_eval, niveau_expert, evaluateur=None):
     return e
 
 
-def pending_evaluations(db, *, dept=None, limit=200):
+def pending_evaluations(db, *, dept=None, limit=500):
     """File de validation : auto-évaluations non encore validées par un expert.
+    Les compétences NOUVELLEMENT PROPOSÉES par les collaborateurs (proposee=True) sont
+    remontées en tête pour ne jamais être noyées par les auto-évaluations du référentiel.
     `dept` (manager) restreint aux collaborateurs de son équipe ; None = tout (RH/Direction/Admin)."""
-    from app.db.models import Employe, EvaluationCompetence
+    from app.db.models import Competence, Employe, EvaluationCompetence
     rows = list(db.scalars(
-        select(EvaluationCompetence).where(EvaluationCompetence.statut == "auto")
-        .order_by(EvaluationCompetence.date_evaluation.desc()).limit(limit)))
+        select(EvaluationCompetence)
+        .join(Competence, EvaluationCompetence.id_competence == Competence.id_competence)
+        .where(EvaluationCompetence.statut == "auto")
+        .order_by(Competence.proposee.desc(),
+                  EvaluationCompetence.date_evaluation.desc(),
+                  EvaluationCompetence.id.desc())
+        .limit(limit)))
     if dept is not None:
         mats = set(db.scalars(select(Employe.matricule).where(Employe.id_departement == dept)))
         rows = [e for e in rows if e.matricule in mats]
@@ -1018,8 +1038,52 @@ def create_missing_metiers(db) -> dict:
     return {"created": created, "count": len(created)}
 
 
+def _niveau_effectif(e):
+    """Niveau retenu pour une éval : la note validée par le manager prime sur l'auto-éval."""
+    if e is None:
+        return 0
+    return (e.niveau_expert if e.niveau_expert is not None else e.niveau_auto) or 0
+
+
+def _niveau_valide(e):
+    """Niveau OFFICIEL d'une compétence = uniquement la note validée par le manager.
+    L'auto-évaluation du collaborateur ne compte pas pour le niveau de poste."""
+    return (e.niveau_expert or 0) if e is not None else 0
+
+
+def current_career_level(db, matricule, *, metier=None, evals=None):
+    """Niveau de poste ATTEINT par le collaborateur, déduit de ses compétences VALIDÉES.
+
+    Un niveau est atteint si, pour TOUTES les compétences requises à ce niveau, la note
+    VALIDÉE PAR LE MANAGER atteint le niveau attendu. La progression est cumulative : on retient
+    le plus haut niveau contigu atteint. Le niveau ne change donc QU'APRÈS confirmation du manager
+    (l'auto-évaluation du collaborateur n'a aucun effet dessus).
+    """
+    from app.db.models import Employe, NIVEAUX_CARRIERE
+    emp = db.get(Employe, matricule)
+    if emp is None:
+        return None
+    if metier is None:
+        metier = resolve_metier_for_poste(db, emp.poste)
+    if metier is None:
+        return None
+    if evals is None:
+        evals = {e.id_competence: e for e in evaluations_for(db, matricule)}
+    atteint = None
+    for niv in NIVEAUX_CARRIERE:  # ordre croissant Junior → Senior
+        reqs = competences_requises(db, metier.id_metier, niv)
+        if not reqs:
+            continue
+        if all(_niveau_valide(evals.get(r.id_competence)) >= r.niveau_attendu for r in reqs):
+            atteint = niv
+        else:
+            break  # niveau non atteint : on arrête (progression cumulative)
+    return atteint
+
+
 def competence_radar(db, matricule, *, niveau=None):
-    """Radar : pour le métier de l'employé + niveau cible, compare niveau attendu vs actuel."""
+    """Radar : pour le métier de l'employé + niveau cible, compare niveau attendu vs actuel.
+    Inclut `niveau_actuel` = niveau de poste atteint (recalculé selon les notes validées)."""
     from app.db.models import Employe
     emp = db.get(Employe, matricule)
     if emp is None:
@@ -1031,13 +1095,14 @@ def competence_radar(db, matricule, *, niveau=None):
         reqs = competences_requises(db, metier.id_metier, niv) or competences_requises(db, metier.id_metier)
         for r in reqs:
             e = evals.get(r.id_competence)
-            actuel = (e.niveau_expert if e and e.niveau_expert is not None else (e.niveau_auto if e else 0)) or 0
+            actuel = _niveau_effectif(e)
             items.append({"competence": r.competence.nom if r.competence else None,
                           "categorie": r.competence.categorie if r.competence else None,
                           "attendu": r.niveau_attendu, "actuel": actuel,
                           "ecart": actuel - r.niveau_attendu})
     return {"matricule": matricule, "metier": metier.nom if metier else None, "niveau": niv,
-            "items": items, "gaps": [i for i in items if i["ecart"] < 0]}
+            "items": items, "gaps": [i for i in items if i["ecart"] < 0],
+            "niveau_actuel": current_career_level(db, matricule, metier=metier, evals=evals)}
 
 
 def trajectoire_carriere(db, matricule):
@@ -1053,7 +1118,8 @@ def trajectoire_carriere(db, matricule):
             select(CompetenceRequise.niveau).where(CompetenceRequise.id_metier == metier.id_metier)))
         niveaux = [n for n in NIVEAUX_CARRIERE if n in present] or NIVEAUX_CARRIERE
     return {"matricule": matricule, "poste": emp.poste,
-            "metier": metier.nom if metier else None, "niveaux": niveaux}
+            "metier": metier.nom if metier else None, "niveaux": niveaux,
+            "niveau_actuel": current_career_level(db, matricule, metier=metier) if metier else None}
 
 
 # ───────────── Objectifs (OKR) & bilans ─────────────
@@ -1065,10 +1131,23 @@ def list_objectifs(db, matricule, periode=None):
     return list(db.scalars(stmt.order_by(Objectif.periode.desc(), Objectif.id_objectif.desc())))
 
 
-def create_objectif(db, *, matricule, periode, type_obj, titre, description=None, key_results=None):
+def team_objectifs(db, *, dept=None, periode=None):
+    """Tous les objectifs (dept=None) ou ceux des collaborateurs d'un département (manager)."""
+    from app.db.models import Employe, Objectif
+    stmt = select(Objectif)
+    if periode:
+        stmt = stmt.where(Objectif.periode == periode)
+    rows = list(db.scalars(stmt.order_by(Objectif.periode.desc(), Objectif.id_objectif.desc())))
+    if dept is not None:
+        mats = set(db.scalars(select(Employe.matricule).where(Employe.id_departement == dept)))
+        rows = [o for o in rows if o.matricule in mats]
+    return rows
+
+
+def create_objectif(db, *, matricule, periode, type_obj, titre, description=None, key_results=None, groupe_id=None):
     from app.db.models import KeyResult, Objectif
     o = Objectif(matricule=matricule, periode=periode, type_obj=type_obj, titre=titre,
-                 description=description, statut="actif")
+                 description=description, statut="actif", groupe_id=groupe_id)
     db.add(o)
     db.flush()
     for kr in (key_results or []):
@@ -1091,6 +1170,37 @@ def update_key_result(db, id_kr, *, progression=None, cible=None):
     db.commit()
     db.refresh(kr)
     return kr
+
+
+def update_kr_group(db, id_kr, *, progression, dept=None):
+    """Met à jour l'avancement d'un résultat clé sur TOUT le groupe d'un objectif partagé.
+    Le même KR (même libellé) de chaque collaborateur du groupe est aligné sur la valeur.
+    `dept` (manager) limite l'effet aux collaborateurs de son équipe. Retourne le nb de KR modifiés."""
+    from app.db.models import Employe, KeyResult, Objectif
+    kr = db.get(KeyResult, id_kr)
+    if kr is None:
+        return 0
+    obj = db.get(Objectif, kr.id_objectif)
+    if obj is None:
+        return 0
+    val = max(0, min(100, int(progression)))
+    if not obj.groupe_id:                       # objectif individuel : MAJ simple
+        kr.progression = val
+        db.commit()
+        return 1
+    mats = None
+    if dept is not None:
+        mats = set(db.scalars(select(Employe.matricule).where(Employe.id_departement == dept)))
+    n = 0
+    for o in db.scalars(select(Objectif).where(Objectif.groupe_id == obj.groupe_id)):
+        if mats is not None and o.matricule not in mats:
+            continue
+        for k in o.key_results:
+            if k.libelle == kr.libelle:
+                k.progression = val
+                n += 1
+    db.commit()
+    return n
 
 
 def set_objectif_statut(db, id_objectif, statut):
@@ -1185,15 +1295,45 @@ def humeur_aggregate(db, *, weeks=8, dept=None, min_n=3) -> dict:
         trend.append({"semaine": w, "n": len(vals),
                       "moyenne": (None if masque else round(sum(vals) / len(vals), 2)),
                       "masque": masque})
-    cur = by_week[weeks_sorted[-1]] if weeks_sorted else []
+    cur_week = weeks_sorted[-1] if weeks_sorted else None
+    cur = by_week[cur_week] if cur_week else []
     n = len(cur)
     enough = n >= min_n
     dist = ({"satisfait": sum(1 for v in cur if v == 3),
              "neutre": sum(1 for v in cur if v == 2),
              "insatisfait": sum(1 for v in cur if v == 1)} if enough else None)
-    score = round((sum(cur) / n) / 3 * 100) if enough else None  # 0-100
-    return {"semaine_courante": weeks_sorted[-1] if weeks_sorted else None, "n": n,
-            "distribution": dist, "score_satisfaction": score, "min_n": min_n, "trend": trend}
+    score = round((sum(cur) / n) / 3 * 100) if enough else None  # 0-100 (humeur déclarative)
+
+    # ── Enrichissement NLP : sentiment des commentaires de la semaine (agrégé, anonyme) ──
+    score_sentiment = sentiment_label = None
+    n_comments = 0
+    if cur_week:
+        from app.services.sentiment import score_texts
+        comments = []
+        for com, mat in db.execute(
+                select(Humeur.commentaire, Humeur.matricule).where(
+                    Humeur.semaine == cur_week, Humeur.commentaire.is_not(None))).all():
+            if mats is not None and mat not in mats:
+                continue
+            if (com or "").strip():
+                comments.append(com)
+        sent = score_texts(comments)
+        n_comments = sent["n"]
+        if n_comments >= min_n:  # seuil anti-réidentification, comme pour le score déclaratif
+            score_sentiment = sent["score"]
+            sentiment_label = sent["label"]
+
+    # Score global : humeur déclarative (70%) pondérée par le sentiment des commentaires (30%).
+    if score is not None and score_sentiment is not None:
+        score_global = round(0.7 * score + 0.3 * score_sentiment)
+    else:
+        score_global = score
+
+    return {"semaine_courante": cur_week, "n": n,
+            "distribution": dist, "score_satisfaction": score, "min_n": min_n, "trend": trend,
+            "score_declaratif": score, "score_sentiment": score_sentiment,
+            "sentiment_label": sentiment_label, "n_comments": n_comments,
+            "score_global": score_global}
 
 
 def humeur_comments(db, *, dept=None, semaine=None, limit=80) -> list[dict]:

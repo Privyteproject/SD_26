@@ -42,9 +42,17 @@ export default function Climate() {
           <>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 16 }}>
               <Card style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-                <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("climate.score")}</div>
-                <div style={{ fontSize: 46, fontWeight: 700, color: "var(--ink)" }}>{d.score_satisfaction}<span style={{ fontSize: 20, color: "var(--muted)" }}>/100</span></div>
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>{d.score_sentiment != null ? t("climate.scoreEnriched") : t("climate.score")}</div>
+                <div style={{ fontSize: 46, fontWeight: 700, color: "var(--ink)" }}>{d.score_global ?? d.score_satisfaction}<span style={{ fontSize: 20, color: "var(--muted)" }}>/100</span></div>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{d.semaine_courante} · {d.n} {t("climate.responses")}</div>
+                {d.score_sentiment != null && (
+                  <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 8, textAlign: "center", lineHeight: 1.5 }}>
+                    {t("climate.declarative")} : <b style={{ color: "var(--ink)" }}>{d.score_declaratif}</b> ·{" "}
+                    {t("climate.sentiment")} : <b style={{ color: "var(--ink)" }}>{d.score_sentiment}</b>
+                    {" "}({d.n_comments} {t("climate.opinions")})
+                    <div style={{ marginTop: 2 }}>{t("climate.blendNote")}</div>
+                  </div>
+                )}
               </Card>
               <Card>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>{t("climate.distribution")}</div>

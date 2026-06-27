@@ -8,6 +8,7 @@ import csv
 import io
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -58,6 +59,30 @@ def read_me(user: CurrentUser = Depends(get_current_user), db: Session = Depends
     return envelope(data)
 
 
+class MyProfileUpdate(BaseModel):
+    """Champs personnels que le collaborateur peut modifier lui-même (pas son rôle/poste/statut)."""
+    telephone: str | None = Field(None, max_length=40)
+    bio: str | None = Field(None, max_length=2000)
+    photo: str | None = None          # data URL (image base64) ou null pour retirer
+
+
+@router.patch("/me")
+def update_me(payload: MyProfileUpdate, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Mise à jour des informations PERSONNELLES de l'utilisateur connecté (téléphone, bio, photo)."""
+    emp = repo.find_employee_by_email(db, user.email)
+    if emp is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Profil introuvable")
+    patch = payload.model_dump(exclude_unset=True)
+    photo = patch.get("photo")
+    if photo:
+        if not photo.startswith("data:image/"):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Format d'image invalide")
+        if len(photo) > 3_000_000:   # ~2 Mo d'image encodée
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Image trop volumineuse (max ~2 Mo)")
+    emp = repo.update_my_profile(db, emp.matricule, patch)
+    return envelope({**emp.to_dict(), "role": user.role})
+
+
 @router.get("")
 def list_employees(
     search: str | None = Query(None),
@@ -69,11 +94,14 @@ def list_employees(
     user: CurrentUser = Depends(_READ),
     db: Session = Depends(get_db),
 ):
-    # RBAC périmètre : un MANAGER ne voit que son département
+    # RBAC périmètre : un MANAGER ne voit QUE son département (jamais les autres collaborateurs)
     if user.role == "MANAGER":
         emp = repo.find_employee_by_email(db, user.email)
         if emp and emp.id_departement:
             department_id = str(emp.id_departement)
+        else:
+            # Manager sans département rattaché : aucun périmètre → liste vide (pas d'accès global).
+            return envelope([], meta={"total": 0, "page": page, "page_size": page_size})
 
     rows = repo.list_employees(db, search=search, role=role, status=status_, department_id=department_id)
     total = len(rows)
