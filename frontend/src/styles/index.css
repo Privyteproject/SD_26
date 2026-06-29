@@ -1,38 +1,41 @@
 @import "tailwindcss";
 
 :root {
-  /* Tokens Synapse Digital (kit officiel — Lumière) */
-  --bg:#F4EEE3; --bg-alt:#EFE7D7; --surface:#FFFFFF;
-  --ink:#241B10; --muted:#7C6C53; --faint:#AB9C81; --line:#EDE3D1; --line-soft:#F3ECDD;
-  --gold:#B0802F; --gold-deep:#8A5F22; --gold-soft:#DCBE7E; --gold-tint:#F6EEDB;
+  /* Tokens Synapse Digital — Premium (Lumière) */
+  --bg:#F3ECDE; --bg-alt:#EBE0CD; --surface:#FFFFFF; --surface-2:#FBF5EA;
+  --ink:#231A0F; --muted:#796A52; --faint:#A99A7E; --line:#E8DDC8; --line-soft:#F2EADA;
+  --gold:#B0802F; --gold-deep:#8A5F22; --gold-soft:#D9BD7C; --gold-tint:#F7EFD9;
   --on-gold:#FFFFFF; --field:#FFFFFF;
   --panel:#271B10; --panel-2:#34261A; --panel-line:#4A3826; --panel-text:#F3E9D6; --panel-muted:#B49E80;
   --danger:#A8402C; --success:#4F6B27; --warning:#8A5E16; --info:#3E6E8E;
   --success-bg:#EEF2E2; --info-bg:#E9EFF3; --warning-bg:#F6EDD9; --danger-bg:#F6E4DE;
-  /* Élévation */
-  --shadow-sm:0 2px 4px rgba(60,45,20,.04);
-  --shadow:0 18px 36px -28px rgba(60,45,20,.30);
-  --shadow-lg:0 28px 46px -26px rgba(60,45,20,.34);
-  /* Dégradés de marque */
-  --grad-gold:linear-gradient(180deg,#C49A4E 0%,#A9772F 100%);
+  /* Élévation — ombres multicouches (profondeur premium) */
+  --shadow-sm:0 1px 2px rgba(60,45,20,.05), 0 2px 6px rgba(60,45,20,.05);
+  --shadow:0 4px 14px -6px rgba(60,45,20,.16), 0 18px 38px -22px rgba(60,45,20,.30);
+  --shadow-lg:0 10px 28px -10px rgba(60,45,20,.20), 0 34px 64px -26px rgba(60,45,20,.40);
+  --shadow-gold:0 10px 30px -12px rgba(176,128,47,.45);
+  /* Dégradés de marque (or lumineux) */
+  --grad-gold:linear-gradient(135deg,#D8B065 0%,#B0802F 55%,#895E21 100%);
   --grad-progress:linear-gradient(90deg,#DCBE7E 0%,#B0802F 100%);
-  /* Rayons */
-  --r-sm:9px; --r-md:12px; --r-lg:18px; --r-xl:20px; --r-pill:999px;
-  /* Fond de page lumineux (Lumière) */
-  --app-bg:radial-gradient(100% 70% at 100% -10%, #FFF7E6 0%, transparent 58%), linear-gradient(165deg, #F7EFDF, #ECE0C8);
+  /* Rayons — modernisés */
+  --r-sm:10px; --r-md:14px; --r-lg:20px; --r-xl:26px; --r-pill:999px;
+  /* Fond de page lumineux, plus riche */
+  --app-bg:radial-gradient(120% 80% at 100% -15%, #FFF7E4 0%, transparent 55%), radial-gradient(90% 60% at 0% 112%, #F1E3C8 0%, transparent 52%), linear-gradient(160deg, #F7F0E0, #ECDFC7);
 }
 [data-theme="dark"] {
-  --bg:#191108; --bg-alt:#1F160C; --surface:#231910;
-  --ink:#F1E7D6; --muted:#AE9778; --faint:#7E6B4E; --line:#3A2C1C; --line-soft:#2A2014;
-  --gold:#D7A954; --gold-deep:#E7C57F; --gold-soft:#6A4F26; --gold-tint:#2E2114;
-  --on-gold:#191108; --field:#1A1109;
+  --bg:#140E07; --bg-alt:#1C1409; --surface:#221811; --surface-2:#1A120A;
+  --ink:#F2E8D7; --muted:#B09A7B; --faint:#7E6B4E; --line:#3A2C1C; --line-soft:#2A2014;
+  --gold:#E0B45E; --gold-deep:#EBCD88; --gold-soft:#6A4F26; --gold-tint:#2E2114;
+  --on-gold:#161009; --field:#1A1109;
   --panel:#120C06; --panel-2:#241910; --panel-line:#3A2C1C; --panel-text:#F3E9D6; --panel-muted:#B49E80;
   --danger:#E0795F; --success:#9DBE5A; --warning:#E7C57F; --info:#7FB0CE;
   --success-bg:#23270F; --info-bg:#15212A; --warning-bg:#2A2110; --danger-bg:#2A1611;
-  --shadow:0 22px 48px -26px rgba(0,0,0,.7);
-  --shadow-lg:0 30px 56px -26px rgba(0,0,0,.75);
-  --grad-gold:linear-gradient(180deg,#D7A954 0%,#A9772F 100%);
-  --app-bg:var(--bg);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.5);
+  --shadow:0 8px 24px -10px rgba(0,0,0,.6), 0 22px 48px -26px rgba(0,0,0,.72);
+  --shadow-lg:0 14px 36px -12px rgba(0,0,0,.7), 0 34px 66px -26px rgba(0,0,0,.82);
+  --shadow-gold:0 10px 34px -12px rgba(224,180,94,.35);
+  --grad-gold:linear-gradient(135deg,#E7C57F 0%,#C99A45 55%,#A9772F 100%);
+  --app-bg:radial-gradient(120% 80% at 100% -10%, #2A1E0F 0%, transparent 55%), linear-gradient(160deg,#160F08,#1C1409);
 }
 
 * { box-sizing: border-box; }

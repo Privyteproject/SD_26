@@ -24,9 +24,13 @@ import Climate from "../../features/mood/pages/Climate";
 import Tickets from "../../features/tickets/pages/Tickets";
 import News from "../../features/news/pages/News";
 import NewsRh from "../../features/news/pages/NewsRh";
+import Privacy from "../../features/privacy/pages/Privacy";
+import Help from "../../features/help/pages/Help";
 
 // Espace RH / Manager / Direction
 import DashboardRh from "../../features/dashboard/pages/DashboardRh";
+import Vision360 from "../../features/vision/pages/Vision360";
+import ProcessScreen from "../../features/processus/pages/ProcessScreen";
 import AssistantRh from "../../features/assistant/pages/AssistantRh";
 import Team from "../../features/misc/pages/Team";
 import PredictiveAnalytics from "../../features/analytics/pages/PredictiveAnalytics";
@@ -67,10 +71,16 @@ export default function AppRoutes() {
         <Route path="/app/humeur" element={<MyMood />} />
         <Route path="/app/tickets" element={<Tickets />} />
         <Route path="/app/actualites" element={<News />} />
+        <Route path="/app/confidentialite" element={<Privacy />} />
+        <Route path="/app/aide" element={<Help />} />
         <Route path="/app/profil" element={<Profile />} />
 
         {/* Espace RH / Manager / Direction / Médecine */}
         <Route path="/rh" element={<RoleGuard roles={RH_SPACE_ROLES}><DashboardRh /></RoleGuard>} />
+        <Route path="/rh/vision" element={<RoleGuard roles={[ROLES.MANAGER, ROLES.RH, ROLES.DIRECTION]}><Vision360 /></RoleGuard>} />
+        <Route path="/rh/processus/lifecycle" element={<RoleGuard roles={RH_SPACE_ROLES}><ProcessScreen pkey="lifecycle" titleKey="nav.lifecycle" icon="Route" /></RoleGuard>} />
+        <Route path="/rh/processus/carrieres" element={<RoleGuard roles={RH_SPACE_ROLES}><ProcessScreen pkey="carrieres" titleKey="nav.careers" icon="Award" /></RoleGuard>} />
+        <Route path="/rh/processus/happiness" element={<RoleGuard roles={RH_SPACE_ROLES}><ProcessScreen pkey="happiness" titleKey="nav.happiness" icon="HeartPulse" /></RoleGuard>} />
         <Route path="/rh/equipe" element={<RoleGuard roles={RH_SPACE_ROLES}><Team /></RoleGuard>} />
         <Route path="/rh/assistant" element={<RoleGuard roles={RH_SPACE_ROLES}><AssistantRh /></RoleGuard>} />
         <Route path="/rh/alertes" element={<RoleGuard roles={RH_SPACE_ROLES}><Alerts /></RoleGuard>} />

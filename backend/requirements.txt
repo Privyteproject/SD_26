@@ -1,3 +1,6 @@
+# numpy < 2 : torch 2.0.1 est compilé pour l'ABI numpy 1.x ; numpy 2.x provoque un
+# segfault à l'inférence (« _ARRAY_API not found »). À ne pas remonter sans MAJ de torch.
+numpy<2
 fastapi>=0.110
 uvicorn[standard]>=0.29
 pydantic[email]>=2.6

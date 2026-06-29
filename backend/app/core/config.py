@@ -60,6 +60,9 @@ class Settings:
     EMBED_MODEL_OR: str = os.getenv("EMBED_MODEL_OR", "openai/text-embedding-3-small")
     EMBED_DIM_HASH: int = int(os.getenv("EMBED_DIM_HASH", "512"))
     PII_MASKING: bool = os.getenv("PII_MASKING", "true").lower() == "true"
+    # Couche 2 anti-injection (LLM Guard / deberta). Lourde et sujette aux faux positifs ;
+    # la couche 1 (regex) reste toujours active. Désactivable si l'environnement ML est instable.
+    LLMGUARD_ENABLED: bool = os.getenv("LLMGUARD_ENABLED", "true").lower() == "true"
     AUTO_JUDGE: bool = os.getenv("AUTO_JUDGE", "true").lower() == "true"
     # Classification du périmètre par LLM (catégorie + confiance). Repli mots-clés sinon.
     CLS_LLM_ENABLED: bool = os.getenv("CLS_LLM_ENABLED", "true").lower() == "true"

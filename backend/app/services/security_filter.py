@@ -43,11 +43,38 @@ def detect_injection_patterns(text: str, role: str | None = None) -> tuple[bool,
     return False, None
 
 
-def detect_injection_llmguard(text: str) -> tuple[bool, str | None]:
-    """Couche 2 — LLM Guard (détecte variantes obfusquées)."""
+# Scanner LLM Guard mis en CACHE (singleton) : le modèle (deberta) est lourd à charger.
+# L'instancier à chaque requête rechargeait le modèle et faisait expirer le worker (-> 502).
+# On le charge UNE fois ; en cas d'échec (env. sans torch, conflit ABI), on dégrade
+# proprement vers la seule couche regex (couche 1) sans bloquer les requêtes.
+_llmguard_scanner = None
+_llmguard_failed = False
+
+
+def _get_llmguard_scanner():
+    global _llmguard_scanner, _llmguard_failed
+    if _llmguard_scanner is not None or _llmguard_failed:
+        return _llmguard_scanner
     try:
         from llm_guard.input_scanners import PromptInjection
-        scanner = PromptInjection()
+        _llmguard_scanner = PromptInjection()
+    except Exception as e:
+        _llmguard_failed = True
+        print(f"[SECURITY_FILTER] LLM Guard indisponible, repli regex seul : {e}", flush=True)
+    return _llmguard_scanner
+
+
+def warmup_llmguard() -> None:
+    """Pré-charge le scanner au démarrage (hors chemin requête) pour éviter tout timeout."""
+    _get_llmguard_scanner()
+
+
+def detect_injection_llmguard(text: str) -> tuple[bool, str | None]:
+    """Couche 2 — LLM Guard (détecte variantes obfusquées). Scanner mis en cache."""
+    try:
+        scanner = _get_llmguard_scanner()
+        if scanner is None:
+            return False, None
         _, is_valid, risk_score = scanner.scan(text)
         if not is_valid:
             return True, f"prompt injection détectée (LLM Guard, score: {risk_score:.2f})"
@@ -66,9 +93,11 @@ def detect_injection(text: str, role: str | None = None) -> tuple[bool, str | No
         print(f"[SECURITY_FILTER] Blocked by regex: {reason}", flush=True)
         return True, reason
 
-    # Couche 2 — LLM Guard (uniquement pour les profils non-privilégiés)
-    # Les modèles LLM Guard font souvent des faux positifs sur les requêtes RH légitimes.
-    if role not in _ELEVATED:
+    # Couche 2 — LLM Guard (uniquement pour les profils non-privilégiés, et si activée).
+    # Les modèles LLM Guard font souvent des faux positifs sur les requêtes RH légitimes ;
+    # désactivable via LLMGUARD_ENABLED si l'environnement ML est instable (segfault/ABI).
+    from app.core.config import settings
+    if settings.LLMGUARD_ENABLED and role not in _ELEVATED:
         detected, reason = detect_injection_llmguard(text)
         if detected:
             print(f"[SECURITY_FILTER] Blocked by LLM Guard: {reason}", flush=True)

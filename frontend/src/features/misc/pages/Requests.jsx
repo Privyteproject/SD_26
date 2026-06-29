@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useAsync } from "../../../lib/useAsync";
-import { getAbsences, createAbsence } from "../../../lib/api";
+import { getAbsences, createAbsence, getLeaveBalance } from "../../../lib/api";
 import Card from "../../../components/Card";
 import Badge from "../../../components/Badge";
 import AsyncBoundary from "../../../components/AsyncBoundary";
@@ -23,8 +23,12 @@ const fmt = (iso, lang) => (iso ? new Date(iso).toLocaleDateString(lang === "fr"
 export default function Requests() {
   const { t, lang } = useI18n();
   // Page personnelle : `mine` force le périmètre à l'utilisateur courant (même pour un rôle élevé).
-  const { data, loading, error, reload } = useAsync(() => getAbsences({ mine: true }));
-  const items = (data && data.data) || [];
+  const { data, loading, error, reload } = useAsync(async () => {
+    const [abs, bal] = await Promise.all([getAbsences({ mine: true }), getLeaveBalance().catch(() => ({ data: null }))]);
+    return { items: (abs && abs.data) || [], balance: (bal && bal.data) || null };
+  });
+  const items = data?.items || [];
+  const balance = data?.balance;
 
   const [showForm, setShowForm] = useState(false);
   const [type, setType] = useState(TYPES[0].code);
@@ -59,6 +63,23 @@ export default function Requests() {
           {showForm ? <X size={17} /> : <Plus size={17} />} {showForm ? t("usr.cancel") : t("req.new")}
         </button>
       </div>
+
+      {balance && balance.annee && (
+        <Card style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("req.balance")} {balance.annee}</div>
+            <div className="font-display" style={{ fontSize: 30, fontWeight: 700, color: "var(--gold-deep)" }}>
+              {balance.restant}<span style={{ fontSize: 16, color: "var(--muted)" }}> / {balance.alloue} {t("req.days")}</span>
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ height: 10, background: "var(--gold-tint)", borderRadius: 999, overflow: "hidden" }}>
+              <div style={{ width: `${Math.min(100, (balance.pris / (balance.alloue || 1)) * 100)}%`, height: "100%", background: "var(--gold)" }} />
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>{t("req.taken")} : {balance.pris} {t("req.days")}</div>
+          </div>
+        </Card>
+      )}
 
       {showForm && (
         <Card style={{ marginTop: 16 }}>

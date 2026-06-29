@@ -769,23 +769,28 @@ def find_employees_in_text(db, message: str, limit: int = 5) -> list:
     from app.db.models import Employe
     msg = _norm_txt(message)
     tokens = set(re.findall(r"[a-z0-9]+", msg))
-    out = []
+    exact, partial = [], []  # exact = nom complet/matricule ; partial = nom de famille seul
     for e in db.scalars(select(Employe)):
         pn, nn = _norm_txt(e.prenom), _norm_txt(e.nom)
         full = f"{pn} {nn}".strip()
-        if (len(nn) >= 3 and nn in tokens) or (full and full in msg) or (e.matricule or "").lower() in tokens:
-            out.append(e)
-        if len(out) >= limit:
-            break
-    return out
+        full_rev = f"{nn} {pn}".strip()
+        if (full and full in msg) or (full_rev and full_rev in msg) or (e.matricule or "").lower() in tokens:
+            exact.append(e)
+        elif len(nn) >= 3 and nn in tokens:
+            partial.append(e)
+    # Une correspondance par NOM COMPLET prime sur les homonymes partiels (« adam roux »
+    # ne doit pas être noyé par les autres « Adam »). Repli sur le nom de famille sinon.
+    return (exact or partial)[:limit]
 
 
 def get_latest_salary(db, matricule):
-    """Dernière ligne d'historique de salaire (ou None)."""
+    """Dernière ligne d'historique de salaire (ou None).
+    Départage par id_historique pour les lignes de même date (ex. backfill + promotion le même jour)."""
     from app.db.models import HistoriqueSalaire
     return db.scalars(
         select(HistoriqueSalaire).where(HistoriqueSalaire.matricule == matricule)
-        .order_by(HistoriqueSalaire.date_effet.desc()).limit(1)).first()
+        .order_by(HistoriqueSalaire.date_effet.desc(), HistoriqueSalaire.id_historique.desc())
+        .limit(1)).first()
 
 
 def get_dossier_confidentiel(db, matricule) -> dict | None:
@@ -982,13 +987,81 @@ def validate_evaluation(db, *, id_eval, niveau_expert, evaluateur=None):
     e = db.get(EvaluationCompetence, id_eval)
     if e is None:
         return None
+    # Niveau de poste AVANT la validation (pour détecter une montée de niveau).
+    niveau_avant = current_career_level(db, e.matricule)
     e.niveau_expert = niveau_expert
     e.statut = "valide"
     e.evaluateur = evaluateur
     e.date_evaluation = date.today()
+    db.flush()  # rend la validation visible pour le recalcul du niveau
+    niveau_apres = current_career_level(db, e.matricule)
+    # Si le niveau de poste a monté -> alignement du salaire sur la grille (promotion).
+    apply_grille_on_promotion(db, e.matricule, niveau_avant, niveau_apres)
     db.commit()
     db.refresh(e)
     return e
+
+
+def apply_grille_on_promotion(db, matricule, niveau_avant, niveau_apres) -> bool:
+    """Insère une ligne salaire au palier supérieur SI le niveau de poste a monté.
+    N'abaisse jamais le salaire ; n'agit que si la grille dépasse le salaire actuel."""
+    from app.db.models import Employe, HistoriqueSalaire
+    from app.services import salaire as grille
+    if niveau_apres is None:
+        return False
+    if grille.niveau_index(niveau_apres) <= grille.niveau_index(niveau_avant):
+        return False  # pas de montée de niveau
+    emp = db.get(Employe, matricule)
+    if emp is None:
+        return False
+    metier = resolve_metier_for_poste(db, emp.poste)
+    cible = grille.salaire_grille(niveau_apres, metier.nom if metier else None)
+    actuel = get_latest_salary(db, matricule)
+    montant_actuel = float(actuel.montant) if actuel else 0.0
+    if cible <= montant_actuel:
+        return False  # déjà au-dessus de la grille du nouveau palier
+    db.add(HistoriqueSalaire(matricule=matricule, montant=cible,
+                             date_effet=date.today(), motif=f"Promotion {niveau_apres}"))
+    db.flush()
+    return True
+
+
+def _niveau_pour_grille(db, emp) -> str | None:
+    """Niveau retenu pour aligner un salaire sur la grille :
+    niveau de poste validé si disponible, sinon dérivé de l'ancienneté (distribution réaliste)."""
+    niv = current_career_level(db, emp.matricule)
+    if niv:
+        return niv
+    if emp.date_embauche:
+        ans = (date.today() - emp.date_embauche).days / 365.0
+        if ans < 2:
+            return "Junior"
+        if ans < 4:
+            return "Opérationnel"
+        if ans < 7:
+            return "Confirmé"
+        return "Senior"
+    return "Junior"
+
+
+def backfill_grille_salaires(db) -> dict:
+    """Aligne le salaire courant de TOUS les employés sur la grille (métier × niveau).
+    Idempotent : n'ajoute une ligne que si le montant cible diffère du salaire actuel."""
+    from app.db.models import Employe, HistoriqueSalaire
+    from app.services import salaire as grille
+    n_updated = 0
+    for emp in db.scalars(select(Employe)):
+        niveau = _niveau_pour_grille(db, emp)
+        metier = resolve_metier_for_poste(db, emp.poste)
+        cible = grille.salaire_grille(niveau, metier.nom if metier else None)
+        actuel = get_latest_salary(db, emp.matricule)
+        if actuel is not None and abs(float(actuel.montant) - cible) < 1:
+            continue
+        db.add(HistoriqueSalaire(matricule=emp.matricule, montant=cible,
+                                 date_effet=date.today(), motif="Grille"))
+        n_updated += 1
+    db.commit()
+    return {"updated": n_updated}
 
 
 def pending_evaluations(db, *, dept=None, limit=500):
@@ -1309,11 +1382,15 @@ def humeur_aggregate(db, *, weeks=8, dept=None, min_n=3) -> dict:
     n_comments = 0
     if cur_week:
         from app.services.sentiment import score_texts
+        # Conformité : exclure les collaborateurs ayant RETIRÉ leur consentement à l'analyse de sentiment.
+        refus = matricules_refusant(db, "analyse_sentiment")
         comments = []
         for com, mat in db.execute(
                 select(Humeur.commentaire, Humeur.matricule).where(
                     Humeur.semaine == cur_week, Humeur.commentaire.is_not(None))).all():
             if mats is not None and mat not in mats:
+                continue
+            if mat in refus:
                 continue
             if (com or "").strip():
                 comments.append(com)
@@ -2022,10 +2099,13 @@ def salary_mass(db) -> dict:
     """Masse salariale = somme du DERNIER salaire connu par employé (table historique_salaire)."""
     from app.db.models import Employe, HistoriqueSalaire
     latest: dict[str, tuple] = {}
-    for m, d, mt in db.execute(select(HistoriqueSalaire.matricule, HistoriqueSalaire.date_effet,
-                                      HistoriqueSalaire.montant)).all():
-        if m not in latest or (d and d > latest[m][0]):
-            latest[m] = (d, float(mt or 0))
+    for m, d, mt, hid in db.execute(select(
+            HistoriqueSalaire.matricule, HistoriqueSalaire.date_effet,
+            HistoriqueSalaire.montant, HistoriqueSalaire.id_historique)).all():
+        # « dernier » = date la plus récente ; à date égale, id_historique le plus grand.
+        key = (d, hid)
+        if m not in latest or key > latest[m][0]:
+            latest[m] = (key, float(mt or 0))
     emp_site = dict(db.execute(select(Employe.matricule, Employe.site)).all())
     by_site: dict[str, float] = {}
     for m, (_, mt) in latest.items():
@@ -2049,9 +2129,12 @@ def list_scores(db, *, niveau=None, type=None, department_id=None):
     return list(db.scalars(stmt.order_by(ScoreRisque.valeur.desc())))
 
 
-def risk_summary(db, top: int = 5) -> dict:
+def risk_summary(db, top: int = 5, dept=None) -> dict:
     from app.db.models import Employe, ScoreRisque
     rows = list(db.scalars(select(ScoreRisque)))
+    if dept is not None:  # manager : restreint aux scores de son équipe
+        mats = set(db.scalars(select(Employe.matricule).where(Employe.id_departement == dept)))
+        rows = [s for s in rows if s.matricule in mats]
     by_niveau: dict[str, int] = {}
     for s in rows:
         by_niveau[s.niveau] = by_niveau.get(s.niveau, 0) + 1
@@ -2149,3 +2232,154 @@ def mark_annonce_read(db, *, id_annonce, matricule) -> bool:
     d.lu = True
     db.commit()
     return True
+
+
+# ───────────── Conformité / Consentement (RGPD-like) ─────────────
+# Finalités révocables par le collaborateur (les autres traitements relèvent de la sécurité
+# ou d'une obligation et sont seulement documentés, non révocables).
+FINALITES_REVOCABLES = {"analyse_sentiment", "detection_desengagement"}
+
+
+def get_consentements(db, matricule) -> dict:
+    """Consentements du collaborateur par finalité (défaut = accordé tant qu'aucun retrait)."""
+    from app.db.models import Consentement
+    rows = {c.finalite: c.accorde for c in db.scalars(
+        select(Consentement).where(Consentement.matricule == matricule))}
+    return {f: rows.get(f, True) for f in FINALITES_REVOCABLES}
+
+
+def set_consentement(db, *, matricule, finalite, accorde) -> bool:
+    from app.db.models import Consentement
+    if finalite not in FINALITES_REVOCABLES:
+        return False
+    c = db.scalar(select(Consentement).where(
+        Consentement.matricule == matricule, Consentement.finalite == finalite))
+    if c is None:
+        c = Consentement(matricule=matricule, finalite=finalite, accorde=bool(accorde))
+        db.add(c)
+    else:
+        c.accorde = bool(accorde)
+    db.commit()
+    return True
+
+
+def matricules_refusant(db, finalite) -> set:
+    """Matricules ayant RETIRÉ leur consentement pour une finalité (à exclure des traitements)."""
+    from app.db.models import Consentement
+    return set(db.scalars(select(Consentement.matricule).where(
+        Consentement.finalite == finalite, Consentement.accorde.is_(False))))
+
+
+def export_my_data(db, matricule) -> dict:
+    """Export des données personnelles d'un collaborateur (droit d'accès / portabilité)."""
+    from app.db.models import (Demande, EvaluationCompetence, Humeur, Objectif)
+    emp = get_employee(db, matricule)
+    if emp is None:
+        return {}
+    demandes = db.scalars(select(Demande).where(Demande.matricule == matricule))
+    evals = db.scalars(select(EvaluationCompetence).where(EvaluationCompetence.matricule == matricule))
+    objs = db.scalars(select(Objectif).where(Objectif.matricule == matricule))
+    hums = db.scalars(select(Humeur).where(Humeur.matricule == matricule))
+    return {
+        "profil": emp.to_dict(),
+        "demandes": [d.to_dict() for d in demandes],
+        "competences": [e.to_dict() for e in evals],
+        "objectifs": [o.to_dict() for o in objs],
+        "humeurs": [h.to_dict() for h in hums],
+        "consentements": get_consentements(db, matricule),
+    }
+
+
+def list_departements(db):
+    """Liste des départements (pour les vues consolidées par entité)."""
+    from app.db.models import Departement
+    return list(db.scalars(select(Departement).order_by(Departement.nom)))
+
+
+# ───────────── Paramètres / Règles configurables ─────────────
+def get_parametre(db, cle, default=None):
+    from app.db.models import Parametre
+    import json as _json
+    p = db.get(Parametre, cle)
+    if p is None or p.valeur is None:
+        return default
+    try:
+        return _json.loads(p.valeur)
+    except Exception:
+        return default
+
+
+def set_parametre(db, cle, value):
+    from app.db.models import Parametre
+    import json as _json
+    p = db.get(Parametre, cle)
+    if p is None:
+        p = Parametre(cle=cle, valeur=_json.dumps(value))
+        db.add(p)
+    else:
+        p.valeur = _json.dumps(value)
+    db.commit()
+    return value
+
+
+# ───────────── Solde de congés ─────────────
+CONGE_ALLOC_ANNUEL = 25  # jours de congés payés par an (paramétrable ultérieurement)
+
+
+# ───────────── Tâches personnelles (cockpit : Agenda & mes tâches) ─────────────
+def list_taches_perso(db, user_email):
+    from app.db.models import TachePerso
+    return list(db.scalars(
+        select(TachePerso).where(TachePerso.user_email == user_email).order_by(
+            TachePerso.fait, TachePerso.date_echeance.is_(None),
+            TachePerso.date_echeance, TachePerso.id.desc())))
+
+
+def create_tache_perso(db, *, user_email, titre, date_echeance=None, priorite="normale"):
+    from app.db.models import TachePerso
+    t = TachePerso(user_email=user_email, titre=titre, date_echeance=date_echeance,
+                   priorite=priorite or "normale")
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return t
+
+
+def update_tache_perso(db, *, id_tache, user_email, **fields):
+    from app.db.models import TachePerso
+    t = db.get(TachePerso, id_tache)
+    if t is None or t.user_email != user_email:
+        return None
+    for k, v in fields.items():
+        if v is not None and hasattr(t, k):
+            setattr(t, k, v)
+    db.commit()
+    db.refresh(t)
+    return t
+
+
+def delete_tache_perso(db, *, id_tache, user_email) -> bool:
+    from app.db.models import TachePerso
+    t = db.get(TachePerso, id_tache)
+    if t is None or t.user_email != user_email:
+        return False
+    db.delete(t)
+    db.commit()
+    return True
+
+
+def leave_balance(db, matricule) -> dict:
+    """Solde de congés de l'année en cours : alloué - jours de CONGÉ validés."""
+    from datetime import date as _date
+    from app.db.models import Demande
+    annee = _date.today().year
+    used = 0
+    rows = db.scalars(select(Demande).where(
+        Demande.matricule == matricule, Demande.code_type == "CONGE",
+        Demande.statut == "validated"))
+    for d in rows:
+        deb, fin = d.date_debut, d.date_fin
+        if deb and fin and fin >= deb and deb.year == annee:
+            used += (fin - deb).days + 1
+    return {"annee": annee, "alloue": CONGE_ALLOC_ANNUEL, "pris": used,
+            "restant": max(0, CONGE_ALLOC_ANNUEL - used)}

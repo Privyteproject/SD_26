@@ -11,8 +11,11 @@ _STORE: dict[str, tuple[float, dict]] = {}
 _TTL = 3600  # 1h
 
 
-def key(message: str, perimetre: str) -> str:
-    return f"{perimetre}:{normalize(message)}"
+def key(message: str, perimetre: str, role: str = "") -> str:
+    # Le rôle fait PARTIE de la clé : une réponse dépend de l'autorisation (RBAC/ABAC)
+    # et du filtrage documentaire par audience. Sans cela, une réponse mise en cache pour
+    # un rôle habilité (RH) pourrait être resservie à un collaborateur (fuite inter-rôles).
+    return f"{(role or '').upper()}:{perimetre}:{normalize(message)}"
 
 
 def get(k: str):

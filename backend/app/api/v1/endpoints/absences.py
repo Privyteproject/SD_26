@@ -82,6 +82,15 @@ def create_absence(
     return envelope(ab.to_dict())
 
 
+@router.get("/balance")
+def leave_balance(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Solde de congés de l'utilisateur connecté (alloué / pris / restant)."""
+    mat = _own_matricule(db, user)
+    if mat is None:
+        return envelope({"annee": None, "alloue": 0, "pris": 0, "restant": 0})
+    return envelope(repo.leave_balance(db, mat))
+
+
 @router.get("/stats")
 def absence_stats(_: CurrentUser = Depends(_ACT), db: Session = Depends(get_db)):
     return envelope(repo.absence_stats(db))

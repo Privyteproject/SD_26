@@ -27,6 +27,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -227,6 +228,24 @@ class Feedback(Base):
             "note_1_5": self.note_1_5, "categorie": self.categorie,
             "commentaire": self.commentaire, "auteur": self.auteur,
         }
+
+
+class TachePerso(Base):
+    """Tâche personnelle (to-do) d'un utilisateur — bloc « Agenda & mes tâches » du cockpit."""
+    __tablename__ = "tache_perso"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_email: Mapped[str] = mapped_column(String(160), index=True)
+    titre: Mapped[str] = mapped_column(String(200))
+    date_echeance: Mapped[date | None] = mapped_column(Date, nullable=True)
+    priorite: Mapped[str] = mapped_column(String(10), default="normale")  # basse / normale / haute
+    fait: Mapped[bool] = mapped_column(Boolean, default=False)
+    date_creation: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "titre": self.titre,
+                "date_echeance": self.date_echeance.isoformat() if self.date_echeance else None,
+                "priorite": self.priorite, "fait": bool(self.fait),
+                "date_creation": self.date_creation.isoformat() if self.date_creation else None}
 
 
 # ───────────────────────── Carrières & Compétences ─────────────────────────
@@ -590,6 +609,28 @@ class AnnonceDestinataire(Base):
     lu: Mapped[bool] = mapped_column(Boolean, default=False)
 
     annonce: Mapped[Annonce] = relationship(back_populates="destinataires")
+
+
+# ───────────────────────── Paramètres / Règles configurables ─────────────────────────
+class Parametre(Base):
+    """Paramètre de configuration (clé/valeur JSON) — ex. règles de supervision IA."""
+    __tablename__ = "parametre"
+    cle: Mapped[str] = mapped_column(String(60), primary_key=True)
+    valeur: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON sérialisé
+    date_maj: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ───────────────────────── Conformité / Consentement (RGPD-like) ─────────────────────────
+class Consentement(Base):
+    """Consentement d'un collaborateur pour une finalité de traitement analytique avancé.
+    Absence de ligne = valeur par défaut de la finalité. Permet le retrait à tout moment."""
+    __tablename__ = "consentement"
+    __table_args__ = (UniqueConstraint("matricule", "finalite", name="uq_consentement_mat_fin"),)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    matricule: Mapped[str] = mapped_column(ForeignKey("employe.matricule"), index=True)
+    finalite: Mapped[str] = mapped_column(String(40), index=True)
+    accorde: Mapped[bool] = mapped_column(Boolean, default=True)
+    date_maj: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class ScoreRisque(Base):

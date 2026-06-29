@@ -145,10 +145,22 @@ def complete(system_prompt: str, message: str, history: list | None = None, tool
         out = _chat(settings.AGENT_MODEL, messages, settings.AI_MAX_TOKENS, tools=tools)
         return {"reply": out["text"], "model": out["model"], "degraded": False,
                 "usage": out["usage"], "fallback_used": False, "tool_calls": out.get("tool_calls", [])}
-    except RuntimeError:
-        out = _chat(settings.FALLBACK_MODEL, messages, settings.AI_MAX_TOKENS, tools=tools)
-        return {"reply": out["text"], "model": out["model"], "degraded": False,
-                "usage": out["usage"], "fallback_used": True, "tool_calls": out.get("tool_calls", [])}
+    except RuntimeError as primary_exc:
+        try:
+            out = _chat(settings.FALLBACK_MODEL, messages, settings.AI_MAX_TOKENS, tools=tools)
+            return {"reply": out["text"], "model": out["model"], "degraded": False,
+                    "usage": out["usage"], "fallback_used": True, "tool_calls": out.get("tool_calls", [])}
+        except RuntimeError as fallback_exc:
+            # Les deux modèles ont échoué (ex. crédits OpenRouter épuisés -> 402) : on DÉGRADE
+            # proprement au lieu de renvoyer une erreur 502 à l'utilisateur.
+            print(f"[AI] complete() dégradé — primaire={primary_exc} | repli={fallback_exc}", flush=True)
+            is_quota = "402" in str(fallback_exc) or "402" in str(primary_exc)
+            reply = ("Le service d'IA est momentanément indisponible (quota d'API atteint). "
+                     "Réessayez plus tard ou contactez l'administrateur."
+                     if is_quota else
+                     "Le service d'IA est momentanément indisponible. Réessayez dans un instant.")
+            return {"reply": reply, "model": "indisponible", "degraded": True,
+                    "usage": {}, "fallback_used": True, "tool_calls": []}
 
 
 def refine(question: str, previous_answer: str, feedback: str, system_prompt: str) -> dict:
@@ -204,7 +216,14 @@ def judge_reply(question: str, answer: str) -> dict:
         {"role": "system", "content": JUDGE_PROMPT},
         {"role": "user", "content": f"QUESTION:\n{question}\n\nREPONSE:\n{answer}"},
     ]
-    out = _chat(settings.JUDGE_MODEL, messages, 400)
+    try:
+        out = _chat(settings.JUDGE_MODEL, messages, 400)
+    except Exception as exc:
+        # Juge indisponible (ex. quota API/402) : ne PAS faire échouer la requête —
+        # on renvoie un verdict neutre (pas de reformulation déclenchée).
+        return {"note": None, "verdict": "indéterminé",
+                "justification": "Juge indisponible (service IA).", "criteres": {},
+                "model": "indisponible", "degraded": True}
     try:
         verdict = _extract_json(out["text"])
     except Exception:

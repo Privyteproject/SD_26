@@ -149,6 +149,217 @@ def quarterly_series(db, dept=None, quarters=4) -> list[dict]:
     return out
 
 
+_MONTHS_FR = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+
+
+def monthly_series(db, dept=None, year=None, min_n=3) -> dict:
+    """Séries MENSUELLES réelles de l'année courante (axe X = mois) pour les graphes de tendance.
+
+    Sources réelles : absentéisme (jours MALADIE/mois), engagement (enquêtes/mois),
+    humeur (déclarations/mois, agrégées & anonymisées seuil min_n), embauches, mobilité.
+    `value=None` pour les mois FUTURS ou sans donnée (le front filtre les null)."""
+    from app.db.models import Demande, Employe, EnqueteEngagement, HistoriqueSalaire, Humeur
+    year = year or date.today().year
+    today = date.today()
+    last_m = today.month if year == today.year else 12
+    mats = _dept_matricules(db, dept)
+    empty = mats is not None and not mats
+    n = effectifs(db, dept) or 1
+
+    def col(arr):
+        return [{"label": _MONTHS_FR[i], "value": (arr[i] if (i + 1) <= last_m else None)} for i in range(12)]
+
+    abs_days = [0.0] * 12
+    eng = [None] * 12
+    hum = [None] * 12
+    emb = [0] * 12
+    mob = [0] * 12
+
+    if not empty:
+        # Absentéisme : jours MALADIE par mois (recouvrement borné au mois).
+        ab = select(Demande.date_debut, Demande.date_fin).where(Demande.code_type == "MALADIE")
+        if mats is not None:
+            ab = ab.where(Demande.matricule.in_(mats))
+        for d0, d1 in db.execute(ab).all():
+            if not d0:
+                continue
+            end = d1 or d0
+            for m in range(1, 13):
+                ms = date(year, m, 1)
+                me = (date(year, m + 1, 1) - timedelta(days=1)) if m < 12 else date(year, 12, 31)
+                lo, hi = max(d0, ms), min(end, me)
+                if lo <= hi:
+                    abs_days[m - 1] += (hi - lo).days + 1
+        absent = [round(100.0 * abs_days[i] / (n * WORKDAYS_MONTH), 1) for i in range(12)]
+
+        # Engagement : moyenne des enquêtes par mois (×10 sur /100).
+        eq = select(func.extract("month", EnqueteEngagement.date_enquete),
+                    func.avg(EnqueteEngagement.satisfaction_globale)).where(
+            func.extract("year", EnqueteEngagement.date_enquete) == year)
+        if mats is not None:
+            eq = eq.where(EnqueteEngagement.matricule.in_(mats))
+        for m, a in db.execute(eq.group_by(func.extract("month", EnqueteEngagement.date_enquete))).all():
+            if a is not None:
+                eng[int(m) - 1] = round(float(a) * 10, 1)
+
+        # Humeur : moyenne /3*100 par mois, masquée si < min_n réponses (anti-réidentification).
+        hq = select(func.extract("month", Humeur.date_saisie), func.avg(Humeur.niveau), func.count()).where(
+            func.extract("year", Humeur.date_saisie) == year)
+        if mats is not None:
+            hq = hq.where(Humeur.matricule.in_(mats))
+        for m, a, c in db.execute(hq.group_by(func.extract("month", Humeur.date_saisie))).all():
+            if a is not None and (c or 0) >= min_n:
+                hum[int(m) - 1] = round(float(a) / 3 * 100)
+
+        # Embauches : nombre par mois (date_embauche).
+        eb = select(func.extract("month", Employe.date_embauche), func.count()).where(
+            func.extract("year", Employe.date_embauche) == year)
+        if dept is not None:
+            eb = eb.where(Employe.id_departement == dept)
+        for m, c in db.execute(eb.group_by(func.extract("month", Employe.date_embauche))).all():
+            emb[int(m) - 1] = int(c or 0)
+
+        # Mobilité interne : promotions par mois / effectif (%).
+        mq = select(func.extract("month", HistoriqueSalaire.date_effet), func.count()).where(
+            HistoriqueSalaire.motif == "Promotion", func.extract("year", HistoriqueSalaire.date_effet) == year)
+        if mats is not None:
+            mq = mq.where(HistoriqueSalaire.matricule.in_(mats))
+        for m, c in db.execute(mq.group_by(func.extract("month", HistoriqueSalaire.date_effet))).all():
+            mob[int(m) - 1] = round(100.0 * int(c or 0) / n, 1)
+    else:
+        absent = [0.0] * 12
+
+    return {
+        "year": year,
+        "absenteisme": col(absent),
+        "engagement": col(eng),
+        "humeur": col(hum),
+        "embauches": col(emb),
+        "mobilite": col(mob),
+    }
+
+
+def _quarter_ends(today, n):
+    q = (today.month - 1) // 3
+    ends = []
+    for back in range(n - 1, -1, -1):
+        qi, yy = q - back, today.year
+        while qi < 0:
+            qi += 4
+            yy -= 1
+        em = qi * 3 + 3
+        ends.append(date(yy, 12, 31) if em == 12 else date(yy, em + 1, 1) - timedelta(days=1))
+    return ends
+
+
+def career_trends(db, dept=None, quarters=6) -> dict:
+    """Évolution comparée (indexée base 100) du SALAIRE moyen et du NIVEAU DE COMPÉTENCES
+    moyen validé, par trimestre — pour détecter un décrochage rémunération/compétences."""
+    from app.db.models import EvaluationCompetence, HistoriqueSalaire
+    mats = _dept_matricules(db, dept)
+    ends = _quarter_ends(date.today(), quarters)
+    sal_rows = db.execute(select(HistoriqueSalaire.matricule, HistoriqueSalaire.date_effet, HistoriqueSalaire.montant)).all()
+    ev_rows = db.execute(select(EvaluationCompetence.matricule, EvaluationCompetence.date_evaluation,
+                                EvaluationCompetence.niveau_expert).where(EvaluationCompetence.statut == "valide")).all()
+    if mats is not None:
+        sal_rows = [r for r in sal_rows if r[0] in mats]
+        ev_rows = [r for r in ev_rows if r[0] in mats]
+    sal_avg, comp_avg, labels = [], [], []
+    for qe in ends:
+        labels.append(f"{qe.year}-T{((qe.month - 1) // 3) + 1}")
+        latest = {}
+        for m, d, mt in sal_rows:
+            if d and d <= qe and (m not in latest or d > latest[m][0]):
+                latest[m] = (d, float(mt or 0))
+        sal_avg.append(sum(v[1] for v in latest.values()) / len(latest) if latest else 0)
+        nivs = [float(n) for (m, d, n) in ev_rows if d and d <= qe and n is not None]
+        comp_avg.append(sum(nivs) / len(nivs) if nivs else 0)
+
+    def idx(arr):
+        base = next((x for x in arr if x), 0)
+        return [round(100.0 * x / base, 1) if base else None for x in arr]
+    si, ci = idx(sal_avg), idx(comp_avg)
+    series = [{"label": labels[i], "salaire": si[i], "competences": ci[i]} for i in range(len(labels))]
+    return {"series": series}
+
+
+def poste_comparison(db, dept=None, limit=24) -> dict:
+    """Comparaison salaire vs niveau de compétences des collaborateurs d'un MÊME poste
+    (le poste le plus représenté du périmètre) — équité interne."""
+    from collections import Counter, defaultdict
+    from app.db.models import Employe, EvaluationCompetence, HistoriqueSalaire
+    rows = db.execute(select(Employe.matricule, Employe.poste, Employe.prenom, Employe.nom).where(
+        Employe.statut == "ACTIVE", *([Employe.id_departement == dept] if dept is not None else []))).all()
+    cnt = Counter(p for (_, p, _, _) in rows if p)
+    if not cnt:
+        return {"poste": None, "points": []}
+    poste = cnt.most_common(1)[0][0]
+    members = [(m, pr, no) for (m, p, pr, no) in rows if p == poste]
+    memset = {m for m, _, _ in members}
+    latest = {}
+    for m, d, mt in db.execute(select(HistoriqueSalaire.matricule, HistoriqueSalaire.date_effet, HistoriqueSalaire.montant)).all():
+        if m in memset and (m not in latest or (d and d > latest[m][0])):
+            latest[m] = (d, float(mt or 0))
+    nivs = defaultdict(list)
+    for m, n in db.execute(select(EvaluationCompetence.matricule, EvaluationCompetence.niveau_expert).where(
+            EvaluationCompetence.statut == "valide")).all():
+        if m in memset and n is not None:
+            nivs[m].append(float(n))
+    points = []
+    for m, pr, no in members[:limit]:
+        points.append({"nom": f"{pr} {no}".strip(),
+                       "salaire": round(latest.get(m, (None, 0))[1]),
+                       "competence": round(sum(nivs[m]) / len(nivs[m]), 2) if nivs[m] else 0})
+    return {"poste": poste, "points": points}
+
+
+def employee_trends(db, matricule, quarters=8) -> dict:
+    """Tendances d'UN collaborateur : historique de salaire + niveau de compétences validé par trimestre."""
+    from app.db.models import EvaluationCompetence, HistoriqueSalaire
+    sal = db.execute(select(HistoriqueSalaire.date_effet, HistoriqueSalaire.montant).where(
+        HistoriqueSalaire.matricule == matricule).order_by(HistoriqueSalaire.date_effet)).all()
+    sal_series = [{"label": d.strftime("%m/%y") if d else "—", "value": round(float(m or 0))} for d, m in sal]
+    ev = db.execute(select(EvaluationCompetence.date_evaluation, EvaluationCompetence.niveau_expert).where(
+        EvaluationCompetence.matricule == matricule, EvaluationCompetence.statut == "valide")).all()
+    comp_series = []
+    for qe in _quarter_ends(date.today(), quarters):
+        nivs = [float(n) for (d, n) in ev if d and d <= qe and n is not None]
+        comp_series.append({"label": f"T{((qe.month - 1) // 3) + 1} {str(qe.year)[2:]}",
+                            "value": round(sum(nivs) / len(nivs), 2) if nivs else None})
+    return {"salaire": sal_series, "competences": comp_series}
+
+
+def compare_series(db, matricules, metric="salaire", quarters=8) -> dict:
+    """Comparaison multi-collaborateurs par trimestre : une courbe par collaborateur.
+    metric = 'salaire' (dernier salaire connu <= trimestre) ou 'competences' (niveau moyen validé)."""
+    from app.db.models import Employe, EvaluationCompetence, HistoriqueSalaire
+    ends = _quarter_ends(date.today(), quarters)
+    labels = [f"T{((qe.month - 1) // 3) + 1} {str(qe.year)[2:]}" for qe in ends]
+    series = []
+    for mat in matricules:
+        emp = db.get(Employe, mat)
+        nom = f"{emp.prenom} {emp.nom}".strip() if emp else mat
+        if metric == "competences":
+            rows = db.execute(select(EvaluationCompetence.date_evaluation, EvaluationCompetence.niveau_expert).where(
+                EvaluationCompetence.matricule == mat, EvaluationCompetence.statut == "valide")).all()
+            vals = []
+            for qe in ends:
+                nivs = [float(n) for (d, n) in rows if d and d <= qe and n is not None]
+                vals.append(round(sum(nivs) / len(nivs), 2) if nivs else None)
+        else:
+            rows = db.execute(select(HistoriqueSalaire.date_effet, HistoriqueSalaire.montant).where(
+                HistoriqueSalaire.matricule == mat).order_by(HistoriqueSalaire.date_effet)).all()
+            vals = []
+            for qe in ends:
+                latest = None
+                for d, m in rows:
+                    if d and d <= qe and (latest is None or d > latest[0]):
+                        latest = (d, float(m or 0))
+                vals.append(round(latest[1]) if latest else None)
+        series.append({"matricule": mat, "nom": nom, "values": vals})
+    return {"labels": labels, "metric": metric, "series": series}
+
+
 def mobilite_interne(db, dept=None, months=12) -> float:
     """Taux de mobilité interne = employés promus (HistoriqueSalaire motif Promotion)
     sur N mois / effectif actif, en %."""

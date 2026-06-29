@@ -60,6 +60,12 @@ export const getMe = () => request("/employees/me");
 export const updateMyProfile = (data) => request("/employees/me", { method: "PATCH", body: data });
 
 // ---- Actualités / Annonces ----
+// ---- Confidentialité / Conformité ----
+export const getMyPrivacy = () => request("/confidentialite/me");
+export const setMyConsent = (data) => request("/confidentialite/me", { method: "PATCH", body: data });
+export const exportMyData = () => request("/confidentialite/me/export");
+export const requestErasure = () => request("/confidentialite/me/effacement", { method: "POST" });
+
 export const createAnnonce = (data) => request("/annonces", { method: "POST", body: data });
 export const getAnnoncesAuthored = () => request("/annonces");
 export const getMyAnnonces = () => request("/annonces/me");
@@ -86,6 +92,7 @@ export const deleteEmployee = (id) => request(`/employees/${id}`, { method: "DEL
 
 // ---- Absences ----
 export const getAbsences = (params) => request("/absences", { params });
+export const getLeaveBalance = () => request("/absences/balance");
 export const createAbsence = (data) => request("/absences", { method: "POST", body: data });
 export const updateAbsenceStatus = (id, status) => request(`/absences/${id}/status`, { method: "PATCH", body: { status } });
 export const getAbsenceStats = (params) => request("/absences/stats", { params });
@@ -144,6 +151,8 @@ export const deleteChatSession = (id) => request(`/chat/sessions/${id}`, { metho
 export const getAiLogs = (params) => request("/ai/logs", { params });
 // Indicateurs de sécurité IA (refus 24h/7j, alertes par gravité, taux sensibles).
 export const getAiSecurityStats = () => request("/ai/security-stats");
+export const getSupervisionRules = () => request("/config/rules");
+export const setSupervisionRules = (data) => request("/config/rules", { method: "PUT", body: data });
 // Détail complet d'un échange (accès tracé/audité côté serveur).
 export const getAiLogDetail = (id) => request(`/ai/logs/${id}`);
 
@@ -216,6 +225,23 @@ export const getProjection = (params) => request("/dashboard/projection", { para
 
 // ---- KPIs analytiques + rapport PDF ----
 export const getDashboardAnalytics = () => request("/dashboard/analytics");
+export const getDashboardByDept = () => request("/dashboard/by-departement");
+export const getDashboardOverview = () => request("/dashboard/overview");
+
+// ---- Vision Collaborateur 360 ----
+export const visionSearch = (q) => request("/vision/search", { params: { q } });
+export const getVisionHeader = (mat) => request(`/vision/${mat}/header`);
+export const getVisionTab = (mat, tab) => request(`/vision/${mat}/${tab}`);
+
+// ---- Écrans consolidés (Processus RH) ----
+export const getProcess = (key) => request(`/dashboard/process/${key}`);
+export const getCompare = (metric, matricules) => request("/dashboard/compare", { params: { metric, matricules: (matricules || []).join(",") } });
+
+// ---- Tâches personnelles (Agenda & mes tâches) ----
+export const getMyTaches = () => request("/me/taches");
+export const createTache = (data) => request("/me/taches", { method: "POST", body: data });
+export const updateTache = (id, data) => request(`/me/taches/${id}`, { method: "PATCH", body: data });
+export const deleteTache = (id) => request(`/me/taches/${id}`, { method: "DELETE" });
 export async function downloadReport() {
   const token = getAccessToken();
   const res = await fetch(`${BASE}/rapports/generate`, {

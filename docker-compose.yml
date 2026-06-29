@@ -28,12 +28,17 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - MINIO_ENDPOINT=minio:9000
       - MINIO_PUBLIC_ENDPOINT=localhost:9000
+      # Couche 2 anti-injection (LLM Guard/ML) désactivée : instable ici (segfault ABI / faux
+      # positifs). La couche 1 (regex) reste active. Voir security_filter.py.
+      - LLMGUARD_ENABLED=false
     volumes:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
-    command: sh -c "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    # numpy<2 forcé APRÈS l'install : une dépendance (transformers/presidio) remonte numpy 2.x,
+    # incompatible avec l'ABI de torch 2.0.1 (segfault à l'inférence). On le rétrograde au boot.
+    command: sh -c "pip install -r requirements.txt && pip install 'numpy<2' && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     depends_on:
       db:
         condition: service_healthy

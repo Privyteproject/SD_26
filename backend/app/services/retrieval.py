@@ -74,7 +74,7 @@ KNOWLEDGE: list[dict] = [
      "text": "Le manuel de l'employé regroupe les règles de vie au bureau : horaires (plages fixes 10h-16h), "
              "utilisation des salles de réunion, règles de courtoisie en open space, et accès aux locaux. "
              "Le port du badge est obligatoire en tout temps."},
-    {"id": "pol-procedures", "title": "Procédures internes et achats", "audience": ["MANAGER", "DIRECTION", "ADMIN"],
+    {"id": "pol-procedures", "title": "Procédures internes et achats", "audience": ["MANAGER", "RH", "DIRECTION", "ADMIN"],
      "text": "Toute dépense supérieure à 500€ doit faire l'objet d'un bon de commande validé par le N+1. "
              "Les achats IT doivent être pré-approuvés par le service informatique. La délégation de signature "
              "est définie dans la grille d'autorité financière disponible sur l'intranet."},
@@ -131,6 +131,18 @@ def ingest(chunks: list[dict]) -> int:
     return len(items)
 
 
+def _load_docsforai() -> list[dict]:
+    """Base documentaire RH ingérée depuis les PDF (générée par data/ingest_docsforai.py)."""
+    import json
+    import os
+    path = os.getenv("KB_DOCSFORAI_PATH", "/app/data/kb_docsforai.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return []
+
+
 def ensure_seeded() -> None:
     global _seeded
     if _seeded:
@@ -140,6 +152,9 @@ def ensure_seeded() -> None:
             return
         if get_store().count() == 0:
             ingest(KNOWLEDGE)
+            docs = _load_docsforai()
+            if docs:
+                ingest(docs)
         _seeded = True
 
 
@@ -147,11 +162,17 @@ def retrieve(query: str, role: str, k: int | None = None) -> list[dict]:
     """Passages autorisés les plus pertinents (cosine >= seuil). Interface stable."""
     if not settings.RAG_ENABLED:
         return []
-    ensure_seeded()
-    k = k or settings.RAG_TOP_K
-    store, embedder = get_store(), get_embedder()
-    qv = embedder.embed([query])[0]
-    hits = store.query(qv, k * 4)  # large, puis filtrage permissions (= reranking final)
+    try:
+        ensure_seeded()
+        k = k or settings.RAG_TOP_K
+        store, embedder = get_store(), get_embedder()
+        qv = embedder.embed([query])[0]
+        hits = store.query(qv, k * 4)  # large, puis filtrage permissions (= reranking final)
+    except Exception as exc:
+        # Embeddings/vector store indisponibles (ex. quota API/402 sur OpenRouter) :
+        # on dégrade le RAG (aucun document) plutôt que de faire échouer la requête (502).
+        print(f"[RAG] récupération indisponible, repli sans document : {exc}", flush=True)
+        return []
     out = []
     for h in hits:
         if not _allowed(h["metadata"], role):

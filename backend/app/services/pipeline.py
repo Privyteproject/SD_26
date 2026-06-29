@@ -22,9 +22,19 @@ from app.services import (
     cache, classifier, lang_detect, pii, rate_limit, retrieval, rh_engines, security_filter,
 )
 
-# RBAC/ABAC : types RH nécessitant un rôle de l'espace RH
+# RBAC/ABAC : types RH nécessitant un rôle de l'espace RH (copilote / tonalité du prompt).
 _ELEVATED = {"ADMIN", "RH", "DIRECTION", "MANAGER", "MEDECINE"}
-_RESTRICTED_TYPES = {"sensible", "predictive"}
+
+# Autorisation FINE par type RH restreint -> ensemble des rôles habilités (moindre privilège).
+# La MÉDECINE du travail est volontairement EXCLUE de l'analytique/paie/supervision (réservée
+# au médical, loi 09-08). Le MANAGER est admis mais reste cantonné à SON équipe : le périmètre
+# fin (agrégat entreprise interdit, scope département) est appliqué dans les moteurs E4/E5/E6.
+_TYPE_ROLES = {
+    "sensible":    {"RH", "DIRECTION", "ADMIN", "MANAGER"},
+    "predictive":  {"RH", "DIRECTION", "ADMIN", "MANAGER"},
+    "supervision": {"RH", "DIRECTION", "ADMIN", "MANAGER"},
+}
+_RESTRICTED_TYPES = set(_TYPE_ROLES)
 
 # Mode de génération : pilote le branchement RAG / culture générale / refus court.
 Mode = Literal["rag", "general", "refusal"]
@@ -60,7 +70,7 @@ SYSTEM_PROMPT_RH = (
     "- **Réponds directement:** Ne dis pas « D'après le contexte... ». Donne juste la réponse avec les vraies valeurs.\n"
     "- **Formatage:** Utilise des listes à puces (`-`), du **gras** pour les valeurs clés et des émojis professionnels. N'utilise JAMAIS de tableaux Markdown car ils s'affichent mal.\n"
     "- **Risques (Désengagement/Burnout):** Ne divulgue JAMAIS le nom d'employés à risque. Donne uniquement des statistiques agrégées (par département) en invoquant la politique de confidentialité.\n"
-    "- **Culture générale RH:** Pour les définitions générales (CDI, préavis...), tu peux utiliser tes connaissances générales.\n"
+    "- **Connaissances RH générales:** Pour les NOTIONS générales du droit du travail (types de contrat CDI/CDD, clauses usuelles, préavis, période d'essai, définitions...), tu DOIS répondre utilement avec tes connaissances, même si ce n'est pas dans les documents — sans inventer de chiffres internes spécifiques à l'entreprise. Ne refuse pas une question générale sous prétexte qu'elle n'est pas dans les documents.\n"
     "En cas de situation humaine sensible (harcèlement, détresse), invite la personne à contacter immédiatement un référent RH."
 )
 SYSTEM_PROMPT_GENERAL = (
@@ -78,18 +88,41 @@ RH_PILOT_NOTE = (
 )
 
 
-# Situations RH sensibles -> escalade immédiate vers un référent humain (ouverture de ticket).
-_ESCALADE_KEYWORDS = [
+# Situations RH sensibles -> escalade vers un référent humain (ouverture de ticket).
+# CRITIQUE : détresse vitale -> toujours escalader, même formulée comme une question
+# (la sécurité prime ; un faux positif sur « le suicide » est acceptable).
+_ESCALADE_CRITIQUE = [
+    "suicide", "suicidaire", "me suicider", "me tuer", "envie d'en finir",
+    "envie den finir", "en finir avec la vie", "me faire du mal", "detresse",
+]
+# SIGNALEMENT / détresse personnelle : escalader UNIQUEMENT si la personne parle d'ELLE
+# ou se déclare victime/témoin. Une question d'INFORMATION sur la politique
+# (« que dit le code de conduite sur le harcèlement ? ») part au RAG documentaire.
+_ESCALADE_PERSO = [
     "harcelement", "harcele", "harassment", "discrimination", "discrimine",
-    "agression", "agresse", "violence", "menace", "souffrance au travail",
-    "detresse", "depression", "suicide", "burn out", "epuisement professionnel",
+    "agression", "agresse", "violence", "menace", "souffrance",
+    "burnout", "burn out", "burn-out", "epuisement", "epuise", "depression", "deprime",
+    "a bout", "craquer", "craque", "mal etre", "mal-etre", "plus envie", "n'en peux plus",
+    "nen peux plus",
+]
+# Marqueurs de 1re personne / détresse vécue / signalement (victime, témoin).
+_PERSO_MARKERS = [
+    "je ", "j'", "je suis", "je me sens", "je ressens", "j ai", "j'ai", "je n'en",
+    "je nen", "je veux", "je pense a", "moi", "mon ", "ma ", "mes ", "aide moi", "aidez moi",
+    "victime", "on me", "ils me", "elle me", "il me", "subi", "je subis", "contre moi",
+    "mon collegue", "mon manager", "mon chef", "ma collegue",
+    "i feel", "i am", "i want", "help me", "my ",
 ]
 
 
 def _needs_escalation(message: str) -> bool:
     from app.services.text_utils import normalize
     t = normalize(message)
-    return any(k in t for k in _ESCALADE_KEYWORDS)
+    if any(k in t for k in _ESCALADE_CRITIQUE):
+        return True
+    if any(k in t for k in _ESCALADE_PERSO) and any(m in t for m in _PERSO_MARKERS):
+        return True
+    return False
 
 
 # Intention d'exfiltration de données -> « risque de fuite ».
@@ -273,10 +306,18 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
 
     # 3) Classification
     cls = classifier.classify(message)
+    # Rattrapage : une demande SENSIBLE qui NOMME un employé (« salaire de X », « contrat de Y »)
+    # doit passer par le moteur E5 (ABAC), et non être traitée comme une question générale (RAG).
+    if cls["type_rh"] in (None, "simple") and classifier.has_sensitive_kw(message):
+        try:
+            if repo.find_employees_in_text(db, message):
+                cls = {**cls, "perimetre": classifier.PERIMETRE_RH, "type_rh": "sensible"}
+        except Exception:
+            db.rollback()
     meta["perimetre"], meta["type_rh"] = cls["perimetre"], cls["type_rh"]
 
-    # 4) Cache sémantique
-    ck = cache.key(message, cls["perimetre"])
+    # 4) Cache sémantique (clé incluant le rôle -> pas de fuite inter-rôles via le cache)
+    ck = cache.key(message, cls["perimetre"], user.role)
     cached = cache.get(ck)
     if cached:
         # On conserve le rattachement au fil courant et on journalise l'échange
@@ -311,7 +352,10 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
                         want_judge=want_judge, ck=ck)
 
     # ── Branche RH : RBAC/ABAC avant le RAG ──
-    authorized = not (cls["type_rh"] in _RESTRICTED_TYPES and user.role not in _ELEVATED)
+    # Autorisation par type : un type restreint exige un rôle explicitement habilité POUR CE TYPE
+    # (la médecine est exclue de l'analytique/paie/supervision ; cf. _TYPE_ROLES).
+    allowed_roles = _TYPE_ROLES.get(cls["type_rh"])
+    authorized = (allowed_roles is None) or ((user.role or "").upper() in allowed_roles)
     meta["authorized"] = authorized
     if not authorized:
         # Sécurité IA : tracer la tentative d'accès non autorisé + classer si répétée.

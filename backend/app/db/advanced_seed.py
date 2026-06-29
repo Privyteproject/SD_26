@@ -134,14 +134,17 @@ def _generate(db, dept_ids, fake):
         age = random.randint(23, 60)
         date_naissance = date(TODAY.year - age, random.randint(1, 12), random.randint(1, 28))
         statut = "LEAVING" if profile == "turnover" else "ACTIVE"
+        # Noms MAROCAINS (cohérents avec le genre).
+        from app.db.seed_moroccan_names import NOMS, PRENOMS_F, PRENOMS_M
+        genre = random.choices(GENRES, weights=[48, 48, 4])[0]
+        pool = PRENOMS_M if genre == "M" else PRENOMS_F if genre == "F" else (PRENOMS_M + PRENOMS_F)
         emp_objs.append(Employe(
-            matricule=matricule, nom=(fake.last_name() if fake else "Nom"),
-            prenom=(fake.first_name() if fake else "Prenom"),
+            matricule=matricule, nom=random.choice(NOMS), prenom=random.choice(pool),
             poste=random.choice(POSTES), statut=statut,
             date_embauche=date_embauche, date_naissance=date_naissance,
             site=random.choices(SITES, weights=[40, 20, 15, 25])[0],
             type_contrat=random.choices(CONTRATS, weights=[80, 12, 8])[0],
-            genre=random.choices(GENRES, weights=[48, 48, 4])[0],
+            genre=genre,
             id_departement=random.choice(dept_id_list), id_utilisateur=u.id_utilisateur,
         ))
 

@@ -25,6 +25,7 @@ _ENGINE_BY_TYPE = {
     "parcours": "E3",
     "predictive": "E4",
     "sensible": "E5",
+    "supervision": "E6",
 }
 
 SYSTEM_PROMPT_GENERATION = (
@@ -43,9 +44,14 @@ SYSTEM_PROMPT_PARCOURS = (
 )
 SYSTEM_PROMPT_ANALYTICS = (
     "Tu es l'assistant analytique RH de « Synapse Digital ». Réponds "
-    "UNIQUEMENT à partir des indicateurs et scores de risque réels fournis ci-dessous. "
+    "à partir des indicateurs et scores de risque réels fournis ci-dessous. "
     "Donne une lecture factuelle et prudente (pas de diagnostic individuel définitif, "
-    "aucune donnée médicale). N'invente aucun chiffre absent du contexte."
+    "aucune donnée médicale). N'invente aucun chiffre absent du contexte. "
+    "IMPORTANT : si la ventilation EXACTE demandée n'est pas disponible mais qu'une "
+    "donnée connexe l'est (valeur globale, ou ventilation par département des scores de "
+    "risque), présente-la comme l'information disponible la plus proche — NE REFUSE PAS "
+    "tant qu'une donnée pertinente est présente. Précise simplement le périmètre réel "
+    "de la donnée (ex. « turnover global » + « risque par département »)."
 )
 SYSTEM_PROMPT_SENSIBLE = (
     "Tu es l'assistant RH de « Synapse Digital » habilité à consulter les données "
@@ -54,6 +60,18 @@ SYSTEM_PROMPT_SENSIBLE = (
     "les salaires globaux, donne-lui le résumé de la masse salariale. "
     "N'invente aucun chiffre."
 )
+
+
+SYSTEM_PROMPT_SUPERVISION = (
+    "Tu es l'assistant de supervision RH de « Synapse Digital ». Réponds à partir des "
+    "compteurs opérationnels réels fournis ci-dessous (files d'attente, indicateurs de "
+    "sécurité IA). Donne des chiffres AGRÉGÉS uniquement — ne nomme JAMAIS d'employé. "
+    "Sois concis et factuel. N'invente aucun chiffre absent du contexte."
+)
+
+
+def _has(t: str, words) -> bool:
+    return any(w in t for w in words)
 
 
 def select(type_rh: str | None) -> str | None:
@@ -69,9 +87,11 @@ def build(db, user, message: str, type_rh: str) -> dict:
     if engine == "E3":
         return _parcours(db, user)
     if engine == "E4":
-        return _analytics(db)
+        return _analytics(db, user)
     if engine == "E5":
         return _sensible(db, user, message)
+    if engine == "E6":
+        return _supervision(db, user, message)
     return {}  # garde : le pipeline n'appelle build() que si select() != None
 
 
@@ -121,14 +141,50 @@ def _parcours(db, user) -> dict:
 
 
 # ── E4 · Module prédictif analytics ──
-def _analytics(db) -> dict:
+def _analytics(db, user=None) -> dict:
+    role = (getattr(user, "role", "") or "").upper()
+    is_exec = role in ("RH", "DIRECTION", "ADMIN")
+
+    # Périmètre MANAGER : restreint à SON département (jamais les indicateurs entreprise
+    # ni les autres départements). RH/Direction/Admin : vue entreprise complète.
+    if not is_exec and role == "MANAGER":
+        actor = _employe(db, user)
+        dept = getattr(actor, "id_departement", None)
+        rs = repo.risk_summary(db, dept=dept) if dept is not None else {"total": 0, "by_niveau": {}}
+        context = ("Périmètre : VOTRE ÉQUIPE (département) uniquement.\n"
+                   f"Scores de risque de l'équipe : {rs.get('total', 0)} collaborateurs analysés, "
+                   f"répartition par niveau {rs.get('by_niveau', {})}.\n"
+                   "Les indicateurs globaux de l'entreprise (turnover, masse salariale…) ne sont "
+                   "pas accessibles à ce niveau.")
+        sources = [{"id": "risk_team", "title": "Risque (équipe)", "score": 1.0}]
+        return {"engine": "E4", "system": SYSTEM_PROMPT_ANALYTICS, "context": context, "sources": sources}
+
     indic = repo.latest_indicateurs(db)
     risk = repo.risk_summary(db)
     ind_lines = [f"- {k} : {v.get('valeur')} (période {v.get('periode')})"
                  for k, v in indic.items()] or ["(aucun indicateur)"]
     risk_line = (f"Scores de risque : {risk.get('total', 0)} au total, "
                  f"répartition par niveau {risk.get('by_niveau', {})}")
-    context = "Indicateurs RH :\n" + "\n".join(ind_lines) + "\n\n" + risk_line
+
+    # Ventilation PAR DÉPARTEMENT (agrégée, sans nommer d'employé) pour répondre aux
+    # questions « par département / par service » (climat, risque).
+    dept_lines = []
+    try:
+        for d in repo.list_departements(db):
+            did = getattr(d, "id_departement", None)
+            nom = getattr(d, "nom", None) or f"Département {did}"
+            rs = repo.risk_summary(db, dept=did)
+            if rs.get("total"):
+                dept_lines.append(f"- {nom} : {rs['total']} collaborateurs analysés, "
+                                  f"répartition {rs.get('by_niveau', {})}")
+    except Exception:
+        pass
+    dept_block = ("\n\nRépartition du risque par département :\n" + "\n".join(dept_lines)) if dept_lines else ""
+
+    context = ("Indicateurs RH (valeurs GLOBALES entreprise) :\n" + "\n".join(ind_lines) +
+               "\n\n" + risk_line + dept_block +
+               "\n\nNote : les indicateurs turnover/absentéisme/engagement sont fournis au niveau "
+               "global ; la ventilation par département disponible porte sur les scores de risque.")
     sources = [{"id": k, "title": f"indicateur {k}", "score": 1.0} for k in indic]
     return {"engine": "E4", "system": SYSTEM_PROMPT_ANALYTICS, "context": context, "sources": sources}
 
@@ -140,15 +196,25 @@ def _direct_e5(text: str, sources: list | None = None) -> dict:
     return {"engine": "E5", "direct_answer": True, "reply": text, "sources": sources or []}
 
 
+def _fmt_eur(x) -> str:
+    """Formate un montant en euros avec séparateur d'espace (ex. 52 819 889 €)."""
+    try:
+        return f"{float(x):,.0f} €".replace(",", " ")
+    except (TypeError, ValueError):
+        return f"{x} €"
+
+
 def _sensible_aggregate(db) -> dict:
-    """Repli : masse salariale AGRÉGÉE (aucune donnée personnelle) — passe par le LLM."""
+    """Masse salariale AGRÉGÉE — réponse DÉTERMINISTE (loi 09-08 : la donnée financière ne
+    transite PAS par le LLM externe, et n'est donc pas altérée par le masquage PII)."""
     ms = repo.salary_mass(db)
     total = ms.get("total", 0)
-    lines = [f"- Site {item['site']} : {item['montant']} €" for item in ms.get("by_site", [])]
-    context = (f"Masse salariale totale : {total} €\nRépartition par site :\n" + "\n".join(lines) +
-               "\n\nPour une fiche individuelle, l'utilisateur doit nommer le collaborateur concerné.")
-    sources = [{"id": "db_salaires", "title": "Base de données des rémunérations", "score": 1.0}]
-    return {"engine": "E5", "system": SYSTEM_PROMPT_SENSIBLE, "context": context, "sources": sources}
+    lines = [f"- {item['site']} : {_fmt_eur(item['montant'])}" for item in ms.get("by_site", [])]
+    reply = (f"**Masse salariale totale : {_fmt_eur(total)}**"
+             + ("\n\nRépartition par site :\n" + "\n".join(lines) if lines else "")
+             + "\n\nPour une fiche individuelle, précisez le collaborateur concerné.")
+    return _direct_e5(reply, sources=[{"id": "db_salaires",
+                                       "title": "Base des rémunérations", "score": 1.0}])
 
 
 def _sensible(db, user, message: str) -> dict:
@@ -163,9 +229,30 @@ def _sensible(db, user, message: str) -> dict:
     """
     role = (user.role or "").upper()
     actor = _employe(db, user)
+    # L'agrégat entreprise (masse salariale globale) est réservé à RH/Direction/Admin.
+    # Le manager n'accède qu'aux fiches individuelles de SON équipe (ABAC ci-dessous).
+    can_aggregate = role in ("RH", "DIRECTION", "ADMIN")
+
+    # Intention AGRÉGÉE explicite (« masse salariale », « globale », « par site »…) :
+    # on répond directement par l'agrégat, sans chercher un employé nommé (sinon un mot
+    # comme « masse » peut entrer en collision avec un nom de famille « Masse »).
+    from app.services.text_utils import normalize
+    nt = normalize(message)
+    _AGG = ["masse salariale", "salariale", "globale", "global", "agrege", "agregee",
+            "par site", "par departement", "par service", "total des salaires", "enveloppe"]
+    if any(k in nt for k in _AGG):
+        if not can_aggregate:
+            return _direct_e5("La masse salariale globale est réservée aux RH et à la Direction. "
+                              "En tant que manager, vous pouvez consulter la fiche d'un collaborateur "
+                              "de votre équipe en le nommant.")
+        return _sensible_aggregate(db)
+
     targets = repo.find_employees_in_text(db, message)
 
     if not targets:
+        if not can_aggregate:
+            return _direct_e5("Veuillez préciser le collaborateur de votre équipe concerné "
+                              "(nom complet ou matricule).")
         return _sensible_aggregate(db)
 
     if len(targets) > 1:
@@ -234,3 +321,56 @@ def _sensible(db, user, message: str) -> dict:
 
     return _direct_e5("\n".join(parts),
                       sources=[{"id": emp.matricule, "title": f"Dossier {emp.matricule}", "score": 1.0}])
+
+
+# ── E6 · Supervision opérationnelle (files d'attente RH + sécurité IA) ──
+def _supervision(db, user, message: str) -> dict:
+    """Compteurs agrégés pour encadrants : demandes en attente (périmètre équipe pour un
+    manager) et indicateurs de sécurité IA (interactions, refus d'accès). Aucun nom d'employé."""
+    from app.services.text_utils import normalize
+    nt = normalize(message)
+    role = (user.role or "").upper()
+    parts, sources = [], []
+
+    _SEC = ["interaction ia", "interactions ia", "tentative", "acces refuse", "acces refuses",
+            "securite", "alerte", "injection", "refus d'acces", "refus dacces", "fuite"]
+    _ABS = ["absence", "conge", "demande", "en attente", "a valider", "a approuver", "a traiter"]
+
+    sec_q = _has(nt, _SEC)
+    if sec_q:
+        # Supervision de la sécurité IA : réservée à RH/Direction/Admin (pas le manager).
+        if role not in ("RH", "DIRECTION", "ADMIN"):
+            return _direct_e5("La supervision de la sécurité de l'IA (interactions, tentatives "
+                              "d'accès) est réservée aux RH et à la Direction.")
+        sec = repo.security_stats(db)
+        parts.append(
+            f"Indicateurs de sécurité IA :\n"
+            f"- Interactions IA totales : {sec.get('interactions', 0)} "
+            f"(dont sensibles : {sec.get('sensibles', 0)}, soit {sec.get('taux_sensibles', 0)} %)\n"
+            f"- Tentatives d'accès refusées : {sec.get('refus_24h', 0)} sur 24 h, "
+            f"{sec.get('refus_7j', 0)} sur 7 jours\n"
+            f"- Alertes : {sec.get('alertes_total', 0)} au total "
+            f"({sec.get('alertes_non_resolues', 0)} non résolues), par gravité "
+            f"{sec.get('par_gravite', {})}\n"
+            f"- Injections bloquées : {sec.get('injections', 0)} | Escalades : {sec.get('escalades', 0)}")
+        sources.append({"id": "ia_security_stats", "title": "Supervision sécurité IA", "score": 1.0})
+
+    # Files d'attente RH (demandes/absences) — par défaut, ou si la question le demande.
+    if _has(nt, _ABS) or not parts:
+        actor = _employe(db, user)
+        pending = repo.list_absences(db, status="pending")
+        scope = "entreprise"
+        if role == "MANAGER" and actor and getattr(actor, "id_departement", None):
+            team = set(repo.dept_matricules(db, actor.id_departement))
+            pending = [d for d in pending if d.matricule in team]
+            scope = "votre équipe"
+        by_type: dict[str, int] = {}
+        for d in pending:
+            by_type[d.code_type] = by_type.get(d.code_type, 0) + 1
+        detail = ", ".join(f"{k}: {v}" for k, v in by_type.items()) or "—"
+        parts.append(f"Demandes d'absence/congé EN ATTENTE de validation ({scope}) : "
+                     f"{len(pending)} au total (répartition par type — {detail}).")
+        sources.append({"id": "absences_pending", "title": "File de validation des absences", "score": 1.0})
+
+    context = "\n\n".join(parts)
+    return {"engine": "E6", "system": SYSTEM_PROMPT_SUPERVISION, "context": context, "sources": sources}
