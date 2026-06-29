@@ -3,7 +3,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import RoleGuard from "./RoleGuard";
 import AuthLayout from "../../layouts/AuthLayout";
 import AppLayout from "../../layouts/AppLayout";
-import { RH_SPACE_ROLES, ROLES } from "../../lib/constants";
+import { RH_SPACE_ROLES, RH_MGMT_ROLES, RH_OPS_ROLES, ROLES } from "../../lib/constants";
 
 import Login from "../../features/auth/pages/Login";
 
@@ -11,6 +11,7 @@ import Login from "../../features/auth/pages/Login";
 import DashboardPerso from "../../features/dashboard/pages/DashboardPerso";
 import Assistant from "../../features/assistant/pages/Assistant";
 import Documents from "../../features/documents/pages/Documents";
+import MyPayroll from "../../features/payroll/pages/MyPayroll";
 import Onboarding from "../../features/onboarding/pages/Onboarding";
 import OffboardingPerso from "../../features/offboarding/pages/OffboardingPerso";
 import Requests from "../../features/misc/pages/Requests";
@@ -35,6 +36,7 @@ import AssistantRh from "../../features/assistant/pages/AssistantRh";
 import Team from "../../features/misc/pages/Team";
 import PredictiveAnalytics from "../../features/analytics/pages/PredictiveAnalytics";
 import Payroll from "../../features/analytics/pages/Payroll";
+import Pilotage from "../../features/pilotage/pages/Pilotage";
 import Disengagement from "../../features/disengagement/pages/Disengagement";
 import OnboardingRh from "../../features/onboarding/pages/OnboardingRh";
 import Offboarding from "../../features/offboarding/pages/Offboarding";
@@ -63,6 +65,7 @@ export default function AppRoutes() {
         <Route path="/app" element={<DashboardPerso />} />
         <Route path="/app/assistant" element={<Assistant />} />
         <Route path="/app/documents" element={<Documents />} />
+        <Route path="/app/paie" element={<MyPayroll />} />
         <Route path="/app/onboarding" element={<Onboarding />} />
         <Route path="/app/offboarding" element={<OffboardingPerso />} />
         <Route path="/app/demandes" element={<Requests />} />
@@ -78,26 +81,36 @@ export default function AppRoutes() {
         {/* Espace RH / Manager / Direction / Médecine */}
         <Route path="/rh" element={<RoleGuard roles={RH_SPACE_ROLES}><DashboardRh /></RoleGuard>} />
         <Route path="/rh/vision" element={<RoleGuard roles={[ROLES.MANAGER, ROLES.RH, ROLES.DIRECTION]}><Vision360 /></RoleGuard>} />
-        <Route path="/rh/processus/lifecycle" element={<RoleGuard roles={RH_SPACE_ROLES}><ProcessScreen pkey="lifecycle" titleKey="nav.lifecycle" icon="Route" /></RoleGuard>} />
-        <Route path="/rh/processus/carrieres" element={<RoleGuard roles={RH_SPACE_ROLES}><ProcessScreen pkey="carrieres" titleKey="nav.careers" icon="Award" /></RoleGuard>} />
+        <Route path="/rh/processus/lifecycle" element={<RoleGuard roles={RH_MGMT_ROLES}><ProcessScreen pkey="lifecycle" titleKey="nav.lifecycle" icon="Route" /></RoleGuard>} />
+        <Route path="/rh/processus/carrieres" element={<RoleGuard roles={RH_MGMT_ROLES}><ProcessScreen pkey="carrieres" titleKey="nav.careers" icon="Award" /></RoleGuard>} />
+        {/* Happiness : seul écran Processus RH accessible à la médecine du travail (bien-être) */}
         <Route path="/rh/processus/happiness" element={<RoleGuard roles={RH_SPACE_ROLES}><ProcessScreen pkey="happiness" titleKey="nav.happiness" icon="HeartPulse" /></RoleGuard>} />
-        <Route path="/rh/equipe" element={<RoleGuard roles={RH_SPACE_ROLES}><Team /></RoleGuard>} />
-        <Route path="/rh/assistant" element={<RoleGuard roles={RH_SPACE_ROLES}><AssistantRh /></RoleGuard>} />
-        <Route path="/rh/alertes" element={<RoleGuard roles={RH_SPACE_ROLES}><Alerts /></RoleGuard>} />
-        <Route path="/rh/analytique/predictif" element={<RoleGuard roles={RH_SPACE_ROLES}><PredictiveAnalytics /></RoleGuard>} />
-        <Route path="/rh/analytique/masse-salariale" element={<RoleGuard roles={RH_SPACE_ROLES}><Payroll /></RoleGuard>} />
-        <Route path="/rh/desengagement" element={<RoleGuard roles={RH_SPACE_ROLES}><Disengagement /></RoleGuard>} />
-        <Route path="/rh/competences" element={<RoleGuard roles={RH_SPACE_ROLES}><SkillsRh /></RoleGuard>} />
-        <Route path="/rh/objectifs" element={<RoleGuard roles={RH_SPACE_ROLES}><ObjectivesRh /></RoleGuard>} />
-        <Route path="/rh/climat" element={<RoleGuard roles={RH_SPACE_ROLES}><Climate /></RoleGuard>} />
-        <Route path="/rh/tickets" element={<RoleGuard roles={RH_SPACE_ROLES}><Tickets /></RoleGuard>} />
-        <Route path="/rh/actualites" element={<RoleGuard roles={[ROLES.RH, ROLES.DIRECTION, ROLES.ADMIN]}><NewsRh /></RoleGuard>} />
-        <Route path="/rh/onboarding" element={<RoleGuard roles={RH_SPACE_ROLES}><OnboardingRh /></RoleGuard>} />
-        <Route path="/rh/offboarding" element={<RoleGuard roles={RH_SPACE_ROLES}><Offboarding /></RoleGuard>} />
-        <Route path="/rh/collaborateurs" element={<RoleGuard roles={RH_SPACE_ROLES}><Employees /></RoleGuard>} />
-        <Route path="/rh/rapports" element={<RoleGuard roles={RH_SPACE_ROLES}><Reports /></RoleGuard>} />
-        <Route path="/rh/demandes" element={<RoleGuard roles={[ROLES.MANAGER, ROLES.RH, ROLES.DIRECTION]}><RequestsReview /></RoleGuard>} />
-        <Route path="/rh/documents" element={<RoleGuard roles={[ROLES.RH, ROLES.DIRECTION]}><DocumentsRh /></RoleGuard>} />
+        {/* « Mon équipe » = vue scopée manager ; RH/Direction passent par /rh/collaborateurs */}
+        <Route path="/rh/equipe" element={<RoleGuard roles={[ROLES.MANAGER]}><Team /></RoleGuard>} />
+        <Route path="/rh/assistant" element={<RoleGuard roles={[...RH_SPACE_ROLES, ROLES.ADMIN]}><AssistantRh /></RoleGuard>} />
+        <Route path="/rh/alertes" element={<RoleGuard roles={RH_MGMT_ROLES}><Alerts /></RoleGuard>} />
+        <Route path="/rh/analytique/predictif" element={<RoleGuard roles={RH_MGMT_ROLES}><PredictiveAnalytics /></RoleGuard>} />
+        <Route path="/rh/analytique/masse-salariale" element={<RoleGuard roles={[ROLES.RH, ROLES.DIRECTION]}><Payroll /></RoleGuard>} />
+        {/* Pilotage & gouvernance (décisionnel) : comparatif inter-départements + équité ML (§4.1) */}
+        <Route path="/rh/pilotage" element={<RoleGuard roles={[ROLES.RH, ROLES.DIRECTION]}><Pilotage /></RoleGuard>} />
+        {/* Désengagement = accompagnement individuel (worklist + plans) -> opérationnel manager/RH.
+            La Direction a la vue ANALYTIQUE agrégée via /rh/analytique/predictif. */}
+        <Route path="/rh/desengagement" element={<RoleGuard roles={RH_OPS_ROLES}><Disengagement /></RoleGuard>} />
+        <Route path="/rh/competences" element={<RoleGuard roles={RH_OPS_ROLES}><SkillsRh /></RoleGuard>} />
+        <Route path="/rh/objectifs" element={<RoleGuard roles={RH_OPS_ROLES}><ObjectivesRh /></RoleGuard>} />
+        <Route path="/rh/climat" element={<RoleGuard roles={[ROLES.RH, ROLES.DIRECTION]}><Climate /></RoleGuard>} />
+        <Route path="/rh/tickets" element={<RoleGuard roles={RH_OPS_ROLES}><Tickets /></RoleGuard>} />
+        {/* Publication d'actualités = communication RH (RH/Direction). L'admin = technique/sécurité. */}
+        <Route path="/rh/actualites" element={<RoleGuard roles={[ROLES.RH, ROLES.DIRECTION]}><NewsRh /></RoleGuard>} />
+        <Route path="/rh/onboarding" element={<RoleGuard roles={RH_OPS_ROLES}><OnboardingRh /></RoleGuard>} />
+        <Route path="/rh/offboarding" element={<RoleGuard roles={RH_OPS_ROLES}><Offboarding /></RoleGuard>} />
+        {/* Annuaire org : Direction en LECTURE (pilotage) ; CRUD réservé RH côté backend */}
+        <Route path="/rh/collaborateurs" element={<RoleGuard roles={[ROLES.RH, ROLES.DIRECTION]}><Employees /></RoleGuard>} />
+        {/* Reporting org consolidé : RH/Direction (décisionnel) — hors périmètre manager */}
+        <Route path="/rh/rapports" element={<RoleGuard roles={[ROLES.RH, ROLES.DIRECTION]}><Reports /></RoleGuard>} />
+        <Route path="/rh/demandes" element={<RoleGuard roles={RH_OPS_ROLES}><RequestsReview /></RoleGuard>} />
+        {/* Validation documentaire = acte opérationnel RH (hors périmètre décisionnel Direction) */}
+        <Route path="/rh/documents" element={<RoleGuard roles={[ROLES.RH]}><DocumentsRh /></RoleGuard>} />
 
         {/* Espace admin */}
         <Route path="/admin" element={<RoleGuard roles={[ROLES.ADMIN]}><Supervision /></RoleGuard>} />

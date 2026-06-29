@@ -27,7 +27,7 @@ export default function PredictiveAnalytics() {
       setProj((r && r.data) || null);
     } catch (e) { /* ignore */ } finally { setBusy(false); }
   };
-  const fmt = (n) => (n != null ? Number(n).toLocaleString("fr-FR") : "—");
+  const fmt = (n) => (n != null ? Number(n).toLocaleString("fr-MA") : "—");
   const field = { width: 110 };
 
   const { data, loading, error, reload } = useAsync(async () => {
@@ -287,7 +287,7 @@ export default function PredictiveAnalytics() {
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12, marginTop: 24 }}>
                 {[
                   { label: t("pa.lostDays"), value: fmt(proj.totaux.jours_absence) },
-                  { label: t("pa.absCost"), value: `${fmt(proj.totaux.cout_absenteisme)} €` },
+                  { label: t("pa.absCost"), value: `${fmt(proj.totaux.cout_absenteisme)} MAD` },
                   { label: t("pa.mobDone"), value: fmt(proj.totaux.mobilites_internes) },
                 ].map((x) => (
                   <div key={x.label} style={{ flex: "1 1 150px", background: "var(--field)", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 14px" }}>

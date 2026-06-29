@@ -1,26 +1,41 @@
 import { useState } from "react";
-import { Check, Rocket } from "lucide-react";
+import { Check, Rocket, GraduationCap, BookOpen } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useSession } from "../../../app/providers/SessionProvider";
 import Card from "../../../components/Card";
 import Badge from "../../../components/Badge";
 import AsyncBoundary from "../../../components/AsyncBoundary";
 import { useAsync } from "../../../lib/useAsync";
-import { getParcours, updateTacheStatus } from "../../../lib/api";
-import { ONBOARDING_CONTACTS } from "../../../mock/mockData";
+import { getParcours, getOnboardingRecommandations, updateTacheStatus } from "../../../lib/api";
 
 export default function Onboarding() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const { currentUser } = useSession();
   const matricule = currentUser?.id;
 
-  // Parcours d'onboarding de l'utilisateur courant (il peut cocher ses propres tâches).
+  // Parcours + interlocuteurs RÉELS (manager, chef de département, référent RH) du collaborateur.
   const { data, loading, error, reload } = useAsync(
-    () => (matricule ? getParcours(matricule, { type: "ONBOARDING" }) : Promise.resolve({ data: [] })),
+    async () => {
+      if (!matricule) return { tasks: [], contacts: [], formations: [], documents: [] };
+      const [par, rec] = await Promise.all([
+        getParcours(matricule, { type: "ONBOARDING" }),
+        getOnboardingRecommandations(matricule).catch(() => null),
+      ]);
+      const r = (rec && rec.data) || {};
+      return {
+        tasks: (par && par.data) || [],
+        contacts: r.interlocuteurs || [],
+        formations: r.formations || [],
+        documents: r.documents_a_lire || [],
+      };
+    },
     [matricule]
   );
   const [busyId, setBusyId] = useState(null);
-  const tasks = ((data && data.data) || []).slice().sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
+  const tasks = ((data && data.tasks) || []).slice().sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
+  const contacts = (data && data.contacts) || [];
+  const formations = (data && data.formations) || [];
+  const documents = (data && data.documents) || [];
 
   const toggle = async (tk) => {
     setBusyId(tk.id);
@@ -73,16 +88,55 @@ export default function Onboarding() {
           <Card style={{ alignSelf: "flex-start" }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 14 }}>{t("onb.contacts")}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {ONBOARDING_CONTACTS.map((cont) => (
-                <div key={cont.id} style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 14 }}>{cont.name.charAt(0)}</div>
+              {contacts.length === 0 && (
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("common.none")}</div>
+              )}
+              {contacts.map((cont, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 14 }}>{(cont.nom || "?").charAt(0)}</div>
                   <div>
-                    <div style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{cont.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{cont.role[lang]}</div>
+                    <div style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{cont.nom}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>{cont.role}{cont.poste ? ` · ${cont.poste}` : ""}</div>
                   </div>
                 </div>
               ))}
             </div>
+          </Card>
+        </div>
+
+        {/* Recommandations d'intégration (§3.1) : formations ciblées + documents à lire */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+          <Card style={{ alignSelf: "flex-start" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>
+              <GraduationCap size={16} color="var(--gold-deep)" /> {t("onb.formations")}
+            </div>
+            {formations.length === 0 ? (
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("common.none")}</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {formations.map((f, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, fontSize: 13.5, color: "var(--ink)", padding: "7px 0", borderTop: i ? "1px solid var(--line-soft)" : "none" }}>
+                    <span>{f.titre || f.intitule || f.nom || f.code}</span>
+                    {(f.duree_jours != null || f.categorie) && (
+                      <span style={{ fontSize: 11.5, color: "var(--muted)", flexShrink: 0 }}>{f.categorie || ""}{f.duree_jours != null ? ` · ${f.duree_jours} j` : ""}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card style={{ alignSelf: "flex-start" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>
+              <BookOpen size={16} color="var(--gold-deep)" /> {t("onb.docsToRead")}
+            </div>
+            {documents.length === 0 ? (
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("common.none")}</div>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 7, fontSize: 13.5, color: "var(--ink)" }}>
+                {documents.map((d, i) => <li key={i}>{d.titre || d.title || d.nom}</li>)}
+              </ul>
+            )}
           </Card>
         </div>
       </AsyncBoundary>

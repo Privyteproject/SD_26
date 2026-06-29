@@ -37,8 +37,9 @@ from app.services import doc_preview, document_types as dtypes, pdf_service, red
 
 router = APIRouter()
 
-_VALIDATE = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION)
-_VALIDATE_ROLES = {ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION}
+# Validation documentaire = acte opérationnel RH/Admin (hors périmètre décisionnel Direction).
+_VALIDATE = require_roles(ROLE_ADMIN, ROLE_RH)
+_VALIDATE_ROLES = {ROLE_ADMIN, ROLE_RH}
 _ELEVATED = {ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, "MANAGER"}
 
 # Statut interne (BDD) <-> vocabulaire de la spec exposé au client.

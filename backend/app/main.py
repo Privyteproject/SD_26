@@ -17,6 +17,14 @@ from app.db.base import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Garde-fous de configuration sécurité (loi 09-08 / RGPD) — fail-fast AVANT toute init.
+    _issues = settings.security_issues()
+    _fatal = [m for sev, m in _issues if sev == "fatal" or (sev == "prod" and settings.IS_PRODUCTION)]
+    for m in (m for sev, m in _issues if m not in _fatal):
+        print(f"[SECURITY][WARN] {m}", flush=True)
+    if _fatal:
+        raise RuntimeError("Configuration sécurité non conforme :\n- " + "\n- ".join(_fatal))
+
     init_db()  # create_all + seed si vide
     # Charge les règles de supervision configurables (mots-clés sensibles supplémentaires).
     try:

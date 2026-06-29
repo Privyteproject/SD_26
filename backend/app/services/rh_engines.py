@@ -196,12 +196,23 @@ def _direct_e5(text: str, sources: list | None = None) -> dict:
     return {"engine": "E5", "direct_answer": True, "reply": text, "sources": sources or []}
 
 
+def _mask_cin(c) -> str:
+    """Masque partiellement un CIN (ex. BK123456 -> BK••••56) — minimisation des données (loi 09-08).
+    Le détail complet reste accessible via le module Dossier (accès explicite et tracé)."""
+    c = (c or "").strip()
+    if not c:
+        return "—"
+    if len(c) <= 4:
+        return "•" * len(c)
+    return c[:2] + "•" * (len(c) - 4) + c[-2:]
+
+
 def _fmt_eur(x) -> str:
-    """Formate un montant en euros avec séparateur d'espace (ex. 52 819 889 €)."""
+    """Formate un montant en dirhams avec séparateur d'espace (ex. 52 819 889 MAD)."""
     try:
-        return f"{float(x):,.0f} €".replace(",", " ")
+        return f"{float(x):,.0f} MAD".replace(",", " ")
     except (TypeError, ValueError):
-        return f"{x} €"
+        return f"{x} MAD"
 
 
 def _sensible_aggregate(db) -> dict:
@@ -309,8 +320,11 @@ def _sensible(db, user, message: str) -> dict:
         parts.append("Aucun contrat ni fiche de paie enregistré.")
 
     if dossier and (dossier.get("cin") or dossier.get("adresse")):
-        parts.append(f"Dossier confidentiel — CIN : {dossier.get('cin') or '—'}, "
-                     f"adresse : {dossier.get('adresse') or '—'}.")
+        # Minimisation : on ne restitue JAMAIS le CIN/l'adresse en clair dans le chat ; le détail
+        # complet passe par le module Dossier (accès explicite et tracé). loi 09-08 / §4.4.
+        cin_m = _mask_cin(dossier.get("cin"))
+        addr = "enregistrée — consultable via le module Dossier (accès tracé)" if dossier.get("adresse") else "—"
+        parts.append(f"Dossier confidentiel — CIN : {cin_m} (partiellement masqué), adresse : {addr}.")
 
     # Journalisation de l'accès (traçabilité loi 09-08).
     try:

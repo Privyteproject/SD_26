@@ -2,20 +2,22 @@ import { ROLES, STATUS } from "./constants";
 
 // Stockage local (pas de base de données) : comptes + session.
 // NB : authentification front uniquement (à remplacer par Keycloak plus tard).
-const USERS_KEY = "sd-users-v1";
+// v2 : e-mails alignés sur les employés seedés (@waminey.ma) + devAuth.js. Le bump force
+// le rafraîchissement de la liste locale pour purger l'ancien jeu @synapse.io.
+const USERS_KEY = "sd-users-v2";
 const SESSION_KEY = "sd-session-v1";
 const DEMO_PWD = "demo1234";
 
-// Comptes initiaux (créés par défaut). L'admin peut en créer d'autres.
+// Comptes initiaux : MÊMES e-mails que devAuth.js + seed_demo_accounts.py (login + scoping fiables).
 const SEED = [
-  { id: "u-admin", name: "Admin Système", email: "admin@synapse.io", password: DEMO_PWD, role: ROLES.ADMIN, status: STATUS.ACTIVE, dept: "SI" },
-  { id: "u-rh", name: "Karim Benali", email: "rh@synapse.io", password: DEMO_PWD, role: ROLES.RH, status: STATUS.ACTIVE, dept: "RH" },
-  { id: "u-mgr", name: "Sofia Alami", email: "manager@synapse.io", password: DEMO_PWD, role: ROLES.MANAGER, status: STATUS.ACTIVE, dept: "Ops" },
-  { id: "u-dir", name: "Nadia Idrissi", email: "direction@synapse.io", password: DEMO_PWD, role: ROLES.DIRECTION, status: STATUS.ACTIVE, dept: "Direction" },
-  { id: "u-med", name: "Dr. N. Saidi", email: "medecine@synapse.io", password: DEMO_PWD, role: ROLES.MEDECINE, status: STATUS.ACTIVE, dept: "Santé" },
-  { id: "u-new", name: "Yannick Keke", email: "yannick@synapse.io", password: DEMO_PWD, role: ROLES.COLLABORATEUR, status: STATUS.NEW, dept: "SI" },
-  { id: "u-act", name: "Lina Cherkaoui", email: "lina@synapse.io", password: DEMO_PWD, role: ROLES.COLLABORATEUR, status: STATUS.ACTIVE, dept: "Ventes" },
-  { id: "u-leave", name: "Sami Lahlou", email: "sami@synapse.io", password: DEMO_PWD, role: ROLES.COLLABORATEUR, status: STATUS.LEAVING, dept: "Ops" },
+  { id: "u-admin", name: "Mohammed El Idrissi", email: "admin@waminey.ma", password: DEMO_PWD, role: ROLES.ADMIN, status: STATUS.ACTIVE, dept: "Systèmes d'information" },
+  { id: "u-rh", name: "Karim Benali", email: "rh@waminey.ma", password: DEMO_PWD, role: ROLES.RH, status: STATUS.ACTIVE, dept: "Ressources Humaines" },
+  { id: "u-mgr", name: "Sofia Alami", email: "manager@waminey.ma", password: DEMO_PWD, role: ROLES.MANAGER, status: STATUS.ACTIVE, dept: "Équipe Démo" },
+  { id: "u-dir", name: "Nadia Benjelloun", email: "direction@waminey.ma", password: DEMO_PWD, role: ROLES.DIRECTION, status: STATUS.ACTIVE, dept: "Direction" },
+  { id: "u-med", name: "Yasmine Saidi", email: "medecine@waminey.ma", password: DEMO_PWD, role: ROLES.MEDECINE, status: STATUS.ACTIVE, dept: "Santé au travail" },
+  { id: "u-new", name: "Adam Tazi", email: "nouveau@waminey.ma", password: DEMO_PWD, role: ROLES.COLLABORATEUR, status: STATUS.NEW, dept: "Équipe Démo" },
+  { id: "u-act", name: "Hamza Cherkaoui", email: "collaborateur@waminey.ma", password: DEMO_PWD, role: ROLES.COLLABORATEUR, status: STATUS.ACTIVE, dept: "Équipe Démo" },
+  { id: "u-leave", name: "Lina Haddad", email: "depart@waminey.ma", password: DEMO_PWD, role: ROLES.COLLABORATEUR, status: STATUS.LEAVING, dept: "Équipe Démo" },
 ];
 
 export const DEMO_PASSWORD = DEMO_PWD;

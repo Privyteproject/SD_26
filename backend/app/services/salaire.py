@@ -5,7 +5,7 @@ Le niveau de poste est celui atteint via les compétences VALIDÉES par le manag
 (cf. repository.current_career_level). Quand un collaborateur monte de niveau,
 son salaire est porté au palier correspondant (cf. repository.validate_evaluation).
 
-Barème indicatif (annuel brut, en €) — ajustable ici sans toucher au reste du code.
+Barème indicatif (annuel brut, en MAD) — ajustable ici sans toucher au reste du code.
 """
 
 import unicodedata

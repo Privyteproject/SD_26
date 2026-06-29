@@ -186,10 +186,15 @@ def delete_employee(db, matricule: str) -> bool:
 
 
 # ───────────── Absences (= demande filtrée) ─────────────
-def list_absences(db, *, employee_id=None, status=None, date_from=None, date_to=None) -> list[Demande]:
+def list_absences(db, *, employee_id=None, status=None, date_from=None, date_to=None, department_id=None) -> list[Demande]:
     stmt = select(Demande).where(Demande.code_type.in_(ABSENCE_TYPE_CODES))
     if employee_id:
         stmt = stmt.where(Demande.matricule == employee_id)
+    elif department_id is not None:  # scope manager : absences de son département
+        mats = set(db.scalars(select(Employe.matricule).where(Employe.id_departement == department_id)))
+        if not mats:
+            return []
+        stmt = stmt.where(Demande.matricule.in_(mats))
     if status:
         stmt = stmt.where(Demande.statut == status)
     if date_from:
@@ -241,8 +246,8 @@ def set_absence_status(db, id_demande: int, new_status: str, decideur_id: int | 
     return d
 
 
-def absence_stats(db) -> dict:
-    rows = list_absences(db)
+def absence_stats(db, *, department_id=None) -> dict:
+    rows = list_absences(db, department_id=department_id)
     by_status, by_type = {}, {}
     for d in rows:
         by_status[d.statut] = by_status.get(d.statut, 0) + 1
@@ -484,6 +489,10 @@ def _alerte_to_dict(a) -> dict:
         "gravite": a.gravite, "lue": bool(a.lue), "resolue": bool(a.resolue),
         "date_creation": a.date_creation.isoformat() if a.date_creation else None,
         "matricule": a.matricule, "id_destinataire": a.id_destinataire,
+        # Traitement (historique) : plan d'action retenu + note + auteur + date de résolution.
+        "plan_action": a.plan_action, "note_resolution": a.note_resolution,
+        "resolu_par": a.resolu_par,
+        "date_resolution": a.date_resolution.isoformat() if a.date_resolution else None,
     }
 
 
@@ -512,8 +521,15 @@ def count_recent_refusals(db, matricule, hours: int = 1) -> int:
 
 _GRAVITE_RANK = {"high": 0, "mid": 1, "low": 2}
 
+# Catégories d'alertes de SÉCURITÉ TECHNIQUE (§3.3) : injection, accès refusé, fuite de données —
+# réservées Admin et « responsables RH autorisés » (securite_habilite). Jamais au manager.
+# NB : « escalade » est une alerte RH (situation sensible remontée pour accompagnement humain),
+# donc traitée comme préventive (visible RH/Direction et manager pour son équipe), pas sécurité.
+SECURITY_ALERT_CATEGORIES = ("securite", "acces_refuse", "acces_refuse_repete", "fuite_donnees")
 
-def list_alertes_prioritized(db, *, include_resolved=False, limit=100, department_id=None):
+
+def list_alertes_prioritized(db, *, include_resolved=False, limit=100, department_id=None,
+                             exclude_categories=None, only_categories=None):
     """Worklist : alertes triées par criticité (high d'abord) puis date (récent d'abord)."""
     from app.db.models import Alerte, Employe
     stmt = select(Alerte)
@@ -521,13 +537,19 @@ def list_alertes_prioritized(db, *, include_resolved=False, limit=100, departmen
         stmt = stmt.join(Employe, Employe.matricule == Alerte.matricule).where(Employe.id_departement == department_id)
     if not include_resolved:
         stmt = stmt.where(Alerte.resolue.is_(False))
+    if only_categories is not None:  # whitelist (ex. admin = sécurité uniquement)
+        stmt = stmt.where(Alerte.categorie.in_(list(only_categories)))
+    if exclude_categories:
+        stmt = stmt.where(Alerte.categorie.notin_(list(exclude_categories)))
     rows = list(db.scalars(stmt.limit(500)))
     rows.sort(key=lambda a: (_GRAVITE_RANK.get(a.gravite, 3),
                              -(a.date_creation.timestamp() if a.date_creation else 0)))
     return [_alerte_to_dict(a) for a in rows[:limit]]
 
 
-def resolve_alerte(db, id_alerte) -> bool:
+def resolve_alerte(db, id_alerte, *, plan_action=None, note=None, resolu_par=None) -> bool:
+    """Marque une alerte comme traitée en conservant le plan d'action retenu, une note
+    éventuelle et l'auteur — pour l'historique RH (motif = message/catégorie de l'alerte)."""
     from datetime import date as _date
     from app.db.models import Alerte
     a = db.get(Alerte, id_alerte)
@@ -535,8 +557,35 @@ def resolve_alerte(db, id_alerte) -> bool:
         return False
     a.resolue = True
     a.date_resolution = _date.today()
+    if plan_action is not None:
+        # Accepte une liste d'actions ou un texte ; stocké en texte (une action par ligne).
+        a.plan_action = "\n".join(plan_action) if isinstance(plan_action, (list, tuple)) else str(plan_action)
+    if note is not None:
+        a.note_resolution = note
+    if resolu_par is not None:
+        a.resolu_par = resolu_par
     db.commit()
     return True
+
+
+_GRAVITE_RANK_HIST = {"high": 0, "mid": 1, "low": 2}
+
+
+def list_alertes_history(db, *, limit=100, department_id=None, exclude_categories=None, only_categories=None):
+    """Historique des alertes TRAITÉES (résolues), récentes d'abord — avec plan d'action,
+    note, auteur et motif. Scopable au département (manager)."""
+    from app.db.models import Alerte, Employe
+    stmt = select(Alerte).where(Alerte.resolue.is_(True))
+    if department_id:
+        stmt = stmt.join(Employe, Employe.matricule == Alerte.matricule).where(Employe.id_departement == department_id)
+    if only_categories is not None:
+        stmt = stmt.where(Alerte.categorie.in_(list(only_categories)))
+    if exclude_categories:
+        stmt = stmt.where(Alerte.categorie.notin_(list(exclude_categories)))
+    rows = list(db.scalars(stmt.limit(800)))
+    rows.sort(key=lambda a: (a.date_resolution.toordinal() if a.date_resolution else 0,
+                             a.date_creation.timestamp() if a.date_creation else 0), reverse=True)
+    return [_alerte_to_dict(a) for a in rows[:limit]]
 
 
 def create_alerte(db, *, message, categorie="info", gravite="mid", id_destinataire=None, matricule=None):
@@ -563,11 +612,16 @@ def create_feedback(db, *, matricule, note_1_5=None, categorie=None, commentaire
     return f
 
 
-def list_feedbacks(db, matricule=None, limit=200):
-    from app.db.models import Feedback
+def list_feedbacks(db, matricule=None, limit=200, department_id=None):
+    from app.db.models import Employe, Feedback
     stmt = select(Feedback).order_by(Feedback.date_feedback.desc())
     if matricule:
         stmt = stmt.where(Feedback.matricule == matricule)
+    elif department_id is not None:  # scope manager : feedbacks de son département
+        mats = set(db.scalars(select(Employe.matricule).where(Employe.id_departement == department_id)))
+        if not mats:
+            return []
+        stmt = stmt.where(Feedback.matricule.in_(mats))
     return list(db.scalars(stmt.limit(limit)))
 
 
@@ -1344,6 +1398,15 @@ def my_humeur(db, matricule):
         Humeur.matricule == matricule, Humeur.semaine == _iso_week(date.today())))
 
 
+def my_humeur_history(db, matricule, weeks: int = 8) -> list[dict]:
+    """Historique PERSONNEL d'humeur (données propres du collaborateur, non agrégées) :
+    [{semaine, niveau}] des dernières semaines saisies. Usage : courbe perso du tableau de bord."""
+    from app.db.models import Humeur
+    rows = db.scalars(select(Humeur).where(Humeur.matricule == matricule)
+                      .order_by(Humeur.semaine.desc()).limit(weeks)).all()
+    return [{"semaine": h.semaine, "niveau": h.niveau} for h in reversed(rows)]
+
+
 def humeur_aggregate(db, *, weeks=8, dept=None, min_n=3) -> dict:
     """Climat social AGRÉGÉ et anonymisé : distribution de la semaine + tendance hebdo.
     Les semaines comptant moins de `min_n` réponses sont masquées (anti-réidentification)."""
@@ -1413,11 +1476,12 @@ def humeur_aggregate(db, *, weeks=8, dept=None, min_n=3) -> dict:
             "score_global": score_global}
 
 
-def humeur_comments(db, *, dept=None, semaine=None, limit=80) -> list[dict]:
+def humeur_comments(db, *, dept=None, semaine=None, limit=80, force_anonymous=False) -> list[dict]:
     """Retours qualitatifs (commentaires) du climat social.
     Par défaut anonymes ; si le collaborateur a explicitement levé l'anonymat (anonyme=False),
     son nom accompagne le commentaire. Aucun matricule n'est jamais exposé.
-    Filtrables par semaine ; scope département pour les managers."""
+    `force_anonymous=True` (médecine du travail, loi 09-08) : anonymat TOTAL même si le
+    collaborateur a consenti à se nommer. Filtrables par semaine ; scope département (managers)."""
     from app.db.models import Employe, Humeur
     mats = None
     if dept is not None:
@@ -1435,7 +1499,7 @@ def humeur_comments(db, *, dept=None, semaine=None, limit=80) -> list[dict]:
             continue
         if not (com or "").strip():
             continue
-        is_anon = anon is None or bool(anon)
+        is_anon = anon is None or bool(anon) or force_anonymous
         auteur = None
         if not is_anon:
             emp = db.get(Employe, mat)
@@ -1509,6 +1573,43 @@ def ia_interactions_stats(db) -> dict:
         select(func.count(InteractionIA.id_interaction)).where(InteractionIA.sensible.is_(True))
     ) or 0
     return {"count": int(total), "total_tokens": int(tokens), "sensibles": int(sensibles)}
+
+
+def ia_usage_trend(db, days: int = 14) -> list[dict]:
+    """Volume d'échanges IA par jour sur la période (supervision admin)."""
+    from datetime import date as _date, timedelta
+    from app.db.models import InteractionIA
+    start = _date.today() - timedelta(days=days - 1)
+    counts = {}
+    rows = db.scalars(select(InteractionIA.date_creation).where(
+        InteractionIA.date_creation.isnot(None))).all()
+    for d in rows:
+        jour = d.date() if hasattr(d, "date") else d
+        if jour >= start:
+            counts[jour] = counts.get(jour, 0) + 1
+    return [{"jour": (start + timedelta(days=i)).strftime("%d/%m"),
+             "count": counts.get(start + timedelta(days=i), 0)} for i in range(days)]
+
+
+def recent_ia_events(db, limit: int = 8) -> list[dict]:
+    """Derniers événements de SÉCURITÉ IA (injection / refus d'accès / escalade) pour le
+    tableau admin. EXCLUT les alertes RH (risques désengagement/burnout, retards onboarding) :
+    la supervision admin porte sur le SYSTÈME, pas sur les données RH nominatives (moindre privilège)."""
+    from app.db.models import Alerte
+    sec_cats = ("securite", "acces_refuse", "acces_refuse_repete", "escalade")
+    cat_sev = {"securite": "high", "acces_refuse_repete": "high", "escalade": "high",
+               "acces_refuse": "mid"}
+    rows = db.scalars(select(Alerte).where(Alerte.categorie.in_(sec_cats))
+                      .order_by(Alerte.date_creation.desc()).limit(limit)).all()
+    out = []
+    for a in rows:
+        out.append({
+            "id": a.id_alerte,
+            "time": a.date_creation.strftime("%H:%M") if a.date_creation else "",
+            "type": a.message or a.categorie,
+            "severity": a.gravite or cat_sev.get(a.categorie, "low"),
+        })
+    return out
 
 
 def security_stats(db) -> dict:
@@ -1586,10 +1687,15 @@ def type_exists(db, code_type: str) -> bool:
     return db.get(TypeDemande, code_type) is not None
 
 
-def list_demandes(db, *, employee_id=None, code_type=None, status=None) -> list[Demande]:
+def list_demandes(db, *, employee_id=None, code_type=None, status=None, department_id=None) -> list[Demande]:
     stmt = select(Demande)
     if employee_id:
         stmt = stmt.where(Demande.matricule == employee_id)
+    elif department_id is not None:  # scope manager : demandes des matricules de son département
+        mats = set(db.scalars(select(Employe.matricule).where(Employe.id_departement == department_id)))
+        if not mats:
+            return []
+        stmt = stmt.where(Demande.matricule.in_(mats))
     if code_type:
         stmt = stmt.where(Demande.code_type == code_type)
     if status:
@@ -1944,16 +2050,23 @@ def dept_matricules(db, dept_id) -> list[str]:
     return list(db.scalars(select(Employe.matricule).where(Employe.id_departement == dept_id)))
 
 
-def gsearch_employees(db, q, *, dept_id=None, limit=5):
-    """Employés par nom/prénom/email/poste (ILIKE). dept_id => périmètre équipe."""
+def gsearch_employees(db, q, *, dept_id=None, limit=5, match_email=True):
+    """Employés par nom/prénom/nom complet/poste (ILIKE). `match_email` ajoute l'e-mail au
+    critère (recherche globale) ; mis à False pour la recherche par NOM visible. dept_id => équipe."""
     from app.db.models import Departement, Employe, Utilisateur
     like = f"%{q}%"
+    conds = [
+        Employe.nom.ilike(like), Employe.prenom.ilike(like), Employe.poste.ilike(like),
+        func.concat(Employe.prenom, " ", Employe.nom).ilike(like),
+        func.concat(Employe.nom, " ", Employe.prenom).ilike(like),
+    ]
+    if match_email:
+        conds.append(Utilisateur.email.ilike(like))
     stmt = (
         select(Employe, Utilisateur.email, Departement.nom)
         .join(Utilisateur, Employe.id_utilisateur == Utilisateur.id_utilisateur, isouter=True)
         .join(Departement, Employe.id_departement == Departement.id_departement, isouter=True)
-        .where(or_(Employe.nom.ilike(like), Employe.prenom.ilike(like),
-                   Employe.poste.ilike(like), Utilisateur.email.ilike(like)))
+        .where(or_(*conds))
     )
     if dept_id is not None:
         stmt = stmt.where(Employe.id_departement == dept_id)
@@ -2129,7 +2242,9 @@ def list_scores(db, *, niveau=None, type=None, department_id=None):
     return list(db.scalars(stmt.order_by(ScoreRisque.valeur.desc())))
 
 
-def risk_summary(db, top: int = 5, dept=None) -> dict:
+def risk_summary(db, top: int = 5, dept=None, anonymize: bool = False) -> dict:
+    """Synthèse des risques. `anonymize=True` : aucun détail nominatif (ni nom ni matricule)
+    dans le top — réservé aux profils hors périmètre RH (ex. médecine du travail, loi 09-08)."""
     from app.db.models import Employe, ScoreRisque
     rows = list(db.scalars(select(ScoreRisque)))
     if dept is not None:  # manager : restreint aux scores de son équipe
@@ -2138,6 +2253,9 @@ def risk_summary(db, top: int = 5, dept=None) -> dict:
     by_niveau: dict[str, int] = {}
     for s in rows:
         by_niveau[s.niveau] = by_niveau.get(s.niveau, 0) + 1
+    if anonymize:
+        # Agrégats uniquement : pas de liste nominative (anti-réidentification).
+        return {"total": len(rows), "by_niveau": by_niveau, "top": []}
     ranked = sorted(rows, key=lambda s: float(s.valeur or 0), reverse=True)[:top]
     top_list = []
     for s in ranked:

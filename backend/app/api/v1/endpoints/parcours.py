@@ -37,8 +37,9 @@ from app.schemas.hr import (
 
 router = APIRouter()
 
-_MANAGE = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_MANAGER, ROLE_DIRECTION)
-_ELEVATED = {ROLE_ADMIN, ROLE_RH, ROLE_MANAGER, ROLE_DIRECTION}
+# Gestion des parcours onboarding/offboarding = opérationnel RH + manager (équipe). Pas la Direction.
+_MANAGE = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_MANAGER)
+_ELEVATED = {ROLE_ADMIN, ROLE_RH, ROLE_MANAGER}
 
 
 @router.get("/modeles")

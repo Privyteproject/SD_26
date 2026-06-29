@@ -78,7 +78,7 @@ def generate_pdf(db) -> tuple[bytes, str]:
 
     section("Masse salariale")
     m = data["masse"]
-    table([[s["site"], f"{s['montant']:,.0f} €"] for s in m["by_site"]] + [["TOTAL", f"{m['total']:,.0f} €"]],
+    table([[s["site"], f"{s['montant']:,.0f} MAD"] for s in m["by_site"]] + [["TOTAL", f"{m['total']:,.0f} MAD"]],
           ["Site", "Masse salariale annuelle"])
 
     section("Alertes récentes")
@@ -95,5 +95,5 @@ def _text_fallback(data, stamp) -> bytes:
     lines += [f"  - {s['site']} : {s['count']}" for s in data["sites"]]
     lines += ["", "Pyramide des âges :"]
     lines += [f"  - {p['tranche']} : {p['count']}" for p in data["pyramide"]]
-    lines += ["", f"Masse salariale totale : {data['masse']['total']:,.0f} €"]
+    lines += ["", f"Masse salariale totale : {data['masse']['total']:,.0f} MAD"]
     return "\n".join(lines).encode("utf-8")

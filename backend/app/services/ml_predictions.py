@@ -19,7 +19,7 @@ _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 _MODELS_PATH = os.path.join(_DATA_DIR, "ml_models.joblib")
 TODAY = date(2026, 6, 1)
 
-SITE_MAP = {"Paris": 0, "Lyon": 1, "Bordeaux": 2, "Remote": 3}
+SITE_MAP = {"Casablanca": 0, "Rabat": 1, "Marrakech": 2, "Tanger": 3}
 CONTRAT_MAP = {"CDI": 0, "CDD": 1, "Alternance": 2}
 
 # Éthique / §4.1 : on EXCLUT volontairement les attributs personnels ou potentiellement
@@ -56,8 +56,20 @@ def _months(d1: date, d2: date) -> int:
     return max(0, (d1.year - d2.year) * 12 + (d1.month - d2.month))
 
 
-def _build_dataset(db) -> list[dict]:
-    """Construit une ligne de features + cibles par employé (agrégation en mémoire)."""
+def _add_months(d: date, months: int) -> date:
+    m = d.month - 1 + months
+    y = d.year + m // 12
+    return date(y, m % 12 + 1, min(d.day, 28))
+
+
+# Horizon de prédiction temporelle (burnout / désengagement) : on prédit l'étiquette des
+# 12 prochains mois À PARTIR des signaux ANTÉRIEURS au cutoff -> aucune fuite de cible.
+HORIZON_MONTHS = 12
+CUTOFF = _add_months(TODAY, -HORIZON_MONTHS)
+
+
+def _collect(db):
+    """Agrège, par employé, tous les historiques nécessaires aux features (en mémoire)."""
     from app.db.models import (Demande, Employe, EnqueteEngagement, EntretienAnnuel,
                                EvaluationCompetence, Feedback, HistoriqueSalaire)
 
@@ -89,27 +101,61 @@ def _build_dataset(db) -> list[dict]:
             Demande.matricule, Demande.date_debut, Demande.code_type).where(
             Demande.code_type.in_(["MALADIE", "ABSENCE"]))).all():
         maladies.setdefault(m, []).append((d0, ctype))
+    return employees, enquetes, entretiens, salaires, maladies, feedbacks, competences
 
+
+def _build_dataset(db, as_of=None) -> list[dict]:
+    """Une ligne de features par employé, calculée à la date `as_of` (TODAY par défaut)."""
+    employees, enq, entr, sal, mal, fbk, comp = _collect(db)
     rows = []
     for e in employees:
         mat = e.matricule
-        rows.append(_features_for(e, enquetes.get(mat, []), entretiens.get(mat, []),
-                                  salaires.get(mat, []), maladies.get(mat, []),
-                                  feedbacks.get(mat, []), competences.get(mat, [])))
+        rows.append(_features_for(e, enq.get(mat, []), entr.get(mat, []), sal.get(mat, []),
+                                  mal.get(mat, []), fbk.get(mat, []), comp.get(mat, []), as_of=as_of))
     return rows
 
 
-def _features_for(e, enq, entr, sal, mal, fbk=None, comp=None) -> dict:
-    age = _months(TODAY, e.date_naissance) // 12 if e.date_naissance else 40
-    anciennete = _months(TODAY, e.date_embauche) if e.date_embauche else 0
+def _temporal_rows(db, horizon_months=HORIZON_MONTHS) -> list[dict]:
+    """Jeu d'apprentissage TEMPOREL (anti-fuite) : features calculées AU CUTOFF (passé) et
+    étiquette mesurée sur la fenêtre FUTURE (cutoff → aujourd'hui). On prédit donc un
+    événement futur à partir de signaux strictement antérieurs."""
+    cutoff = _add_months(TODAY, -horizon_months)
+    employees, enq, entr, sal, mal, fbk, comp = _collect(db)
+    rows = []
+    for e in employees:
+        if not e.date_embauche or e.date_embauche > cutoff:
+            continue  # pas d'historique avant le cutoff -> exclu
+        mat = e.matricule
+        feats = _features_for(e, enq.get(mat, []), entr.get(mat, []), sal.get(mat, []),
+                              mal.get(mat, []), fbk.get(mat, []), comp.get(mat, []), as_of=cutoff)
+        ev = mal.get(mat, [])
+        fut_mal = sum(1 for d0, ct in ev if d0 and cutoff < d0 <= TODAY and ct == "MALADIE")
+        fut_abs = sum(1 for d0, ct in ev if d0 and cutoff < d0 <= TODAY and ct == "ABSENCE")
+        fut_sats = [x[1] for x in enq.get(mat, []) if x[0] and cutoff < x[0] <= TODAY]
+        fut_sat = (sum(fut_sats) / len(fut_sats)) if fut_sats else None
+        # Étiquettes FUTURES (indépendantes des features passées) :
+        feats["y_burnout_future"] = 1 if fut_mal >= 2 else 0
+        feats["y_deseng_future"] = 1 if ((fut_sat is not None and fut_sat < 6) or fut_abs >= 1
+                                         or e.statut == "LEAVING") else 0
+        rows.append(feats)
+    return rows
 
-    # Dernière augmentation (Annuel/Promotion).
+
+def _features_for(e, enq, entr, sal, mal, fbk=None, comp=None, as_of=None) -> dict:
+    """Features d'un employé à la date `as_of` : seuls les événements ANTÉRIEURS à `as_of`
+    sont pris en compte (fenêtres glissantes relatives à `as_of`)."""
+    as_of = as_of or TODAY
+    age = _months(as_of, e.date_naissance) // 12 if e.date_naissance else 40
+    anciennete = _months(as_of, e.date_embauche) if e.date_embauche else 0
+
+    # Dernière augmentation (Annuel/Promotion) — uniquement ≤ as_of.
+    sal = [(d, mo) for d, mo in sal if d and d <= as_of]
     raises = sorted([d for d, mo in sal if mo in ("Annuel", "Promotion")])
-    delai_augm = _months(TODAY, raises[-1]) if raises else anciennete
-    promo_12m = 1 if any(mo == "Promotion" and _months(TODAY, d) <= 12 for d, mo in sal) else 0
+    delai_augm = _months(as_of, raises[-1]) if raises else anciennete
+    promo_12m = 1 if any(mo == "Promotion" and _months(as_of, d) <= 12 for d, mo in sal) else 0
 
-    # Engagement : dernier point + évolution (récent - ancien).
-    enq_sorted = sorted(enq, key=lambda x: x[0])
+    # Engagement : dernier point + évolution (récent - ancien), ≤ as_of.
+    enq_sorted = sorted([x for x in enq if x[0] and x[0] <= as_of], key=lambda x: x[0])
     if enq_sorted:
         last = enq_sorted[-1]
         charge, equilibre, recon = last[2], last[3], last[4]
@@ -120,14 +166,15 @@ def _features_for(e, enq, entr, sal, mal, fbk=None, comp=None) -> dict:
         charge = equilibre = recon = 5
         evol = 0.0
 
-    note_perf = sorted(entr, key=lambda x: x[0])[-1][1] if entr else 3
+    entr_f = [x for x in entr if x[0] and x[0] <= as_of]
+    note_perf = sorted(entr_f, key=lambda x: x[0])[-1][1] if entr_f else 3
 
-    nb_maladie_12m = sum(1 for d0, ctype in mal if d0 and ctype == "MALADIE" and _months(TODAY, d0) <= 12)
-    nb_absences_12m = sum(1 for d0, ctype in mal if d0 and ctype == "ABSENCE" and _months(TODAY, d0) <= 12)
+    nb_maladie_12m = sum(1 for d0, ctype in mal if d0 and d0 <= as_of and ctype == "MALADIE" and _months(as_of, d0) <= 12)
+    nb_absences_12m = sum(1 for d0, ctype in mal if d0 and d0 <= as_of and ctype == "ABSENCE" and _months(as_of, d0) <= 12)
 
-    # Feedbacks internes récents (≤ 12 mois) : note moyenne sur 5 ; neutre (3) si aucun.
+    # Feedbacks internes récents (≤ 12 mois avant as_of) : note moyenne sur 5 ; neutre (3) si aucun.
     fbk = fbk or []
-    recent_fbk = [n for d, n in fbk if d and _months(TODAY, d) <= 12]
+    recent_fbk = [n for d, n in fbk if d and d <= as_of and _months(as_of, d) <= 12]
     feedback_moyen = (sum(recent_fbk) / len(recent_fbk)) if recent_fbk else 3.0
 
     # Niveau de compétences moyen (validé sinon auto) ; neutre (3) si non évalué.
@@ -170,27 +217,51 @@ def train(db) -> dict:
     from sklearn.model_selection import train_test_split
     import joblib
 
-    rows = _build_dataset(db)
-    if len(rows) < 30:
-        return {"error": "Pas assez de données. Lancez advanced_seed.", "n": len(rows)}
+    today_rows = _build_dataset(db)
+    if len(today_rows) < 30:
+        return {"error": "Pas assez de données. Lancez advanced_seed.", "n": len(today_rows)}
+    # Burnout & désengagement : apprentissage TEMPOREL (features passées -> étiquette future).
+    temporal_rows = _temporal_rows(db)
 
     bundle, metrics = {}, {}
-    specs = [("turnover", F_TURNOVER, "y_turnover"), ("burnout", F_BURNOUT, "y_burnout"),
-             ("desengagement", F_DESENGAGEMENT, "y_desengagement")]
-    for name, feats, target in specs:
+    # (nom, features, cible, jeu de données, type d'évaluation)
+    specs = [
+        ("turnover", F_TURNOVER, "y_turnover", today_rows, "predictif"),
+        ("burnout", F_BURNOUT, "y_burnout_future", temporal_rows, "predictif (horizon 12 mois)"),
+        ("desengagement", F_DESENGAGEMENT, "y_deseng_future", temporal_rows, "predictif (horizon 12 mois)"),
+    ]
+    for name, feats, target, rows, eval_type in specs:
+        if not rows:
+            metrics[name] = {"trained": False, "reason": "pas d'historique suffisant"}
+            continue
         X = [_vec(r, feats) for r in rows]
         y = [r[target] for r in rows]
         if len(set(y)) < 2:  # une seule classe -> non entraînable
             metrics[name] = {"trained": False, "reason": "classe unique"}
             continue
+        import numpy as np
         Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
-        clf = RandomForestClassifier(n_estimators=120, max_depth=8, random_state=42, class_weight="balanced")
-        clf.fit(Xtr, ytr)
+        rf_params = dict(n_estimators=200, max_depth=10, min_samples_leaf=2,
+                         random_state=42, class_weight="balanced", n_jobs=-1)
+        # Calibration du SEUIL de décision sur une validation interne (jamais le test) :
+        # on maximise le F1 -> bien meilleur compromis précision/rappel que le seuil 0,5.
+        best_t = 0.5
+        if len(set(ytr)) > 1:
+            Xt2, Xval, yt2, yval = train_test_split(Xtr, ytr, test_size=0.25, random_state=42, stratify=ytr)
+            if len(set(yt2)) > 1 and len(set(yval)) > 1:
+                pv = RandomForestClassifier(**rf_params).fit(Xt2, yt2).predict_proba(Xval)[:, 1]
+                best_f1 = -1.0
+                for t in np.linspace(0.15, 0.85, 29):
+                    _, _, f, _ = precision_recall_fscore_support(
+                        yval, (pv >= t).astype(int), average="binary", pos_label=1, zero_division=0)
+                    if f > best_f1:
+                        best_f1, best_t = f, float(t)
+        clf = RandomForestClassifier(**rf_params).fit(Xtr, ytr)
 
-        # KPIs d'évaluation sur le jeu de test (classe positive = 1).
-        y_pred = clf.predict(Xte)
+        # KPIs d'évaluation sur le jeu de test, AU SEUIL CALIBRÉ (classe positive = 1).
         y_proba = clf.predict_proba(Xte)[:, 1]
-        acc = clf.score(Xte, yte)
+        y_pred = (y_proba >= best_t).astype(int)
+        acc = float((y_pred == np.array(yte)).mean())
         prec, rec, f1, _ = precision_recall_fscore_support(yte, y_pred, average="binary",
                                                            pos_label=1, zero_division=0)
         try:
@@ -215,9 +286,10 @@ def train(db) -> dict:
             else:
                 corr_sign[f] = 0
         bundle[name] = {"model": clf, "feats": feats, "importances": importances,
-                        "means": means, "corr_sign": corr_sign}
+                        "means": means, "corr_sign": corr_sign, "threshold": best_t}
         metrics[name] = {
             "trained": True, "n": len(y), "positives": int(sum(y)), "test_size": len(yte),
+            "eval_type": eval_type, "threshold": round(best_t, 3),
             "accuracy": round(float(acc), 3), "precision": round(float(prec), 3),
             "recall": round(float(rec), 3), "f1": round(float(f1), 3),
             "roc_auc": round(float(auc), 3) if auc is not None else None,
@@ -227,7 +299,7 @@ def train(db) -> dict:
 
     os.makedirs(_DATA_DIR, exist_ok=True)
     joblib.dump(bundle, _MODELS_PATH)
-    return {"models": metrics, "n_employes": len(rows)}
+    return {"models": metrics, "n_employes": len(today_rows), "n_temporel": len(temporal_rows)}
 
 
 def batch_score(db) -> dict:
@@ -257,10 +329,11 @@ def batch_score(db) -> dict:
         if not spec:
             continue
         X = [_vec(r, spec["feats"]) for r in rows]
+        thr = spec.get("threshold", 0.5)
         probas = spec["model"].predict_proba(X)[:, 1]  # prédiction en lot
         for r, p in zip(rows, probas):
             p = float(p)
-            objs.append(ScoreRisque(type=score_type, valeur=round(p, 3), niveau=_niveau(p),
+            objs.append(ScoreRisque(type=score_type, valeur=round(p, 3), niveau=_niveau(p, thr),
                                     date_calcul=today, matricule=r["matricule"]))
     db.bulk_save_objects(objs)  # une seule transaction
     db.commit()
@@ -275,9 +348,10 @@ def batch_score(db) -> dict:
     for key, label in [("turnover", "départ"), ("burnout", "burnout"), ("desengagement", "désengagement")]:
         spec = bundle.get(key)
         if spec:
+            thr = spec.get("threshold", 0.5)
             probas = spec["model"].predict_proba([_vec(r, spec["feats"]) for r in rows])[:, 1]
             for r, p in zip(rows, probas):
-                if _niveau(float(p)) == "high":
+                if _niveau(float(p), thr) == "high":
                     repo.create_alerte(
                         db, message=f"Risque de {label} élevé détecté ({r['matricule']}, {round(float(p) * 100)}%).",
                         categorie="risque_eleve", gravite="high", id_destinataire=None, matricule=r["matricule"])
@@ -329,8 +403,14 @@ def _load_bundle():
         return None
 
 
-def _niveau(p: float) -> str:
-    return "high" if p >= 0.66 else "mid" if p >= 0.33 else "low"
+def _niveau(p: float, threshold: float = 0.5) -> str:
+    """Niveau de risque relatif au SEUIL calibré du modèle : « high » = au-dessus du seuil
+    de décision (= prédiction positive), « mid » = zone d'alerte approchante, « low » sinon."""
+    if p >= threshold:
+        return "high"
+    if p >= threshold * 0.6:
+        return "mid"
+    return "low"
 
 
 def _explain(row, spec, top=3) -> list[dict]:
@@ -386,7 +466,7 @@ def predict_for(db, matricule: str) -> dict | None:
         if not spec:
             continue
         proba = float(spec["model"].predict_proba([_vec(row, spec["feats"])])[0][1])
-        out["risks"][name] = {"proba": round(proba, 3), "niveau": _niveau(proba),
+        out["risks"][name] = {"proba": round(proba, 3), "niveau": _niveau(proba, spec.get("threshold", 0.5)),
                               "facteurs": _explain(row, spec)}  # explicabilité §4.1
     return out
 
@@ -414,7 +494,7 @@ def fairness_audit(db) -> dict:
     groupers = {
         "genre": lambda r: r.get("genre", "Autre"),
         "tranche_age": lambda r: _age_band(r.get("age", 40)),
-        "site": lambda r: {0: "Paris", 1: "Lyon", 2: "Bordeaux", 3: "Remote"}.get(int(r.get("site", 0)), "?"),
+        "site": lambda r: {0: "Casablanca", 1: "Rabat", 2: "Marrakech", 3: "Tanger"}.get(int(r.get("site", 0)), "?"),
         "contrat": lambda r: {0: "CDI", 1: "CDD", 2: "Alternance"}.get(int(r.get("contrat", 0)), "?"),
     }
 
@@ -423,8 +503,9 @@ def fairness_audit(db) -> dict:
         spec = bundle.get(model_name)
         if not spec:
             continue
+        thr = spec.get("threshold", 0.5)
         probas = spec["model"].predict_proba([_vec(r, spec["feats"]) for r in rows])[:, 1]
-        flagged = [1 if _niveau(float(p)) == "high" else 0 for p in probas]
+        flagged = [1 if float(p) >= thr else 0 for p in probas]
         per_attr = {}
         for attr, fn in groupers.items():
             buckets = {}

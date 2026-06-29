@@ -1,13 +1,12 @@
-// Marque Synapse Digital — images officielles (empreinte cuivre, fond transparent).
-// layout: "mark" (icône seule) | "full" (lockup icône + texte). `animated` = apparition en fondu/zoom.
+// Marque Synapse Digital — nouveau logo officiel (mark doré, fond transparent).
+// layout: "mark" (icône) | "full"/"stack" (mise en avant). `animated` = apparition en fondu/zoom.
+// Variante crème disponible (/brand/synapse-mark-cream.png) pour les fonds sombres.
 const MARK = "/brand/synapse-mark.png";
-const FULL = "/brand/synapse-logo.png";
 
 export default function Logo({ size = 32, layout = "mark", animated = false }) {
   const isFull = layout === "full" || layout === "row" || layout === "stack";
-  const src = isFull ? FULL : MARK;
-  // Le lockup est ~carré ; la marque est légèrement plus haute que large.
-  const height = isFull ? size * 1.35 : size * 1.16;
+  const src = MARK;  // un seul mark officiel (le nouveau jeu ne contient pas de lockup texte)
+  const height = isFull ? size * 1.3 : size * 1.16;
   return (
     <img
       src={src}

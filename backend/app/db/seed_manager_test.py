@@ -65,7 +65,7 @@ def run():
             db.flush()
             db.add(Employe(matricule=mat, nom=nom, prenom=prenom, poste=poste, statut="ACTIVE",
                            date_embauche=date(2022, 3, 1), date_naissance=date(1990, 1, 1),
-                           site="Paris", type_contrat="CDI", genre="Autre",
+                           site="Casablanca", type_contrat="CDI", genre="Autre",
                            id_departement=dept.id_departement, id_utilisateur=u.id_utilisateur,
                            matricule_manager=mgr))
         db.commit()

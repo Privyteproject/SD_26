@@ -21,7 +21,8 @@ from app.schemas.common import envelope
 
 router = APIRouter()
 
-_MANAGE = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER)
+# Gestion des OKR (création/affectation) = opérationnel RH + manager. Pas la Direction (décisionnel).
+_MANAGE = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_MANAGER)
 _ELEVATED = {ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER}
 
 

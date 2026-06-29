@@ -33,8 +33,8 @@ export default function Payroll() {
       ) : (
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{t("an.payroll")} — {t("an.monthlyBySite")} (k€)</div>
-            <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("an.totalMonthly")} : <b style={{ color: "var(--ink)" }}>{Math.round((masse.mensuelle || 0) / 1000).toLocaleString()} k€</b></div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{t("an.payroll")} — {t("an.monthlyBySite")} (k MAD)</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>{t("an.totalMonthly")} : <b style={{ color: "var(--ink)" }}>{Math.round((masse.mensuelle || 0) / 1000).toLocaleString()} k MAD</b></div>
           </div>
           <AsyncBoundary loading={loading} error={error} onRetry={reload} empty={!bySite.length} emptyLabel={t("common.empty")}>
             <div style={{ height: 300 }}>
@@ -43,7 +43,7 @@ export default function Payroll() {
                   <XAxis dataKey="m" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip />
-                  <Bar dataKey="v" fill="var(--gold)" radius={[4, 4, 0, 0]} name="k€/mois" />
+                  <Bar dataKey="v" fill="var(--gold)" radius={[4, 4, 0, 0]} name="k MAD/mois" />
                 </BarChart>
               </ResponsiveContainer>
             </div>

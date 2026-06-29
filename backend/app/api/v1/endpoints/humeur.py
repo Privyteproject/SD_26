@@ -55,6 +55,16 @@ def my_mood(user: CurrentUser = Depends(get_current_user), db: Session = Depends
     return envelope(h.to_dict() if h else None)
 
 
+@router.get("/me/history")
+def my_mood_history(weeks: int = Query(8, ge=1, le=26),
+                    user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Historique PERSONNEL de l'humeur du collaborateur (ses propres données, non agrégées)."""
+    emp = repo.find_employee_by_email(db, user.email)
+    if emp is None:
+        return envelope([])
+    return envelope(repo.my_humeur_history(db, emp.matricule, weeks))
+
+
 @router.get("/stats")
 def stats(weeks: int = Query(8, ge=1, le=26),
           user: CurrentUser = Depends(_VIEW), db: Session = Depends(get_db)):
@@ -66,7 +76,9 @@ def stats(weeks: int = Query(8, ge=1, le=26),
 @router.get("/comments")
 def comments(semaine: str | None = Query(None),
              user: CurrentUser = Depends(_VIEW), db: Session = Depends(get_db)):
-    """Retours qualitatifs ANONYMISÉS (par semaine, scopés au périmètre du rôle)."""
+    """Retours qualitatifs ANONYMISÉS (par semaine, scopés au périmètre du rôle).
+    Médecine du travail : anonymat TOTAL forcé (loi 09-08), même si le collaborateur a levé l'anonymat."""
     dept = _dept_for(user, db)
-    rows = repo.humeur_comments(db, dept=dept, semaine=semaine)
+    rows = repo.humeur_comments(db, dept=dept, semaine=semaine,
+                                force_anonymous=(user.role == ROLE_MEDECINE))
     return envelope(rows, meta={"total": len(rows)})

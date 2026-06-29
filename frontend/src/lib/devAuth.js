@@ -6,21 +6,23 @@
 // il décode les claims sans vérifier la signature). La signature ici est donc
 // un simple marqueur ("dev") — JAMAIS de secret, JAMAIS à activer en production.
 //
-// Les e-mails correspondent aux comptes semés par le backend (db/seed.py) afin
-// que GET /employees/me renvoie un profil complet (matricule, département…).
+// Les e-mails correspondent EXACTEMENT aux comptes semés par le backend
+// (db/seed_demo_accounts.py, domaine @waminey.ma) afin que GET /employees/me
+// renvoie un profil complet (matricule, département, équipe…) et que le scoping
+// par rôle fonctionne. Source unique partagée avec authStore.js.
 
 export const DEMO_PASSWORD = "demo1234";
 
 // Compte de démo -> rôle realm Keycloak (minuscule) attendu par le mapping back/front.
 export const DEV_ACCOUNTS = [
-  { email: "yannick.keke@entreprise.com",   name: "Yannick Keke",     realmRole: "admin",         role: "ADMIN" },
-  { email: "lina.cherkaoui@entreprise.com", name: "Lina Cherkaoui",   realmRole: "direction",     role: "DIRECTION" },
-  { email: "karim.benali@entreprise.com",   name: "Karim Benali",     realmRole: "rh",            role: "RH" },
-  { email: "sofia.alami@entreprise.com",    name: "Sofia Alami",      realmRole: "manager",       role: "MANAGER" },
-  { email: "nora.idrissi@entreprise.com",   name: "Nora Idrissi",     realmRole: "medecine",      role: "MEDECINE" },
-  { email: "adam.roux@entreprise.com",      name: "Adam Roux",        realmRole: "collaborateur", role: "COLLABORATEUR" },
-  { email: "sami.lahlou@entreprise.com",    name: "Sami Lahlou",      realmRole: "collaborateur", role: "COLLABORATEUR" },
-  { email: "yasmine.haddad@entreprise.com", name: "Yasmine Haddad",   realmRole: "collaborateur", role: "COLLABORATEUR" },
+  { email: "admin@waminey.ma",         name: "Mohammed El Idrissi", realmRole: "admin",         role: "ADMIN" },
+  { email: "direction@waminey.ma",     name: "Nadia Benjelloun",    realmRole: "direction",     role: "DIRECTION" },
+  { email: "rh@waminey.ma",            name: "Karim Benali",        realmRole: "rh",            role: "RH" },
+  { email: "manager@waminey.ma",       name: "Sofia Alami",         realmRole: "manager",       role: "MANAGER" },
+  { email: "medecine@waminey.ma",      name: "Yasmine Saidi",       realmRole: "medecine",      role: "MEDECINE" },
+  { email: "collaborateur@waminey.ma", name: "Hamza Cherkaoui",     realmRole: "collaborateur", role: "COLLABORATEUR" },
+  { email: "nouveau@waminey.ma",       name: "Adam Tazi",           realmRole: "collaborateur", role: "COLLABORATEUR" },
+  { email: "depart@waminey.ma",        name: "Lina Haddad",         realmRole: "collaborateur", role: "COLLABORATEUR" },
 ];
 
 function findAccount(email) {

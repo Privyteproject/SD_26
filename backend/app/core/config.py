@@ -109,5 +109,42 @@ class Settings:
     # --- CORS (serveur Vite) ---
     CORS_ORIGINS: list[str] = _csv(os.getenv("CORS_ORIGINS", "http://localhost:5173"))
 
+    # --- Environnement / posture de sécurité ---
+    APP_ENV: str = os.getenv("APP_ENV", "development").lower()  # development | production
+
+    @property
+    def IS_PRODUCTION(self) -> bool:
+        return self.APP_ENV in ("production", "prod")
+
+    def security_issues(self) -> list[tuple[str, str]]:
+        """Garde-fous de configuration (loi 09-08 / RGPD). Renvoie (sévérité, message).
+
+        'fatal' : bloque le démarrage dans TOUT environnement (risque de fuite de données).
+        'prod'  : bloque en production, simple alerte en développement.
+        """
+        out: list[tuple[str, str]] = []
+        default_secret = "dev-doc-preview-secret"
+
+        # Masquage PII OBLIGATOIRE : sans lui, des données personnelles partiraient en clair
+        # vers le LLM externe (interdit par la loi 09-08 quel que soit l'environnement).
+        if not self.PII_MASKING:
+            out.append(("fatal", "PII_MASKING désactivé : les données personnelles seraient "
+                                 "transmises en clair au LLM (interdit, loi 09-08)."))
+
+        if self.LOG_ENCRYPTION_SECRET == default_secret:
+            out.append(("prod", "LOG_ENCRYPTION_SECRET utilise le secret par défaut : "
+                                "définissez un secret fort (chiffrement des journaux IA au repos)."))
+        if self.DOC_PREVIEW_SECRET == default_secret:
+            out.append(("prod", "DOC_PREVIEW_SECRET utilise le secret par défaut : définissez un secret fort."))
+        if not self.AUTH_VERIFY_SIGNATURE:
+            out.append(("prod", "AUTH_VERIFY_SIGNATURE désactivé : la signature des JWT n'est pas vérifiée."))
+        if self.SIRH_API_KEY == "dev-sirh-key-change-me":
+            out.append(("prod", "SIRH_API_KEY utilise la valeur par défaut : définissez une clé forte."))
+        if "minioadmin" in (self.MINIO_ACCESS_KEY, self.MINIO_SECRET_KEY):
+            out.append(("prod", "Identifiants MinIO par défaut (minioadmin) : à changer."))
+        if "*" in self.CORS_ORIGINS:
+            out.append(("prod", "CORS ouvert à '*' : restreignez aux origines de confiance."))
+        return out
+
 
 settings = Settings()

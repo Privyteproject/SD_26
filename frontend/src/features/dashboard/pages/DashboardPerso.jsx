@@ -8,8 +8,7 @@ import Card from "../../../components/Card";
 import KpiCard from "../../../components/KpiCard";
 import Badge from "../../../components/Badge";
 import { useAsync } from "../../../lib/useAsync";
-import { getAbsences, getParcours } from "../../../lib/api";
-import { ENGAGEMENT_TREND, LEAVE } from "../../../mock/mockData";
+import { getAbsences, getParcours, getLeaveBalance, getMyHumeurHistory } from "../../../lib/api";
 
 const tone = { pending: "warning", validated: "success", refused: "danger" };
 const key = { pending: "st.pending", validated: "st.validated", refused: "st.refused" };
@@ -60,17 +59,30 @@ export default function DashboardPerso() {
   // Type de parcours pertinent selon le statut du collaborateur.
   const lifecycleType = status === STATUS.NEW ? "ONBOARDING" : status === STATUS.LEAVING ? "OFFBOARDING" : null;
 
-  // Données réelles : absences + tâches du parcours en cours.
+  // Données RÉELLES : absences + tâches du parcours + solde congés + humeur perso.
   const { data, loading } = useAsync(async () => {
-    const [abs, par] = await Promise.all([
+    const [abs, par, bal, mood] = await Promise.all([
       getAbsences(),
       lifecycleType && matricule ? getParcours(matricule, { type: lifecycleType }) : Promise.resolve({ data: [] }),
+      getLeaveBalance().catch(() => null),
+      getMyHumeurHistory(8).catch(() => null),
     ]);
-    return { absences: (abs && abs.data) || [], tasks: (par && par.data) || [] };
+    return {
+      absences: (abs && abs.data) || [],
+      tasks: (par && par.data) || [],
+      balance: (bal && bal.data) || null,
+      mood: (mood && mood.data) || [],
+    };
   }, [matricule, lifecycleType]);
 
   const absences = data?.absences || [];
   const tasks = (data?.tasks || []).slice().sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
+  const balance = data?.balance;
+  // Humeur perso 1-3 -> pourcentage de satisfaction pour la courbe.
+  const moodSeries = (data?.mood || []).map((m) => ({
+    m: (m.semaine || "").replace(/^\d{4}-/, ""),
+    v: Math.round(((m.niveau || 0) / 3) * 100),
+  }));
   const pendingCount = absences.filter((a) => a.status === "pending").length;
   const todoCount = tasks.filter((t) => t.status !== "done").length;
   const done = tasks.filter((t) => t.status === "done").length;
@@ -107,23 +119,29 @@ export default function DashboardPerso() {
 
       {/* KPI : "Demandes en cours" et "À faire" sont RÉELS */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginTop: 22 }}>
-        <KpiCard label={t("dash.leave")} value={`${LEAVE.remaining} ${t("dash.days")}`} sub={`/ ${LEAVE.total}`} />
+        <KpiCard label={t("dash.leave")} value={loading ? "…" : `${balance?.restant ?? 0} ${t("dash.days")}`} sub={`/ ${balance?.alloue ?? 0}`} />
         <KpiCard label={t("dash.requests")} value={loading ? "…" : pendingCount} />
         <KpiCard label={t("dash.todo")} value={loading ? "…" : todoCount} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, marginTop: 16 }}>
         <Card>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 10 }}>{t("dash.engagement")}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 10 }}>{t("dash.satisfaction")}</div>
           <div style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={ENGAGEMENT_TREND} margin={{ top: 6, right: 8, left: -20, bottom: 0 }}>
-                <XAxis dataKey="m" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} domain={[60, 90]} />
-                <Tooltip />
-                <Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--gold)" }} />
-              </LineChart>
-            </ResponsiveContainer>
+            {moodSeries.length === 0 ? (
+              <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: 13, textAlign: "center", padding: "0 12px" }}>
+                {loading ? t("common.loading") : t("dash.noMood")}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={moodSeries} margin={{ top: 6, right: 8, left: -20, bottom: 0 }}>
+                  <XAxis dataKey="m" stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--muted)" fontSize={12} tickLine={false} axisLine={false} domain={[0, 100]} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="v" stroke="var(--gold)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--gold)" }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
 

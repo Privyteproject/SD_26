@@ -75,7 +75,7 @@ KNOWLEDGE: list[dict] = [
              "utilisation des salles de réunion, règles de courtoisie en open space, et accès aux locaux. "
              "Le port du badge est obligatoire en tout temps."},
     {"id": "pol-procedures", "title": "Procédures internes et achats", "audience": ["MANAGER", "RH", "DIRECTION", "ADMIN"],
-     "text": "Toute dépense supérieure à 500€ doit faire l'objet d'un bon de commande validé par le N+1. "
+     "text": "Toute dépense supérieure à 500 MAD doit faire l'objet d'un bon de commande validé par le N+1. "
              "Les achats IT doivent être pré-approuvés par le service informatique. La délégation de signature "
              "est définie dans la grille d'autorité financière disponible sur l'intranet."},
     {"id": "pol-securite-it", "title": "Sécurité informatique (IT)", "audience": [ALL],
@@ -89,7 +89,7 @@ KNOWLEDGE: list[dict] = [
     {"id": "pol-avantages", "title": "Avantages sociaux (Mutuelle, CSE)", "audience": [ALL],
      "text": "La mutuelle d'entreprise (couverture familiale en option) est prise en charge à 70% par l'employeur. "
              "Le CSE propose des chèques vacances, des réductions billetterie, et subventionne les abonnements "
-             "sportifs à hauteur de 200€ par an."},
+             "sportifs à hauteur de 200 MAD par an."},
     {"id": "pol-diversite", "title": "Politique d'Inclusion et Diversité", "audience": [ALL],
      "text": "L'entreprise promeut l'égalité des chances à l'embauche et au quotidien. Nous visons la parité "
              "hommes-femmes et soutenons l'emploi des personnes en situation de handicap via des aménagements "

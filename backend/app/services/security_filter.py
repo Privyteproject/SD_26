@@ -93,11 +93,13 @@ def detect_injection(text: str, role: str | None = None) -> tuple[bool, str | No
         print(f"[SECURITY_FILTER] Blocked by regex: {reason}", flush=True)
         return True, reason
 
-    # Couche 2 — LLM Guard (uniquement pour les profils non-privilégiés, et si activée).
-    # Les modèles LLM Guard font souvent des faux positifs sur les requêtes RH légitimes ;
-    # désactivable via LLMGUARD_ENABLED si l'environnement ML est instable (segfault/ABI).
+    # Couche 2 — LLM Guard pour TOUS les rôles (l'injection de prompt / le jailbreak est une
+    # menace quel que soit le profil ; un compte RH/Manager compromis doit aussi être couvert).
+    # La détection cible l'INJECTION, pas les requêtes de données légitimes (l'exfiltration
+    # autorisée pour les profils privilégiés reste gérée par la couche 1 ci-dessus).
+    # Désactivable via LLMGUARD_ENABLED si l'environnement ML est instable (segfault/ABI).
     from app.core.config import settings
-    if settings.LLMGUARD_ENABLED and role not in _ELEVATED:
+    if settings.LLMGUARD_ENABLED:
         detected, reason = detect_injection_llmguard(text)
         if detected:
             print(f"[SECURITY_FILTER] Blocked by LLM Guard: {reason}", flush=True)

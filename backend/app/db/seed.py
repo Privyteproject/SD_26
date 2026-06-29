@@ -27,6 +27,11 @@ ABSENCE_TYPE_CODES = {"CONGE", "MALADIE", "TELETRAVAIL", "RTT"}
 def seed_if_empty(db: Session) -> None:
     if db.scalar(select(Employe.matricule).limit(1)) is not None:
         return
+    # Garde anti-course : si des départements existent déjà (ex. reseed en cours via
+    # advanced_seed, où les employés sont momentanément vides), la base n'est PAS vierge —
+    # on ne réinsère rien (sinon UniqueViolation au boot, cf. departement_nom_key).
+    if db.scalar(select(Departement.id_departement).limit(1)) is not None:
+        return
 
     # Rôles (codes alignés sur lib/constants.js)
     roles = [

@@ -102,6 +102,9 @@ class Utilisateur(Base):
     keycloak_sub: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(180), unique=True, index=True)
     actif: Mapped[bool] = mapped_column(Boolean, default=True)
+    # « Responsable RH autorisé » (§3.3) : habilitation explicite à voir les alertes de SÉCURITÉ
+    # (injection, accès refusé, fuite). Par défaut désactivé — seul l'admin les voit sinon.
+    securite_habilite: Mapped[bool] = mapped_column(Boolean, default=False)
     date_creation: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     code_role: Mapped[str] = mapped_column(ForeignKey("role.code_role"), index=True)
 
@@ -137,7 +140,7 @@ class Employe(Base):
     poste: Mapped[str | None] = mapped_column(String(120), nullable=True)
     date_embauche: Mapped[date | None] = mapped_column(Date, nullable=True)
     date_naissance: Mapped[date | None] = mapped_column(Date, nullable=True)
-    site: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)  # Paris/Lyon/…/Remote
+    site: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)  # Casablanca/Rabat/Marrakech/Tanger
     type_contrat: Mapped[str | None] = mapped_column(String(20), nullable=True)       # CDI/CDD/Alternance
     genre: Mapped[str | None] = mapped_column(String(10), nullable=True)              # M/F/Autre
     statut: Mapped[str] = mapped_column(String(10), default="ACTIVE", index=True)
@@ -576,6 +579,10 @@ class Alerte(Base):
     id_resolveur: Mapped[int | None] = mapped_column(
         ForeignKey("utilisateur.id_utilisateur"), nullable=True
     )
+    # Traitement de l'alerte : plan d'action retenu + note + auteur (historique RH).
+    plan_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note_resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolu_par: Mapped[str | None] = mapped_column(String(160), nullable=True)
 
 
 # ───────────────────────── Actualités / Annonces ─────────────────────────

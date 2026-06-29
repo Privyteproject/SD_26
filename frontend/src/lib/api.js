@@ -151,6 +151,9 @@ export const deleteChatSession = (id) => request(`/chat/sessions/${id}`, { metho
 export const getAiLogs = (params) => request("/ai/logs", { params });
 // Indicateurs de sécurité IA (refus 24h/7j, alertes par gravité, taux sensibles).
 export const getAiSecurityStats = () => request("/ai/security-stats");
+// Volume d'échanges IA par jour + derniers événements de sécurité (supervision admin).
+export const getAiUsageTrend = (days) => request("/ai/usage-trend", { params: days ? { days } : undefined });
+export const getAiEvents = (limit) => request("/ai/events", { params: limit ? { limit } : undefined });
 export const getSupervisionRules = () => request("/config/rules");
 export const setSupervisionRules = (data) => request("/config/rules", { method: "PUT", body: data });
 // Détail complet d'un échange (accès tracé/audité côté serveur).
@@ -214,11 +217,13 @@ export const createBilan = (data) => request("/okr/bilans", { method: "POST", bo
 // ---- Humeur / climat social ----
 export const submitHumeur = (data) => request("/humeur", { method: "POST", body: data });
 export const getMyHumeur = () => request("/humeur/me");
+export const getMyHumeurHistory = (weeks) => request("/humeur/me/history", { params: weeks ? { weeks } : undefined });
 export const getHumeurStats = (weeks) => request("/humeur/stats", { params: weeks ? { weeks } : undefined });
 export const getHumeurComments = (semaine) => request("/humeur/comments", { params: semaine ? { semaine } : undefined });
 
 // ---- Tickets d'assistance ----
 export const getTickets = () => request("/tickets");
+export const createTicket = (body) => request("/tickets", { method: "POST", body });
 export const setTicketStatus = (id, statut) => request(`/tickets/${id}/status`, { method: "PATCH", body: { statut } });
 // Projection / simulation de scénario (effectifs + masse salariale).
 export const getProjection = (params) => request("/dashboard/projection", { params });
@@ -266,7 +271,10 @@ export const markAllNotificationsRead = () => request("/notifications/read-all",
 
 // ---- Worklist priorisée (alertes RH/sécurité) ----
 export const getPrioritizedAlertes = (params) => request("/alertes/prioritized", { params });
-export const resolveAlerte = (id) => request(`/alertes/${id}/resolve`, { method: "PATCH" });
+// body optionnel : { plan_action: [...], note } pour conserver le plan d'action retenu.
+export const resolveAlerte = (id, body) => request(`/alertes/${id}/resolve`, { method: "PATCH", body: body || {} });
+// Historique des alertes traitées (motif + plan d'action + note + auteur + date).
+export const getAlertesHistory = (params) => request("/alertes/history", { params });
 
 // ---- Journal d'audit (ADMIN) ----
 // Mutations tracées automatiquement : { data: [{ date, action, entite, actor, ip, changements }], meta: { total } }
@@ -295,6 +303,8 @@ export const getDocumentTypes = () => request("/documents/types");
 export const previewDocument = (data) => request("/documents/preview", { method: "POST", body: data });
 export const confirmDocument = (preview_token) => request("/documents/submit", { method: "POST", body: { preview_token } });
 export const getMyDocuments = () => request("/documents/my");
+// Paie self-service du collaborateur (historique de salaire MAD + bulletins), scopé à ses données.
+export const getMyPayroll = () => request("/employees/me/paie");
 // Édition d'un brouillon (nom et/ou contenu) — propriétaire, statut draft/refused.
 export const updateDocument = (id, data) => request(`/documents/${id}`, { method: "PATCH", body: data });
 // Soumission explicite : draft|refused -> pending (validation RH).

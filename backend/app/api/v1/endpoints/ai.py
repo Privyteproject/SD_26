@@ -118,6 +118,20 @@ def ai_security_stats(_: CurrentUser = Depends(_SUPERVISE), db: Session = Depend
     return envelope(repo.security_stats(db))
 
 
+@router.get("/usage-trend")
+def ai_usage_trend(days: int = Query(14, ge=1, le=60),
+                   _: CurrentUser = Depends(_SUPERVISE), db: Session = Depends(get_db)):
+    """Volume d'échanges IA par jour (graphe supervision admin)."""
+    return envelope(repo.ia_usage_trend(db, days))
+
+
+@router.get("/events")
+def ai_events(limit: int = Query(8, ge=1, le=50),
+              _: CurrentUser = Depends(_SUPERVISE), db: Session = Depends(get_db)):
+    """Derniers événements de sécurité IA (refus / sensibles / escalades). ADMIN."""
+    return envelope(repo.recent_ia_events(db, limit))
+
+
 @router.get("/logs/{interaction_id}")
 def ai_log_detail(interaction_id: int, user: CurrentUser = Depends(_SUPERVISE), db: Session = Depends(get_db)):
     """Contenu complet d'un échange (accès ADMIN, TRACÉ dans le journal d'audit)."""

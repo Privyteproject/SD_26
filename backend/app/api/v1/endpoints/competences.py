@@ -24,7 +24,8 @@ from app.schemas.common import envelope
 router = APIRouter()
 
 # Gestion du référentiel (métiers/compétences) : RH = tout, manager = son périmètre.
-_VALIDATE = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER)
+# Gestion du référentiel compétences = opérationnel RH + manager (validation). Pas la Direction.
+_VALIDATE = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_MANAGER)
 # Confirmation des compétences d'un collaborateur : SEUL le manager (de son équipe) — pas le RH.
 # L'admin reste superviseur global.
 _CONFIRM = require_roles(ROLE_MANAGER, ROLE_ADMIN)
@@ -288,7 +289,7 @@ def proposees(user: CurrentUser = Depends(_VALIDATE), db: Session = Depends(get_
     return envelope(rows, meta={"total": len(rows)})
 
 
-_SYNC = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION)
+_SYNC = require_roles(ROLE_ADMIN, ROLE_RH)  # synchro postes/métiers = opérationnel RH (pas Direction)
 
 
 @router.get("/postes/manquants")

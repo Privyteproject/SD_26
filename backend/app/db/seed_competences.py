@@ -95,18 +95,20 @@ METIERS = {
                  ["JavaScript / React", "Communication", "Esprit d'analyse", "Travail d'équipe", "Adaptabilité"]),
 }
 
-# Auto-évaluations démo : matricule -> [(compétence, niveau_auto)]
+# Auto-évaluations démo : matricule -> [(compétence, niveau_auto)]. Comptes démo @waminey.ma.
 EVALS = {
-    "EMP008": [("Python", 4), ("JavaScript / React", 3), ("SQL & Bases de données", 3),
-               ("Communication", 4), ("Esprit d'analyse", 3)],
-    "EMP003": [("Droit social", 4), ("Communication", 4), ("Travail d'équipe", 4), ("Gestion de projet", 2)],
-    "EMP002": [("Leadership", 4), ("Communication", 5), ("Gestion de projet", 3), ("Travail d'équipe", 4)],
+    "DEMO_NEW": [("Python", 4), ("JavaScript / React", 3), ("SQL & Bases de données", 3),
+                 ("Communication", 4), ("Esprit d'analyse", 3)],
+    "DEMO_COL": [("Python", 3), ("JavaScript / React", 4), ("Travail d'équipe", 4), ("Communication", 3)],
+    "DEMO_MGR": [("Leadership", 4), ("Communication", 5), ("Gestion de projet", 3), ("Travail d'équipe", 4)],
 }
-# Compétences déjà validées par un expert (sous-ensemble) : (matricule, compétence, niveau_expert)
-VALIDATED = [("EMP008", "Python", 4), ("EMP003", "Droit social", 5), ("EMP002", "Leadership", 4)]
+# Compétences déjà validées par un expert (sous-ensemble) : (matricule, compétence, niveau_expert).
+# DEMO_COL reste en « auto » -> alimente la file de validation du manager (DEMO_MGR).
+VALIDATED = [("DEMO_NEW", "Python", 4), ("DEMO_MGR", "Leadership", 4)]
 
 
 def run():
+    random.seed(42)  # déterminisme : mêmes évaluations population d'un run à l'autre
     db = SessionLocal()
     try:
         # 1) Catalogue de compétences (créé si absent).

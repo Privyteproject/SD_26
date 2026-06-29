@@ -57,7 +57,7 @@ export default function CareerComparator() {
       chart.push(row);
     });
   }
-  const unit = metric === "salaire" ? " €" : "";
+  const unit = metric === "salaire" ? " MAD" : "";
 
   return (
     <Card style={{ marginTop: 22 }}>
@@ -124,7 +124,7 @@ export default function CareerComparator() {
               <CartesianGrid stroke="var(--line-soft)" vertical={false} />
               <XAxis dataKey="label" stroke="var(--muted)" fontSize={11.5} tickLine={false} axisLine={false} />
               <YAxis stroke="var(--muted)" fontSize={11.5} tickLine={false} axisLine={false} width={56} />
-              <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--line)", fontSize: 12.5 }} formatter={(v) => `${Number(v).toLocaleString("fr-FR")}${unit}`} />
+              <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid var(--line)", fontSize: 12.5 }} formatter={(v) => `${Number(v).toLocaleString("fr-MA")}${unit}`} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               {(data?.series || []).map((s, i) => (
                 <Line key={s.matricule} type="monotone" dataKey={s.nom} stroke={COLORS[i % COLORS.length]} strokeWidth={2.4} dot={{ r: 3 }} connectNulls />

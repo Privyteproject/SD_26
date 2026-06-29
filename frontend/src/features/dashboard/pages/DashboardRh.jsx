@@ -115,7 +115,7 @@ export default function DashboardRh() {
                 {isMed && <Act icon={ScanFace} label={t("nav.happiness")} onClick={() => navigate("/rh/processus/happiness")} tone="outline" />}
               </div>
 
-              {(isExec || isMed) && (
+              {isExec && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line-soft)" }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--faint)", marginBottom: 8 }}>Risques (ML)</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -133,7 +133,7 @@ export default function DashboardRh() {
                   {pred && pred.trained === false && <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--muted)" }}>{t("ml.notrained")}</div>}
                   {pred && pred.risks && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-                      {[["turnover", t("ml.turnover")], ["absent", t("ml.absent")], ["mobilite", t("ml.mobilite")]].map(([k, label]) => {
+                      {[["turnover", t("ml.turnover")], ["burnout", t("ml.burnout")], ["desengagement", t("ml.desengagement")]].map(([k, label]) => {
                         const r = pred.risks[k]; if (!r) return null;
                         return (
                           <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>

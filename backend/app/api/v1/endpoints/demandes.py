@@ -18,6 +18,7 @@ from app.core.security import (
     get_current_user,
     require_roles,
 )
+from app.core import scope
 from app.db import repository as repo
 from app.db.base import get_db
 from app.schemas.common import envelope
@@ -25,8 +26,10 @@ from app.schemas.hr import DemandeCreate, DemandeStatusUpdate
 
 router = APIRouter()
 
-_ACT = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_MANAGER, ROLE_DIRECTION)
-_ELEVATED = {ROLE_ADMIN, ROLE_RH, ROLE_MANAGER, ROLE_DIRECTION}
+# Décision/consultation des demandes = opérationnel (RH org + manager équipe). La Direction est
+# décisionnelle : traitée comme un employé standard ici (ne voit/agit que sur SES propres demandes).
+_ACT = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_MANAGER)
+_ELEVATED = {ROLE_ADMIN, ROLE_RH, ROLE_MANAGER}
 
 
 def _own_matricule(db: Session, user: CurrentUser):
@@ -49,8 +52,13 @@ def list_demandes(
     db: Session = Depends(get_db),
 ):
     if user.role not in _ELEVATED:
-        employee_id = _own_matricule(db, user)
-    rows = repo.list_demandes(db, employee_id=employee_id, code_type=code_type, status=status_)
+        rows = repo.list_demandes(db, employee_id=_own_matricule(db, user), code_type=code_type, status=status_)
+    elif user.role == ROLE_MANAGER:
+        # Périmètre ÉQUIPE : un manager ne voit que les demandes de son département (§3.3).
+        dept = scope.manager_dept_id(db, user)
+        rows = repo.list_demandes(db, department_id=dept, code_type=code_type, status=status_) if dept is not None else []
+    else:
+        rows = repo.list_demandes(db, employee_id=employee_id, code_type=code_type, status=status_)
     return envelope([d.to_dict() for d in rows], meta={"total": len(rows)})
 
 
@@ -83,6 +91,8 @@ def get_demande(demande_id: int, user: CurrentUser = Depends(get_current_user), 
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Demande introuvable")
     if user.role not in _ELEVATED and d.matricule != _own_matricule(db, user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Accès non autorisé")
+    if user.role == ROLE_MANAGER and not scope.is_in_scope(db, user, d.matricule):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Hors de votre périmètre d'équipe")
     return envelope(d.to_dict())
 
 
@@ -91,10 +101,13 @@ def decide_demande(
     demande_id: int, payload: DemandeStatusUpdate,
     user: CurrentUser = Depends(_ACT), db: Session = Depends(get_db),
 ):
+    target = repo.get_demande(db, demande_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Demande introuvable")
+    if user.role == ROLE_MANAGER and not scope.is_in_scope(db, user, target.matricule):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Hors de votre périmètre d'équipe")
     emp = repo.find_employee_by_email(db, user.email)
     decideur_id = emp.id_utilisateur if emp else None
     d = repo.set_demande_status(db, demande_id, payload.status,
                                 commentaire=payload.commentaire, decideur_id=decideur_id)
-    if d is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Demande introuvable")
     return envelope(d.to_dict())

@@ -30,5 +30,10 @@ export const STATUS_LABELS = {
   LEAVING: { fr: "En départ", en: "Leaving" },
 };
 
-// Rôles qui accèdent à l'espace RH / Manager / Direction
+// Rôles qui accèdent à l'espace RH / Manager / Direction (médecine = cockpit + happiness + assistant)
 export const RH_SPACE_ROLES = [ROLES.MANAGER, ROLES.RH, ROLES.DIRECTION, ROLES.MEDECINE];
+// Rôles de GESTION RH (hors médecine du travail : moindre privilège loi 09-08)
+export const RH_MGMT_ROLES = [ROLES.MANAGER, ROLES.RH, ROLES.DIRECTION];
+// Rôles OPÉRATIONNELS (agissent sur des individus) : manager (équipe) + RH (org).
+// EXCLUT la Direction, dont le périmètre est décisionnel/pilotage, pas la gestion individuelle.
+export const RH_OPS_ROLES = [ROLES.MANAGER, ROLES.RH];

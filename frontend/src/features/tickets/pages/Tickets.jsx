@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Ticket as TicketIcon } from "lucide-react";
+import { Ticket as TicketIcon, Plus, X } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useSession } from "../../../app/providers/SessionProvider";
 import { RH_SPACE_ROLES } from "../../../lib/constants";
@@ -7,7 +7,7 @@ import Card from "../../../components/Card";
 import Badge from "../../../components/Badge";
 import AsyncBoundary from "../../../components/AsyncBoundary";
 import { useAsync } from "../../../lib/useAsync";
-import { getTickets, setTicketStatus } from "../../../lib/api";
+import { getTickets, createTicket, setTicketStatus } from "../../../lib/api";
 
 const STATUTS = ["Nouveau", "En cours", "Résolu"];
 const TONE = { "Nouveau": "warning", "En cours": "info", "Résolu": "success" };
@@ -19,6 +19,19 @@ export default function Tickets() {
   const { data, loading, error, reload } = useAsync(async () => (await getTickets()).data || []);
   const [busy, setBusy] = useState(null);
 
+  const [open, setOpen] = useState(false);
+  const [sujet, setSujet] = useState("");
+  const [desc, setDesc] = useState("");
+  const submit = async () => {
+    if (sujet.trim().length < 2) return;
+    setBusy("create");
+    try {
+      await createTicket({ sujet: sujet.trim(), description: desc.trim() || null });
+      setSujet(""); setDesc(""); setOpen(false); reload();
+      window.dispatchEvent(new CustomEvent("toast", { detail: { type: "success", message: t("tickets.created") } }));
+    } catch (e) { /* ignore */ } finally { setBusy(null); }
+  };
+
   const change = async (id, statut) => {
     setBusy(id);
     try { await setTicketStatus(id, statut); reload(); } catch (e) { /* ignore */ } finally { setBusy(null); }
@@ -28,8 +41,30 @@ export default function Tickets() {
 
   return (
     <div>
-      <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: "0 0 4px" }}>{t("tickets.title")}</h1>
-      <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 18px" }}>{canManage ? t("tickets.subRh") : t("tickets.subMe")}</p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+        <div>
+          <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: "0 0 4px" }}>{t("tickets.title")}</h1>
+          <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 18px" }}>{canManage ? t("tickets.subRh") : t("tickets.subMe")}</p>
+        </div>
+        <button onClick={() => setOpen((v) => !v)} className="sd-btn sd-btn--gold sd-btn--sm">
+          {open ? <X size={15} /> : <Plus size={15} />} {t("tickets.new")}
+        </button>
+      </div>
+
+      {open && (
+        <Card style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <input value={sujet} onChange={(e) => setSujet(e.target.value)} placeholder={t("tickets.subject")} maxLength={160}
+            className="sd-field" style={{ fontSize: 14 }} aria-label={t("tickets.subject")} />
+          <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={t("tickets.desc")} rows={3} maxLength={4000}
+            className="sd-field" style={{ fontSize: 13.5, resize: "vertical", fontFamily: "inherit" }} aria-label={t("tickets.desc")} />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button onClick={() => { setOpen(false); setSujet(""); setDesc(""); }} className="sd-btn sd-btn--outline sd-btn--sm">{t("al.cancel")}</button>
+            <button onClick={submit} disabled={sujet.trim().length < 2 || busy === "create"} className="sd-btn sd-btn--gold sd-btn--sm">
+              {busy === "create" ? "…" : t("tickets.send")}
+            </button>
+          </div>
+        </Card>
+      )}
 
       <AsyncBoundary loading={loading} error={error} onRetry={reload} empty={!tickets.length} emptyLabel={t("tickets.empty")}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -50,11 +85,11 @@ export default function Tickets() {
                 </div>
                 {canManage ? (
                   <select value={st} disabled={busy === tk.id} onChange={(e) => change(tk.id, e.target.value)}
-                    className="sd-field">
+                    className="sd-field" style={{ width: 150, flexShrink: 0 }}>
                     {STATUTS.map((s) => <option key={s} value={s}>{t(`tickets.st.${s}`)}</option>)}
                   </select>
                 ) : (
-                  <Badge tone={TONE[st] || "info"}>{t(`tickets.st.${st}`)}</Badge>
+                  <Badge tone={TONE[st] || "info"} style={{ flexShrink: 0 }}>{t(`tickets.st.${st}`)}</Badge>
                 )}
               </Card>
             );

@@ -20,7 +20,8 @@ from app.schemas.common import envelope
 
 router = APIRouter()
 
-_PUBLISH = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION)
+# Publication d'actualités = communication RH/Direction. L'admin (technique/sécurité) en est exclu.
+_PUBLISH = require_roles(ROLE_RH, ROLE_DIRECTION)
 
 
 def _own_matricule(db, user):

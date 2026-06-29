@@ -30,7 +30,8 @@ from app.services.keycloak_service import (
 
 router = APIRouter()
 
-_MANAGE = require_roles(ROLE_ADMIN, "RH", "DIRECTION")
+# Écriture du dossier employé = RH/Admin. La Direction est en LECTURE (pilotage), pas en gestion.
+_MANAGE = require_roles(ROLE_ADMIN, "RH")
 _READ = require_roles(ROLE_ADMIN, *RH_SPACE_ROLES)
 
 
@@ -57,6 +58,28 @@ def read_me(user: CurrentUser = Depends(get_current_user), db: Session = Depends
         
     data = {**emp.to_dict(), "role": user.role}  # rôle = JWT (source de vérité)
     return envelope(data)
+
+
+@router.get("/me/paie")
+def my_payroll(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Paie self-service du collaborateur (§2 « paie ») : SON historique de salaire (MAD) et
+    SES bulletins de paie, strictement scopés à ses propres données."""
+    from sqlalchemy import select
+    from app.db.models import HistoriqueSalaire
+    emp = repo.find_employee_by_email(db, user.email)
+    if emp is None:
+        return envelope({"actuel": None, "historique": [], "bulletins": [], "devise": "MAD"})
+    hist = db.scalars(
+        select(HistoriqueSalaire).where(HistoriqueSalaire.matricule == emp.matricule)
+        .order_by(HistoriqueSalaire.date_effet.asc(), HistoriqueSalaire.id_historique.asc())).all()
+    historique = [{"montant": float(h.montant),
+                   "date_effet": h.date_effet.isoformat() if h.date_effet else None,
+                   "motif": h.motif} for h in hist]
+    bulletins = [{"id": d.id_document, "nom": d.nom_fichier,
+                  "date": d.date_creation.isoformat() if d.date_creation else None, "statut": d.statut}
+                 for d in repo.get_employee_documents(db, emp.matricule, types=("FICHE_PAIE",))]
+    return envelope({"actuel": (historique[-1] if historique else None),
+                     "historique": historique, "bulletins": bulletins, "devise": "MAD"})
 
 
 class MyProfileUpdate(BaseModel):
@@ -172,9 +195,13 @@ def import_employees(
 
 
 @router.get("/{employee_id}")
-def get_employee(employee_id: str, _: CurrentUser = Depends(_READ), db: Session = Depends(get_db)):
+def get_employee(employee_id: str, user: CurrentUser = Depends(_READ), db: Session = Depends(get_db)):
+    from app.core import scope
     emp = repo.get_employee(db, employee_id)
     if emp is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
+    # Un manager ne consulte la fiche que d'un membre de SON équipe (anti-IDOR, §3.3).
+    if not scope.is_in_scope(db, user, employee_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
     return envelope(emp.to_dict())
 

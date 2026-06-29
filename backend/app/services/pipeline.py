@@ -23,16 +23,18 @@ from app.services import (
 )
 
 # RBAC/ABAC : types RH nécessitant un rôle de l'espace RH (copilote / tonalité du prompt).
-_ELEVATED = {"ADMIN", "RH", "DIRECTION", "MANAGER", "MEDECINE"}
+# NB : l'ADMIN est volontairement EXCLU (profil technique/sécurité §2) — il n'accède PAS aux
+# données RH métier ni nominatives via l'assistant (ni copilote RH, ni E5/paie, ni prédictif).
+_ELEVATED = {"RH", "DIRECTION", "MANAGER", "MEDECINE"}
 
 # Autorisation FINE par type RH restreint -> ensemble des rôles habilités (moindre privilège).
 # La MÉDECINE du travail est volontairement EXCLUE de l'analytique/paie/supervision (réservée
-# au médical, loi 09-08). Le MANAGER est admis mais reste cantonné à SON équipe : le périmètre
-# fin (agrégat entreprise interdit, scope département) est appliqué dans les moteurs E4/E5/E6.
+# au médical, loi 09-08). L'ADMIN aussi (technique/sécurité, pas de données RH). Le MANAGER est
+# admis mais cantonné à SON équipe (scope appliqué dans les moteurs E4/E5/E6).
 _TYPE_ROLES = {
-    "sensible":    {"RH", "DIRECTION", "ADMIN", "MANAGER"},
-    "predictive":  {"RH", "DIRECTION", "ADMIN", "MANAGER"},
-    "supervision": {"RH", "DIRECTION", "ADMIN", "MANAGER"},
+    "sensible":    {"RH", "DIRECTION", "MANAGER"},
+    "predictive":  {"RH", "DIRECTION", "MANAGER"},
+    "supervision": {"RH", "DIRECTION", "MANAGER"},
 }
 _RESTRICTED_TYPES = set(_TYPE_ROLES)
 
@@ -85,6 +87,21 @@ RH_PILOT_NOTE = (
     "\n\nContexte : tu assistes un responsable RH ou un manager. Tu peux analyser les "
     "demandes, suivre les collaborateurs, proposer des réponses à valider et commenter les "
     "indicateurs RH. Tu PROPOSES ; la décision et la validation finales restent humaines."
+)
+
+# Profil dédié MÉDECINE DU TRAVAIL / QVT : strictement bien-être, agrégé/anonyme (loi 09-08).
+SYSTEM_PROMPT_MEDECINE = (
+    "Tu es l'assistant BIEN-ÊTRE & QVT de « Waminey Tech » (plateforme « Synapse Digital »), dédié à "
+    "la médecine du travail, à la prévention des risques psychosociaux (RPS) et à la qualité de vie au travail.\n\n"
+    "## PÉRIMÈTRE STRICT (loi 09-08)\n"
+    "1. Tu traites UNIQUEMENT la santé au travail, la prévention du burnout/RPS, la QVT et le climat social AGRÉGÉ.\n"
+    "2. Tu ne donnes JAMAIS de données nominatives, salariales ni d'indicateurs RH individuels — aucune information sur un collaborateur identifié.\n"
+    "3. Le climat et le désengagement sont présentés de façon AGRÉGÉE et ANONYME uniquement (jamais qui est à risque).\n"
+    "4. Appuie-toi sur les politiques de santé/bien-être et guides de prévention fournis ; n'invente rien.\n\n"
+    "## COMMENT RÉPONDRE\n"
+    "- Réponds directement, ton bienveillant et factuel ; listes à puces, **gras** pour l'essentiel ; pas de tableaux Markdown.\n"
+    "- Oriente vers les dispositifs de prévention et l'accompagnement humain.\n"
+    "En cas de détresse exprimée, invite à contacter immédiatement un référent (RH / ligne d'écoute dédiée)."
 )
 
 
@@ -400,8 +417,12 @@ def generate(db, user: CurrentUser, message: str, history: list, *, mode: Mode,
     lang_note, lang = _lang_directive(message)
     meta["lang"] = lang
     # Orientation copilote RH/manager (profil audience=rh, déjà validé par le RBAC en amont).
-    pilot_note = RH_PILOT_NOTE if meta.get("audience") == "rh" else ""
+    # La MÉDECINE n'a PAS le cadrage « copilote RH » : son profil est strictement bien-être/QVT.
+    is_med = (user.role or "").upper() == "MEDECINE"
+    pilot_note = RH_PILOT_NOTE if (meta.get("audience") == "rh" and not is_med) else ""
     suffix = lang_note + pilot_note
+    # Prompt RH générique, sauf pour la médecine -> prompt bien-être/QVT borné.
+    rh_system = SYSTEM_PROMPT_MEDECINE if is_med else SYSTEM_PROMPT_RH
 
     # ── Culture générale : on contourne entièrement le RAG ──
     if mode == "general":
@@ -452,8 +473,8 @@ def generate(db, user: CurrentUser, message: str, history: list, *, mode: Mode,
     masked, mapping = (pii.mask(enriched) if settings.PII_MASKING else (enriched, {}))
     meta["pii_masked"] = bool(mapping)
 
-    out = ai_service.complete(SYSTEM_PROMPT_RH + suffix, masked, history)
-    return _finalize(db, user, message, out, meta, want_judge, ck, SYSTEM_PROMPT_RH, mapping)
+    out = ai_service.complete(rh_system + suffix, masked, history)
+    return _finalize(db, user, message, out, meta, want_judge, ck, rh_system, mapping)
 
 
 def _finalize(db, user, message, out, meta, want_judge, ck, system_prompt, mapping=None) -> dict:

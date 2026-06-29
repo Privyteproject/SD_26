@@ -7,14 +7,24 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.security import ROLE_ADMIN, ROLE_DIRECTION, ROLE_MEDECINE, ROLE_RH, ROLE_MANAGER, CurrentUser, require_roles
+from app.core import scope
+from app.core.security import (
+    ROLE_ADMIN, ROLE_DIRECTION, ROLE_MANAGER, ROLE_RH, CurrentUser, require_roles,
+)
 from app.db.base import get_db
 from app.schemas.common import envelope
 from app.services import ml_predictions
 
 router = APIRouter()
 
-_RH = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MEDECINE, ROLE_MANAGER)
+# Analytique prédictive réservée au RH exécutif (ADMIN/RH/DIRECTION). EXCLUT la médecine du
+# travail (périmètre bien-être, loi 09-08) et le manager (entraînement/scoring = opération globale).
+# Gouvernance ML (entraînement, équité, scoring global) : RH/Direction + ADMIN (supervision §4.1).
+_RH = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION)
+# Prédictions INDIVIDUELLES nominatives (risques/plan d'un employé) : données RH -> PAS l'admin
+# (technique/sécurité §2). RH/Direction (org) + manager (scopé équipe, vérif dans l'endpoint).
+_RH_INDIV = require_roles(ROLE_RH, ROLE_DIRECTION)
+_RH_OR_MANAGER = require_roles(ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER)
 
 
 @router.post("/train")
@@ -56,8 +66,11 @@ def fairness(_: CurrentUser = Depends(_RH), db: Session = Depends(get_db)):
 
 
 @router.get("/action-plan/{matricule}")
-def action_plan(matricule: str, _: CurrentUser = Depends(_RH), db: Session = Depends(get_db)):
-    """Plan d'action ciblé selon les risques prédits pour un employé."""
+def action_plan(matricule: str, user: CurrentUser = Depends(_RH_OR_MANAGER), db: Session = Depends(get_db)):
+    """Plan d'action ciblé selon les risques prédits pour un employé.
+    RH/Direction/Admin : tout employé. Manager : uniquement les membres de son équipe."""
+    if user.role == ROLE_MANAGER and not scope.is_in_scope(db, user, matricule):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Hors de votre périmètre d'équipe")
     res = ml_predictions.action_plan(db, matricule)
     if res is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
@@ -65,7 +78,7 @@ def action_plan(matricule: str, _: CurrentUser = Depends(_RH), db: Session = Dep
 
 
 @router.get("/risks/{matricule}")
-def predict_risks(matricule: str, _: CurrentUser = Depends(_RH), db: Session = Depends(get_db)):
+def predict_risks(matricule: str, _: CurrentUser = Depends(_RH_INDIV), db: Session = Depends(get_db)):
     try:
         res = ml_predictions.predict_for(db, matricule)
     except ModuleNotFoundError:

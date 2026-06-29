@@ -29,9 +29,10 @@ from app.services import kpi_service
 
 router = APIRouter()
 
-_FULL = {ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION}
-# Rôles autorisés à consulter une fiche 360 (encadrement). Médecine & collaborateur exclus.
-_ALLOWED = {ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER}
+# Accès org complet à une fiche 360 = RH/Direction. L'ADMIN (technique) en est exclu (nominatif RH).
+_FULL = {ROLE_RH, ROLE_DIRECTION}
+# Rôles autorisés à consulter une fiche 360 (encadrement). Médecine, collaborateur & admin exclus.
+_ALLOWED = {ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER}
 
 
 def _caller_dept(user: CurrentUser, db: Session):
@@ -91,8 +92,8 @@ def vision_search(q: str = Query("", min_length=0), user: CurrentUser = Depends(
     if user.role not in _ALLOWED:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Accès réservé à l'encadrement RH.")
     dept = _caller_dept(user, db) if user.role == ROLE_MANAGER else None
-    # gsearch_employees renvoie des dicts {id (matricule), title (nom complet), subtitle}.
-    rows = repo.gsearch_employees(db, q, dept_id=dept, limit=8)
+    # Recherche sur le NOM visible (pas l'e-mail) — cohérent avec l'affichage.
+    rows = repo.gsearch_employees(db, q, dept_id=dept, limit=8, match_email=False)
     out = [{"matricule": r.get("id"), "nom": r.get("title"), "poste": r.get("subtitle")} for r in rows]
     return envelope(out, meta={"total": len(out)})
 
@@ -155,9 +156,9 @@ def vision_synthese(matricule: str, emp=Depends(vision_guard),
         montant = float(sal.montant) if sal else None
         cards.append({
             "key": "remuneration", "label": "Rémunération", "value": (round(montant) if montant else "—"),
-            "unit": "€", "tone": "gold",
+            "unit": "MAD", "tone": "gold",
             "detail": {"kind": "stat", "items": [
-                {"label": "Dernier salaire", "value": (f"{round(montant):,}".replace(",", " ") + " €") if montant else "—"},
+                {"label": "Dernier salaire", "value": (f"{round(montant):,}".replace(",", " ") + " MAD") if montant else "—"},
                 {"label": "Effet", "value": (sal.date_effet.isoformat() if sal and sal.date_effet else "—")},
                 {"label": "Motif", "value": (sal.motif if sal else "—")},
             ], "note": "Donnée confidentielle — accès RH/Direction, tracé."}})

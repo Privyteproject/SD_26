@@ -19,14 +19,17 @@ from app.core.security import (
     require_roles,
 )
 from app.db import repository as repo
+from app.core import scope
 from app.db.base import get_db
 from app.schemas.common import envelope
 from app.schemas.hr import AbsenceCreate, AbsenceStatusUpdate
 
 router = APIRouter()
 
-_ACT = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_MANAGER, ROLE_DIRECTION)
-_ELEVATED = {ROLE_ADMIN, ROLE_RH, ROLE_MANAGER, ROLE_DIRECTION}
+# Décision/consultation des absences = opérationnel (RH org + manager équipe). La Direction
+# (décisionnelle) est traitée comme un employé standard : ne voit/agit que sur SES absences.
+_ACT = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_MANAGER)
+_ELEVATED = {ROLE_ADMIN, ROLE_RH, ROLE_MANAGER}
 
 
 def _own_matricule(db: Session, user: CurrentUser) -> str | None:
@@ -46,9 +49,16 @@ def list_absences(
 ):
     # `mine` force le périmètre personnel même pour un rôle élevé (page « Mes demandes »).
     if mine or user.role not in _ELEVATED:
-        employee_id = _own_matricule(db, user)
-    rows = repo.list_absences(db, employee_id=employee_id, status=status_,
-                              date_from=date_from, date_to=date_to)
+        rows = repo.list_absences(db, employee_id=_own_matricule(db, user), status=status_,
+                                  date_from=date_from, date_to=date_to)
+    elif user.role == ROLE_MANAGER:
+        # Périmètre ÉQUIPE : un manager ne voit/approuve que les absences de son département (§3.3).
+        dept = scope.manager_dept_id(db, user)
+        rows = repo.list_absences(db, department_id=dept, status=status_,
+                                  date_from=date_from, date_to=date_to) if dept is not None else []
+    else:
+        rows = repo.list_absences(db, employee_id=employee_id, status=status_,
+                                  date_from=date_from, date_to=date_to)
     return envelope([a.to_dict() for a in rows], meta={"total": len(rows)})
 
 
@@ -92,8 +102,9 @@ def leave_balance(user: CurrentUser = Depends(get_current_user), db: Session = D
 
 
 @router.get("/stats")
-def absence_stats(_: CurrentUser = Depends(_ACT), db: Session = Depends(get_db)):
-    return envelope(repo.absence_stats(db))
+def absence_stats(user: CurrentUser = Depends(_ACT), db: Session = Depends(get_db)):
+    # Agrégat scopé au département pour un manager (équipe), organisation pour RH/Direction/Admin.
+    return envelope(repo.absence_stats(db, department_id=scope.manager_dept_id(db, user)))
 
 
 @router.patch("/{absence_id}/status")
@@ -101,9 +112,12 @@ def update_absence_status(
     absence_id: int, payload: AbsenceStatusUpdate,
     user: CurrentUser = Depends(_ACT), db: Session = Depends(get_db),
 ):
+    target = repo.get_absence(db, absence_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Absence introuvable")
+    if user.role == ROLE_MANAGER and not scope.is_in_scope(db, user, target.matricule):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Hors de votre périmètre d'équipe")
     emp = repo.find_employee_by_email(db, user.email)
     decideur_id = emp.id_utilisateur if emp else None
     ab = repo.set_absence_status(db, absence_id, payload.status, decideur_id=decideur_id)
-    if ab is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Absence introuvable")
     return envelope(ab.to_dict())

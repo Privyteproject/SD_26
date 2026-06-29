@@ -26,9 +26,13 @@ from app.services import kpi_service, redis_cache, risk_calculator
 
 router = APIRouter()
 
-_RH_VIEW = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER, ROLE_MEDECINE)
-_WELLBEING = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION, ROLE_MEDECINE, ROLE_MANAGER)
-_EXEC = require_roles(ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION)  # vues consolidées / financières
+# L'ADMIN (technique/sécurité §2) est EXCLU des tableaux de bord RH métier/nominatifs : il n'a
+# aucune donnée RH (ni cockpit, ni analytique, ni financier). Sa supervision passe par /ai/* et /audit.
+_RH_VIEW = require_roles(ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER, ROLE_MEDECINE)
+_WELLBEING = require_roles(ROLE_RH, ROLE_DIRECTION, ROLE_MEDECINE, ROLE_MANAGER)
+_EXEC = require_roles(ROLE_RH, ROLE_DIRECTION)  # vues consolidées / financières
+# Analytique RH (hors médecine du travail : moindre privilège loi 09-08). Manager = scope équipe.
+_NO_MED = require_roles(ROLE_RH, ROLE_DIRECTION, ROLE_MANAGER)
 
 
 def _dept_for(user: CurrentUser, db: Session):
@@ -40,7 +44,9 @@ def _dept_for(user: CurrentUser, db: Session):
 
 
 @router.get("/kpis")
-def dashboard_kpis(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+def dashboard_kpis(user: CurrentUser = Depends(_EXEC), db: Session = Depends(get_db)):
+    # Contient la masse salariale (financier) -> réservé RH/Direction (_EXEC). Exclut
+    # collaborateur, manager et médecine (qui ont des vues dédiées scopées/sans financier).
     dept = _dept_for(user, db)
     ckey = f"dashboard:kpis:{dept or 'all'}"
     data = redis_cache.get(ckey)
@@ -62,6 +68,8 @@ def dashboard_kpis(user: CurrentUser = Depends(get_current_user), db: Session = 
 def dashboard_rh(user: CurrentUser = Depends(_RH_VIEW), db: Session = Depends(get_db)):
     """Vue RH consolidée : effectifs, risques agrégés, indicateurs (dynamiques, scopés)."""
     dept = _dept_for(user, db)
+    # Médecine du travail : périmètre bien-être — risques en agrégat anonyme, jamais nominatif (loi 09-08).
+    is_med = user.role == ROLE_MEDECINE
     snap = kpi_service.snapshot(db, dept)
     counts = repo.dashboard_counts(db)
     return envelope({
@@ -69,7 +77,7 @@ def dashboard_rh(user: CurrentUser = Depends(_RH_VIEW), db: Session = Depends(ge
         "new_hires": counts.get("new_hires"),
         "leaving": counts.get("leaving"),
         "pending_absences": counts.get("pending_absences"),
-        "risques": repo.risk_summary(db, dept=dept),
+        "risques": repo.risk_summary(db, dept=dept, anonymize=is_med),
         "indicateurs": {
             "turnover": {"valeur": snap["turnover"]},
             "absenteisme": {"valeur": snap["absenteisme"]},
@@ -119,7 +127,7 @@ def dashboard_overview(user: CurrentUser = Depends(_RH_VIEW), db: Session = Depe
         d = tre.get(typ, {})
         return [{"label": p, "value": d[p]} for p in sorted(d)]
 
-    risk = repo.risk_summary(db, dept=dept)
+    risk = repo.risk_summary(db, dept=dept, anonymize=is_med)
     bn = risk.get("by_niveau", {}) or {}
 
     def tone_lt(v, good, warn):  # plus c'est bas, mieux c'est (turnover, absentéisme…)
@@ -222,16 +230,20 @@ def dashboard_overview(user: CurrentUser = Depends(_RH_VIEW), db: Session = Depe
     dist = hum.get("distribution") or {}
     mood_trend = [{"label": w["semaine"], "value": (round(w["moyenne"] / 3 * 100) if w.get("moyenne") else None)}
                   for w in (hum.get("trend") or []) if not w.get("masque")]
-    # Collaborateurs à risque (scores de risque agrégés ; anonymisés pour la médecine du travail).
+    # Collaborateurs à risque. CONFORMITÉ 09-08 : aucune liste nominative (ni matricule) pour la
+    # médecine du travail -> elle ne voit que le COMPTE agrégé, jamais qui est à risque.
     risk_high = (bn.get("high", 0) or 0)
     risk_items = []
-    for s in (risk.get("top") or []):
-        nom = s.get("matricule") if is_med else (s.get("employee_name") or s.get("matricule") or "—")
-        risk_items.append({
-            "primary": nom,
-            "secondary": f"{s.get('type', '')} · {round((s.get('valeur') or 0) * 100)}%",
-            "badge": s.get("niveau"),
-        })
+    if not is_med:
+        for s in (risk.get("top") or []):
+            risk_items.append({
+                "primary": s.get("employee_name") or s.get("matricule") or "—",
+                "secondary": f"{s.get('type', '')} · {round((s.get('valeur') or 0) * 100)}%",
+                "badge": s.get("niveau"),
+            })
+    elif risk_high:
+        risk_items = [{"primary": f"{risk_high} collaborateur(s) à risque élevé",
+                       "secondary": "détail nominatif réservé aux RH/Direction", "badge": ""}]
     block_climat = {
         "id": "climat", "title": "Climat social", "icon": "heart",
         "cards": [
@@ -338,10 +350,12 @@ def dashboard_overview(user: CurrentUser = Depends(_RH_VIEW), db: Session = Depe
         ],
     }
 
-    return envelope({
-        "scope": "team" if dept else "org",
-        "blocks": [block_rh, block_onb, block_climat, block_okr, block_comp],
-    })
+    # Médecine du travail (loi 09-08) : cockpit STRICTEMENT bien-être, agrégé/anonyme — on ne
+    # renvoie que les indicateurs globaux agrégés + le climat. Les blocs onboarding/départs,
+    # objectifs et compétences contiennent des LISTES NOMINATIVES -> jamais exposés à la médecine.
+    blocks = ([block_rh, block_climat] if is_med
+              else [block_rh, block_onb, block_climat, block_okr, block_comp])
+    return envelope({"scope": "team" if dept else "org", "blocks": blocks})
 
 
 @router.get("/process/{key}")
@@ -358,12 +372,16 @@ def dashboard_process(key: str, user: CurrentUser = Depends(_RH_VIEW), db: Sessi
     from app.db.models import (Competence, Employe, EvaluationCompetence, KeyResult, Metier,
                                ModeleTache, Objectif, ScoreRisque, TacheParcours)
 
+    # Médecine du travail : périmètre bien-être uniquement -> seul l'écran « happiness ».
+    if user.role == ROLE_MEDECINE and key != "happiness":
+        raise HTTPException(_st.HTTP_403_FORBIDDEN, detail="Hors périmètre (bien-être uniquement).")
+
     dept = _dept_for(user, db)
     is_exec = user.role in (ROLE_ADMIN, ROLE_RH, ROLE_DIRECTION)
     today = date.today()
     snap = kpi_service.snapshot(db, dept)
     monthly = kpi_service.monthly_series(db, dept)
-    risk = repo.risk_summary(db, dept=dept)
+    risk = repo.risk_summary(db, dept=dept, anonymize=(user.role == ROLE_MEDECINE))
     bn = risk.get("by_niveau", {}) or {}
     mats = list(db.scalars(_sel(Employe.matricule).where(Employe.id_departement == dept))) if dept is not None else None
 
@@ -504,16 +522,16 @@ def dashboard_process(key: str, user: CurrentUser = Depends(_RH_VIEW), db: Sessi
             tabs.append({"key": "masse_salariale", "label": "Masse salariale", "icon": "target",
                          "manage": {"route": "/rh/analytique/masse-salariale", "label": "Ouvrir la masse salariale"},
                          "cards": [
-                             C("total", "Masse salariale", round(ms.get("total", 0) or 0), "€", "gold",
-                               {"kind": "stat", "items": [{"label": "Annuelle", "value": f"{round(ms.get('total',0) or 0):,}".replace(",", " ") + " €"}], "note": "Somme des derniers salaires connus."}),
-                             C("moyen", "Salaire moyen", avg_sal, "€", "info",
-                               {"kind": "stat", "items": [{"label": "Moyen / collaborateur", "value": f"{avg_sal:,}".replace(",", " ") + " €"}, {"label": "Effectif", "value": head}], "note": "Moyenne annuelle."}),
+                             C("total", "Masse salariale", round(ms.get("total", 0) or 0), "MAD", "gold",
+                               {"kind": "stat", "items": [{"label": "Annuelle", "value": f"{round(ms.get('total',0) or 0):,}".replace(",", " ") + " MAD"}], "note": "Somme des derniers salaires connus."}),
+                             C("moyen", "Salaire moyen", avg_sal, "MAD", "info",
+                               {"kind": "stat", "items": [{"label": "Moyen / collaborateur", "value": f"{avg_sal:,}".replace(",", " ") + " MAD"}, {"label": "Effectif", "value": head}], "note": "Moyenne annuelle."}),
                              C("mobilite", "Mobilité interne", snap.get("mobilite"), "%", tgt(snap.get("mobilite"), 8, 3),
                                {"kind": "trend", "series": monthly["mobilite"], "unit": "%", "note": "Promotions par mois."}),
                              C("sites", "Par site", len(ms.get("by_site", [])), "", "info",
                                {"kind": "distribution", "items": [
                                    {"label": s["site"], "value": round((s.get("montant", 0) or 0) / 1000), "tone": "gold"} for s in ms.get("by_site", [])
-                               ] or [{"label": "—", "value": 0, "tone": "gold"}], "note": "Masse salariale par site (k€)."}),
+                               ] or [{"label": "—", "value": 0, "tone": "gold"}], "note": "Masse salariale par site (k MAD)."}),
                          ]})
         # Analyse carrières (graphes de tendance) — exclue de la médecine du travail.
         if user.role != ROLE_MEDECINE:
@@ -530,7 +548,7 @@ def dashboard_process(key: str, user: CurrentUser = Depends(_RH_VIEW), db: Sessi
                              C("equite", f"Équité · {pc.get('poste') or '—'}", len(pc.get("points", [])), "",
                                "info",
                                {"kind": "scatter", "points": pc.get("points", []), "xKey": "competence", "yKey": "salaire",
-                                "nameKey": "nom", "xLabel": "Compétences (1-5)", "yLabel": "Salaire (€)",
+                                "nameKey": "nom", "xLabel": "Compétences (1-5)", "yLabel": "Salaire (MAD)",
                                 "note": f"Salaire vs compétences des collaborateurs du poste « {pc.get('poste') or '—'} »."}),
                          ]})
 
@@ -545,9 +563,13 @@ def dashboard_process(key: str, user: CurrentUser = Depends(_RH_VIEW), db: Sessi
         participation = round(100 * (hum.get("n", 0)) / headcount) if headcount else 0
         is_med = user.role == ROLE_MEDECINE
         risk_items = []
-        for s in (risk.get("top") or []):
-            nom = s.get("matricule") if is_med else (s.get("employee_name") or s.get("matricule") or "—")
-            risk_items.append({"primary": nom, "secondary": f"{s.get('type', '')} · {round((s.get('valeur') or 0) * 100)}%", "badge": s.get("niveau")})
+        if not is_med:  # médecine : jamais de liste nominative (loi 09-08)
+            for s in (risk.get("top") or []):
+                risk_items.append({"primary": s.get("employee_name") or s.get("matricule") or "—",
+                                   "secondary": f"{s.get('type', '')} · {round((s.get('valeur') or 0) * 100)}%", "badge": s.get("niveau")})
+        elif bn.get("high", 0):
+            risk_items = [{"primary": f"{bn.get('high', 0)} collaborateur(s) à risque élevé",
+                           "secondary": "détail nominatif réservé aux RH/Direction", "badge": ""}]
         tabs = [
             {"key": "climat", "label": "Climat social", "icon": "heart",
              "manage": {"route": "/rh/climat", "label": "Ouvrir le climat social"},
@@ -631,7 +653,7 @@ def dashboard_projection(
     raise_pct: float = Query(0.0),
     absenteisme_pct: float | None = Query(None),
     mobilite_pct: float | None = Query(None),
-    user: CurrentUser = Depends(_RH_VIEW), db: Session = Depends(get_db),
+    user: CurrentUser = Depends(_NO_MED), db: Session = Depends(get_db),
 ):
     """Projection / simulation « what-if » des effectifs, masse salariale, absentéisme
     (jours perdus + coût) et mobilité interne (mouvements attendus)."""
@@ -642,12 +664,10 @@ def dashboard_projection(
 
 
 @router.get("/analytics")
-def dashboard_analytics(user: CurrentUser = Depends(_RH_VIEW), db: Session = Depends(get_db)):
+def dashboard_analytics(user: CurrentUser = Depends(_EXEC), db: Session = Depends(get_db)):
     """Pyramide des âges (par genre), répartition par site, masse salariale — dynamiques.
-    Exclu de la Médecine du travail : périmètre bien-être uniquement (pas de données financières)."""
-    from fastapi import HTTPException, status as _st
-    if user.role == ROLE_MEDECINE:
-        raise HTTPException(_st.HTTP_403_FORBIDDEN, detail="Hors périmètre bien-être")
+    Données consolidées/FINANCIÈRES réservées RH/Direction (_EXEC) : exclut le manager et la
+    médecine du travail (périmètre bien-être / pas de financier, loi 09-08)."""
     dept = _dept_for(user, db)
     return envelope({
         "pyramide": kpi_service.pyramide(db, dept),
@@ -688,7 +708,7 @@ def dashboard_indicateurs(user: CurrentUser = Depends(_RH_VIEW), db: Session = D
 
 
 @router.post("/risques/calculate")
-def calculate_risques(_: CurrentUser = Depends(_WELLBEING), db: Session = Depends(get_db)):
+def calculate_risques(_: CurrentUser = Depends(_NO_MED), db: Session = Depends(get_db)):
     """Recalcule les scores de risque (règles métier burnout + turnover)."""
     summary = risk_calculator.recompute(db)
     redis_cache.delete("dashboard:kpis:all")
@@ -699,7 +719,7 @@ def calculate_risques(_: CurrentUser = Depends(_WELLBEING), db: Session = Depend
 def dashboard_risques(
     niveau: str | None = Query(None),
     type_: str | None = Query(None, alias="type"),
-    user: CurrentUser = Depends(_WELLBEING),
+    user: CurrentUser = Depends(_NO_MED),
     db: Session = Depends(get_db),
 ):
     dept = _dept_for(user, db)

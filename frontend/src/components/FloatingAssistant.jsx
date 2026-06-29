@@ -81,8 +81,9 @@ export default function FloatingAssistant() {
           {/* Input */}
           <div style={{ display: "flex", gap: 8, padding: 10, borderTop: "1px solid var(--line)" }}>
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKey} placeholder={t("fab.placeholder")}
+              aria-label={t("fab.placeholder")}
               style={{ flex: 1, height: 38, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", fontSize: 13.5, fontFamily: "inherit", outline: "none" }} />
-            <button onClick={send} disabled={loading || !input.trim()} style={{ width: 38, height: 38, borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: !input.trim() ? 0.6 : 1 }}><Send size={16} /></button>
+            <button onClick={send} aria-label={t("fab.send") || "Envoyer"} disabled={loading || !input.trim()} style={{ width: 38, height: 38, borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: !input.trim() ? 0.6 : 1 }}><Send size={16} /></button>
           </div>
         </div>
       )}
