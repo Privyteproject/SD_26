@@ -45,6 +45,17 @@ L'architecture locale est entièrement conteneurisée. Voici comment lancer l'en
 
 **Magie DevOps :** Le conteneur du backend exécute automatiquement les migrations de base de données (Alembic) au démarrage, avant de lancer le serveur FastAPI.
 
+### Jeu de données de démo (IDENTIQUE pour toute l'équipe)
+
+Les données métier (employés, salaires, contrats, compétences, scores de risque…) ne sont **pas** versionnées dans Git : seul le **générateur** l'est. Au **premier** `docker compose up` (base **vide**), le backend sème automatiquement un **jeu DÉTERMINISTE** (graine fixe) : **120 employés**, historiques, compétences, puis entraînement ML + scoring. Résultat : **tout le monde obtient exactement les mêmes données** (mêmes noms, salaires, etc.) pour des tests reproductibles. Une base **déjà peuplée n'est jamais réécrasée** au démarrage.
+
+- Contrôlé par `SEED_MODE` dans `.env` : `demo` (défaut, jeu complet) · `minimal` (8 comptes) · `none`. **En production : `SEED_MODE=none`.**
+- Régénérer/réinitialiser manuellement le jeu de démo (DESTRUCTIF) :
+  ```bash
+  docker compose exec backend python -m app.db.advanced_seed --confirm
+  ```
+- Comptes de démo (mot de passe `demo1234`) : `admin@`, `direction@`, `rh@`, `manager@`, `medecine@`, `collaborateur@`, `nouveau@`, `depart@` `waminey.ma`.
+
 ### Accès aux services :
 - **Frontend** : http://localhost:5173
 - **Backend API (Swagger)** : http://localhost:8000/docs

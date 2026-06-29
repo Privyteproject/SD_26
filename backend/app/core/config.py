@@ -18,6 +18,13 @@ class Settings:
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./synapse.db")
     # Sème des données de démo au démarrage si la base est vide.
     DB_SEED: bool = os.getenv("DB_SEED", "true").lower() == "true"
+    # Type de jeu semé sur une base VIDE (jamais sur une base déjà peuplée) :
+    #  - "demo"    : jeu DÉTERMINISTE complet (120 employés + historiques + compétences + ML) —
+    #                identique sur toutes les machines, pour des tests reproductibles en équipe.
+    #  - "minimal" : 8 comptes de référence seulement (seed.py).
+    #  - "none"    : aucun ensemencement automatique.
+    # En production, mettre SEED_MODE=none (pas de fausses données).
+    SEED_MODE: str = os.getenv("SEED_MODE", "demo").lower()
 
     # --- Keycloak ---
     KEYCLOAK_URL: str = os.getenv("KEYCLOAK_URL", "http://localhost:8080")

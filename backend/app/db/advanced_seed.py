@@ -21,7 +21,7 @@ import random
 import sys
 from datetime import date, timedelta
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.db.base import SessionLocal
 from app.db.models import (
