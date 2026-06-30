@@ -1,0 +1,32 @@
+name: Backend Tests
+
+# Suite de tests automatisés (RBAC/ABAC, sécurité de l'assistant IA, ML & conformité).
+# Tourne sur SQLite isolé + IA en mode démo (aucun service externe requis).
+
+on:
+  push:
+    branches: [ main, develop, dev-ai, Ghost_Work ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  pytest:
+    name: pytest (RBAC · IA security · ML/conformité)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements-test.txt
+
+      - name: Install test dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Run test suite
+        run: python -m pytest -p no:cacheprovider

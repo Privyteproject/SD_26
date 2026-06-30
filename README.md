@@ -43,7 +43,7 @@ L'architecture locale est entièrement conteneurisée. Voici comment lancer l'en
    docker compose up -d --build
    ```
 
-**Magie DevOps :** Le conteneur du backend exécute automatiquement les migrations de base de données (Alembic) au démarrage, avant de lancer le serveur FastAPI.
+**DevOps :** au démarrage, le backend crée le schéma puis applique des **migrations légères idempotentes** (`create_all` + `ALTER ... ADD COLUMN IF NOT EXISTS` dans `db/base.py`), avant de lancer FastAPI. *(Le passage à des migrations Alembic versionnées est une amélioration prévue.)*
 
 ### Jeu de données de démo (IDENTIQUE pour toute l'équipe)
 
@@ -61,3 +61,24 @@ Les données métier (employés, salaires, contrats, compétences, scores de ris
 - **Backend API (Swagger)** : http://localhost:8000/docs
 - **Keycloak** : http://localhost:8080
 - **MinIO Console** : http://localhost:9001
+
+## Tests automatisés
+
+Suite `pytest` (RBAC/ABAC, sécurité de l'assistant IA, ML & conformité) sur **SQLite isolé** + IA en **mode démo** (aucun service externe requis) :
+
+```bash
+# Dans le conteneur backend :
+docker compose exec backend python -m pytest
+# Ou en local : cd backend && pip install -r requirements-test.txt && pytest
+```
+
+CI : [.github/workflows/tests.yml](.github/workflows/tests.yml) exécute la suite à chaque push/PR, en plus de Semgrep (SAST) et Trivy (scan d'images).
+
+## Documentation & conformité
+
+- [Conformité RGPD / loi 09-08](docs/CONFORMITE_RGPD_0908.md) — registre des finalités, consentement, droits, anonymisation.
+- [Rapport de sécurité](docs/RAPPORT_SECURITE.md) — modèle de menace STRIDE, contrôles, risques résiduels.
+- [Rapport de tests d'intrusion](docs/RAPPORT_PENTEST.md) — Appendix D, contrôles rejoués automatiquement.
+- [Model Card IA](docs/MODEL_CARD.md) — algorithme, métriques, biais, limites.
+- [Charte éthique de l'IA](docs/AI_ETHICS.md) — principes §4.1.
+- Architecture : `docs/architecture_technique_ydays26.drawio - Architecture Plateforme IA RH.png`.

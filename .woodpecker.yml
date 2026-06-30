@@ -10,10 +10,10 @@ steps:
   test:
     image: python:3.11-slim
     commands:
-      - pip install -r backend/requirements.txt
-      - pip install pytest httpx
+      # requirements-test.txt = sous-ensemble suffisant (sans torch/llm-guard) + pytest/httpx.
+      - pip install -r backend/requirements-test.txt
       - cd backend
-      - pytest tests/
+      - python -m pytest -p no:cacheprovider
 
   security:
     image: aquasec/trivy:latest

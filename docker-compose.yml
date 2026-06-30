@@ -36,6 +36,9 @@ services:
       - ./backend/alembic:/app/alembic
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
+      - ./backend/tests:/app/tests
+      - ./backend/pytest.ini:/app/pytest.ini
+      - ./backend/requirements-test.txt:/app/requirements-test.txt
     # numpy<2 forcé APRÈS l'install : une dépendance (transformers/presidio) remonte numpy 2.x,
     # incompatible avec l'ABI de torch 2.0.1 (segfault à l'inférence). On le rétrograde au boot.
     command: sh -c "pip install -r requirements.txt && pip install 'numpy<2' && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
