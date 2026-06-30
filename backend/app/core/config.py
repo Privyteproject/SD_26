@@ -60,6 +60,9 @@ class Settings:
     EMBED_MODEL_OR: str = os.getenv("EMBED_MODEL_OR", "openai/text-embedding-3-small")
     EMBED_DIM_HASH: int = int(os.getenv("EMBED_DIM_HASH", "512"))
     PII_MASKING: bool = os.getenv("PII_MASKING", "true").lower() == "true"
+    # Couche 2 anti-injection (LLM Guard / deberta). Lourde et sujette aux faux positifs ;
+    # la couche 1 (regex) reste toujours active. Désactivable si l'environnement ML est instable.
+    LLMGUARD_ENABLED: bool = os.getenv("LLMGUARD_ENABLED", "true").lower() == "true"
     AUTO_JUDGE: bool = os.getenv("AUTO_JUDGE", "true").lower() == "true"
     # Classification du périmètre par LLM (catégorie + confiance). Repli mots-clés sinon.
     CLS_LLM_ENABLED: bool = os.getenv("CLS_LLM_ENABLED", "true").lower() == "true"
@@ -72,6 +75,9 @@ class Settings:
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     CACHE_ENABLED: bool = os.getenv("CACHE_ENABLED", "true").lower() == "true"
     DASHBOARD_CACHE_TTL: int = int(os.getenv("DASHBOARD_CACHE_TTL", "300"))  # 5 min
+
+    # --- Intégration SIRH externe (webhooks serveur-à-serveur) ---
+    SIRH_API_KEY: str = os.getenv("SIRH_API_KEY", "dev-sirh-key-change-me")
 
     # --- Audit ---
     # Journalisation automatique des mutations (INSERT/UPDATE/DELETE) dans journal_audit.
@@ -94,6 +100,11 @@ class Settings:
     DOC_PREVIEW_SECRET: str = os.getenv("DOC_PREVIEW_SECRET", "dev-doc-preview-secret")
     DOC_PREVIEW_TTL: int = int(os.getenv("DOC_PREVIEW_TTL", "600"))  # 10 min
     DOC_DOWNLOAD_TTL: int = int(os.getenv("DOC_DOWNLOAD_TTL", "86400"))  # 24 h
+
+    # --- Journalisation IA : rétention + chiffrement au repos (RGPD / §4.4) ---
+    LOG_RETENTION_DAYS: int = int(os.getenv("LOG_RETENTION_DAYS", "90"))  # purge auto au-delà
+    LOG_ENCRYPTION_SECRET: str = os.getenv(
+        "LOG_ENCRYPTION_SECRET", os.getenv("DOC_PREVIEW_SECRET", "dev-doc-preview-secret"))
 
     # --- CORS (serveur Vite) ---
     CORS_ORIGINS: list[str] = _csv(os.getenv("CORS_ORIGINS", "http://localhost:5173"))

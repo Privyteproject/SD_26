@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useAsync } from "../../../lib/useAsync";
-import { getAbsences, createAbsence } from "../../../lib/api";
+import { getAbsences, createAbsence, getLeaveBalance } from "../../../lib/api";
 import Card from "../../../components/Card";
 import Badge from "../../../components/Badge";
 import AsyncBoundary from "../../../components/AsyncBoundary";
@@ -17,15 +17,18 @@ const TYPES = [
   { code: "TELETRAVAIL", fr: "Télétravail", en: "Remote work" },
   { code: "RTT", fr: "RTT", en: "RTT" },
 ];
-const inputStyle = { height: 42, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", fontSize: 14, fontFamily: "inherit", outline: "none", width: "100%" };
 
 const fmt = (iso, lang) => (iso ? new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB") : "—");
 
 export default function Requests() {
   const { t, lang } = useI18n();
-  // GET /absences -> le backend filtre déjà sur l'utilisateur courant (collaborateur).
-  const { data, loading, error, reload } = useAsync(() => getAbsences());
-  const items = (data && data.data) || [];
+  // Page personnelle : `mine` force le périmètre à l'utilisateur courant (même pour un rôle élevé).
+  const { data, loading, error, reload } = useAsync(async () => {
+    const [abs, bal] = await Promise.all([getAbsences({ mine: true }), getLeaveBalance().catch(() => ({ data: null }))]);
+    return { items: (abs && abs.data) || [], balance: (bal && bal.data) || null };
+  });
+  const items = data?.items || [];
+  const balance = data?.balance;
 
   const [showForm, setShowForm] = useState(false);
   const [type, setType] = useState(TYPES[0].code);
@@ -56,35 +59,52 @@ export default function Requests() {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{t("req.title")}</h1>
-        <button onClick={() => { setShowForm(!showForm); setErr(""); }} style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 42, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+        <button onClick={() => { setShowForm(!showForm); setErr(""); }} className="sd-btn sd-btn--gold">
           {showForm ? <X size={17} /> : <Plus size={17} />} {showForm ? t("usr.cancel") : t("req.new")}
         </button>
       </div>
+
+      {balance && balance.annee && (
+        <Card style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("req.balance")} {balance.annee}</div>
+            <div className="font-display" style={{ fontSize: 30, fontWeight: 700, color: "var(--gold-deep)" }}>
+              {balance.restant}<span style={{ fontSize: 16, color: "var(--muted)" }}> / {balance.alloue} {t("req.days")}</span>
+            </div>
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <div style={{ height: 10, background: "var(--gold-tint)", borderRadius: 999, overflow: "hidden" }}>
+              <div style={{ width: `${Math.min(100, (balance.pris / (balance.alloue || 1)) * 100)}%`, height: "100%", background: "var(--gold)" }} />
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>{t("req.taken")} : {balance.pris} {t("req.days")}</div>
+          </div>
+        </Card>
+      )}
 
       {showForm && (
         <Card style={{ marginTop: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("req.formType")}</label>
-              <select style={inputStyle} value={type} onChange={(e) => setType(e.target.value)}>
+              <select className="sd-field" value={type} onChange={(e) => setType(e.target.value)}>
                 {TYPES.map((x) => <option key={x.code} value={x.code}>{x[lang]}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("req.reason")}</label>
-              <input style={inputStyle} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={lang === "fr" ? "Motif (optionnel)" : "Reason (optional)"} />
+              <input className="sd-field" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={lang === "fr" ? "Motif (optionnel)" : "Reason (optional)"} />
             </div>
             <div>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("req.start")}</label>
-              <input type="date" style={inputStyle} value={start} onChange={(e) => setStart(e.target.value)} />
+              <input type="date" className="sd-field" value={start} onChange={(e) => setStart(e.target.value)} />
             </div>
             <div>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("req.end")}</label>
-              <input type="date" style={inputStyle} value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} />
+              <input type="date" className="sd-field" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} />
             </div>
           </div>
           {err && <div style={{ marginTop: 10, fontSize: 13, color: "var(--danger)" }}>{err}</div>}
-          <button onClick={add} disabled={saving} style={{ marginTop: 16, height: 44, padding: "0 20px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>{saving ? t("common.loading") : t("req.add")}</button>
+          <button onClick={add} disabled={saving} className="sd-btn sd-btn--gold" style={{ marginTop: 16 }}>{saving ? t("common.loading") : t("req.add")}</button>
         </Card>
       )}
 

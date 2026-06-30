@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Send, Clock, Download } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
+import { getPreviewPdfUrl } from "../../../lib/api";
 
 // Modal d'aperçu : affiche le HTML généré, un compte à rebours d'expiration du
 // preview_token, et confirme la soumission.
@@ -17,17 +18,20 @@ export default function DocumentPreviewModal({ preview, onConfirm, onClose, busy
     return () => clearInterval(id);
   }, [preview]);
 
-  if (!preview) return null;
   const expired = left <= 0;
-  const mmss = `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
+  const m = Math.floor(left / 60);
+  const s = left % 60;
+  const mmss = `${m}:${s < 10 ? "0" : ""}${s}`;
+
+  if (!preview) return null;
 
   const iframeSrcMatch = preview.html_preview?.match(/src="([^"]+)"/);
   const iframeSrc = iframeSrcMatch ? iframeSrcMatch[1] : null;
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 100, display: "flex", justifyContent: "center" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: iframeSrc ? 850 : 640, height: "100vh", background: "var(--surface)", borderLeft: "1px solid var(--line)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid var(--line)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: iframeSrc ? 850 : 640, height: "100vh", background: "var(--surface)", borderLeft: "1px solid var(--line)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 0 20px rgba(0,0,0,0.2)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 22px", borderBottom: "1px solid var(--line)" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{t("docs.preview")}</div>
             <div style={{ fontSize: 12.5, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview.document_name}</div>
@@ -38,7 +42,7 @@ export default function DocumentPreviewModal({ preview, onConfirm, onClose, busy
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--muted)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={16} /></button>
         </div>
 
-        <div style={{ overflowY: "auto", padding: 0, background: "#fff", height: "calc(100vh - 130px)" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: 0, background: "#fff" }}>
           {iframeSrc ? (
             <iframe
               title="live-preview"
@@ -54,31 +58,19 @@ export default function DocumentPreviewModal({ preview, onConfirm, onClose, busy
           )}
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 18px", borderTop: "1px solid var(--line)" }}>
-          <button onClick={onClose} style={{ height: 42, padding: "0 16px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--ink)", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{t("docs.cancel")}</button>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "14px 22px", borderTop: "1px solid var(--line)", background: "var(--surface)" }}>
+          <button onClick={onClose} className="sd-btn sd-btn--outline">{t("docs.cancel")}</button>
           {!preview.requires_rh_validation && (
             <button 
               onClick={() => window.open(`/api/v1/documents/preview/download?token=${preview.preview_token}`, "_blank")} 
               disabled={expired}
-              style={{ 
-                height: 42, 
-                padding: "0 16px", 
-                borderRadius: 9, 
-                border: "1px solid var(--line)", 
-                background: "transparent", 
-                color: "var(--gold-deep)", 
-                fontWeight: 600, 
-                cursor: expired ? "not-allowed" : "pointer", 
-                fontFamily: "inherit",
-                display: "flex",
-                alignItems: "center",
-                gap: 6
-              }}
+              className="sd-btn sd-btn--outline"
+              style={{ color: "var(--gold-deep)", display: "flex", alignItems: "center", gap: 6 }}
             >
               <Download size={15} /> Télécharger
             </button>
           )}
-          <button onClick={onConfirm} disabled={busy || expired} style={{ height: 42, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, cursor: busy || expired ? "not-allowed" : "pointer", opacity: busy || expired ? 0.6 : 1, display: "flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
+          <button onClick={onConfirm} disabled={busy || expired} className="sd-btn sd-btn--gold">
             <Send size={16} /> {t("docs.confirm")}
           </button>
         </div>

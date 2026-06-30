@@ -19,6 +19,8 @@ const LABELS = {
   date_entretien: "Date de l'entretien", evaluateur_nom: "Évaluateur", periode_evaluee: "Période évaluée",
   points_forts: "Points forts", axes_amelioration: "Axes d'amélioration",
   objectifs_annee_suivante: "Objectifs année suivante",
+  date_depart: "Date de départ", motif_depart: "Motif du départ",
+  dernier_jour: "Dernier jour travaillé", remplacant: "Remplaçant·e prévu·e",
 };
 const labelOf = (k) => LABELS[k] || k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 const inputType = (k) => k.includes("date") ? "date" : k.startsWith("include_") ? "boolean" : k === "montant" ? "number" : (TEXTAREA.has(k) ? "textarea" : "text");
@@ -46,7 +48,7 @@ export default function DocumentRequestForm({ onPreview }) {
 
   const renderField = (k, required) => {
     const tp = inputType(k);
-    const field = { width: "100%", height: 44, marginTop: 6, borderRadius: 10, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", outline: "none", fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" };
+    const field = { marginTop: 6, boxSizing: "border-box" };
     return (
       <div key={k} style={{ marginTop: 14, opacity: required ? 1 : 0.85 }}>
         <label style={{ fontSize: 13, fontWeight: 500, color: required ? "var(--ink)" : "var(--muted)" }}>
@@ -59,10 +61,10 @@ export default function DocumentRequestForm({ onPreview }) {
             </label>
           </div>
         ) : tp === "textarea" ? (
-          <textarea value={values[k] || ""} onChange={(e) => set(k, e.target.value)} rows={3}
-            style={{ ...field, height: "auto", padding: 12, lineHeight: 1.5, resize: "vertical" }} />
+          <textarea value={values[k] || ""} onChange={(e) => set(k, e.target.value)} rows={3} className="sd-field"
+            style={{ ...field, resize: "vertical" }} />
         ) : (
-          <input type={tp} value={values[k] || ""} onChange={(e) => set(k, e.target.value)} style={field} />
+          <input type={tp} value={values[k] || ""} onChange={(e) => set(k, e.target.value)} className="sd-field" style={field} />
         )}
       </div>
     );
@@ -85,13 +87,13 @@ export default function DocumentRequestForm({ onPreview }) {
     finally { setBusy(false); }
   };
 
-  const field = { width: "100%", height: 44, marginTop: 6, borderRadius: 10, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", outline: "none", fontFamily: "inherit", fontSize: 14, boxSizing: "border-box" };
+  const field = { marginTop: 6, boxSizing: "border-box" };
 
   return (
     <Card style={{ marginTop: 12 }}>
       <AsyncBoundary loading={loading} error={error} onRetry={reload} empty={!types.length} emptyLabel="—">
         <label style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{t("docs.type")}</label>
-        <select value={typeKey} onChange={(e) => { setTypeKey(e.target.value); setValues({}); setMsg(""); }} style={field}>
+        <select value={typeKey} onChange={(e) => { setTypeKey(e.target.value); setValues({}); setMsg(""); }} className="sd-field" style={field}>
           {types.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
         </select>
         {current?.description && <div style={{ marginTop: 6, fontSize: 12.5, color: "var(--muted)" }}>{current.description}</div>}
@@ -106,7 +108,7 @@ export default function DocumentRequestForm({ onPreview }) {
         {(current?.optional_fields || []).map((k) => renderField(k, false))}
 
         {msg && <div style={{ marginTop: 12, fontSize: 13, color: "var(--danger)" }}>{msg}</div>}
-        <button onClick={submit} disabled={busy} style={{ marginTop: 18, height: 46, padding: "0 20px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14.5, cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
+        <button onClick={submit} disabled={busy} className="sd-btn sd-btn--gold sd-btn--lg" style={{ marginTop: 18 }}>
           <Eye size={18} /> {busy ? t("common.loading") : t("docs.previewBtn")}
         </button>
       </AsyncBoundary>

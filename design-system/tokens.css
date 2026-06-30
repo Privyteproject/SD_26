@@ -1,0 +1,30 @@
+/* Tokens de design — copie documentée de frontend/src/styles/index.css.
+   Thème clair par défaut ; thème sombre sous [data-theme="dark"]. */
+:root {
+  /* Fonds & surfaces */
+  --bg:#F4ECDC; --bg-alt:#EEE4D0; --surface:#FBF6EC;
+  /* Texte */
+  --ink:#2D2114; --muted:#6E5C46; --line:#E6D8BF;
+  /* Or (couleur de marque) */
+  --gold:#B8893E; --gold-deep:#946B2A; --gold-soft:#DEC48A; --gold-tint:#EFE2C6;
+  --on-gold:#FFFFFF; --field:#FFFFFF;
+  /* Sémantique */
+  --danger:#B4402E; --success:#5C7A2E; --warning:#B7791F; --info:#3E6E8E;
+  /* Élévation */
+  --shadow:0 18px 40px -24px rgba(120,86,30,.45);
+  /* Rayons (proposés pour standardisation) */
+  --radius-sm:8px; --radius-md:10px; --radius-lg:14px; --radius-pill:999px;
+}
+[data-theme="dark"] {
+  --bg:#191108; --bg-alt:#1F160C; --surface:#241A10;
+  --ink:#F1E7D6; --muted:#AE9778; --line:#3A2C1C;
+  --gold:#D7A954; --gold-deep:#E7C57F; --gold-soft:#6A4F26; --gold-tint:#2E2114;
+  --on-gold:#191108; --field:#1A1109;
+  --danger:#E0795F; --success:#9DBE5A; --warning:#E7C57F; --info:#7FB0CE;
+  --shadow:0 22px 48px -26px rgba(0,0,0,.7);
+}
+
+/* Polices : Bricolage Grotesque (titres), Hanken Grotesk (texte), Fraunces (marque) */
+.font-display { font-family:'Bricolage Grotesque', sans-serif; }
+.font-body { font-family:'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif; }
+.font-serif-brand { font-family:'Fraunces', serif; }

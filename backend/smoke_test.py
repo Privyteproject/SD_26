@@ -59,12 +59,27 @@ with TestClient(app) as c:
     chk("PATCH /demandes status (COLLAB -> 403)", c.patch(f"/api/v1/demandes/{cd['data']['id']}/status", headers=COLLAB, json={"status":"refused"}), 403)
 
     print("== parcours on/offboarding ==")
-    chk("GET /parcours/modeles?type=ONBOARDING", c.get("/api/v1/parcours/modeles?type=ONBOARDING", headers=RH), 200)
+    COLLAB_EMP008 = {"Authorization": f"Bearer {tok(['collaborateur'],'yasmine.haddad@entreprise.com','Yasmine Haddad')}"}
+    m_rh = chk("POST /parcours/modeles (acteur RH)", c.post("/api/v1/parcours/modeles", headers=RH,
+        json={"libelle":"Tâche RH","type_parcours":"ONBOARDING","acteur":"RH"}), 201)
+    m_emp = chk("POST /parcours/modeles (acteur EMPLOYE)", c.post("/api/v1/parcours/modeles", headers=RH,
+        json={"libelle":"Tâche Collab","type_parcours":"ONBOARDING","acteur":"EMPLOYE"}), 201)
     init = chk("POST /parcours/EMP008/init ONBOARDING", c.post("/api/v1/parcours/EMP008/init", headers=RH, json={"type_parcours":"ONBOARDING"}), 201)
     print("     -> tâches créées:", init["meta"]["total"])
+    tasks = init["data"]
+    task_rh_id = next((t["id"] for t in tasks if t["acteur"] == "RH"), None)
+    task_emp_id = next((t["id"] for t in tasks if t["acteur"] == "EMPLOYE"), None)
     chk("POST /parcours/EMP404/init -> 404", c.post("/api/v1/parcours/EMP404/init", headers=RH, json={"type_parcours":"ONBOARDING"}), 404)
     chk("GET /parcours/EMP008 (COLLAB autre -> 403)", c.get("/api/v1/parcours/EMP008", headers=COLLAB), 403)
-    chk(f"PATCH /parcours/taches/{init['data'][0]['id']} done", c.patch(f"/api/v1/parcours/taches/{init['data'][0]['id']}", headers=RH, json={"status":"done"}), 200)
+    t_custom = chk("POST /parcours/EMP008/taches (custom EMPLOYE)", c.post("/api/v1/parcours/EMP008/taches", headers=RH,
+        json={"libelle":"Tâche custom collab","type_parcours":"ONBOARDING","acteur":"EMPLOYE"}), 201)
+    if task_rh_id:
+        chk(f"PATCH /parcours/taches/{task_rh_id} done (par RH)", c.patch(f"/api/v1/parcours/taches/{task_rh_id}", headers=RH, json={"status":"done"}), 200)
+    if task_emp_id:
+        chk(f"PATCH /parcours/taches/{task_emp_id} done (par Collab)", c.patch(f"/api/v1/parcours/taches/{task_emp_id}", headers=COLLAB_EMP008, json={"status":"done"}), 200)
+    chk(f"PATCH /parcours/taches/{t_custom['data']['id']} done (par Collab)", c.patch(f"/api/v1/parcours/taches/{t_custom['data']['id']}", headers=COLLAB_EMP008, json={"status":"done"}), 200)
+    if task_rh_id:
+        chk(f"PATCH /parcours/taches/{task_rh_id} done (par Collab -> 403)", c.patch(f"/api/v1/parcours/taches/{task_rh_id}", headers=COLLAB_EMP008, json={"status":"done"}), 403)
 
     print("== dashboard / ai (OpenRouter démo) ==")
     chk("GET /dashboard/kpis", c.get("/api/v1/dashboard/kpis", headers=RH), 200)

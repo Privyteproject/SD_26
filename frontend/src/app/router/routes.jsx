@@ -15,14 +15,26 @@ import Onboarding from "../../features/onboarding/pages/Onboarding";
 import OffboardingPerso from "../../features/offboarding/pages/OffboardingPerso";
 import Requests from "../../features/misc/pages/Requests";
 import Profile from "../../features/misc/pages/Profile";
+import MySkills from "../../features/skills/pages/MySkills";
+import SkillsRh from "../../features/skills/pages/SkillsRh";
+import MyObjectives from "../../features/okr/pages/MyObjectives";
+import ObjectivesRh from "../../features/okr/pages/ObjectivesRh";
+import MyMood from "../../features/mood/pages/MyMood";
+import Climate from "../../features/mood/pages/Climate";
+import Tickets from "../../features/tickets/pages/Tickets";
+import News from "../../features/news/pages/News";
+import NewsRh from "../../features/news/pages/NewsRh";
+import Privacy from "../../features/privacy/pages/Privacy";
+import Help from "../../features/help/pages/Help";
 
 // Espace RH / Manager / Direction
 import DashboardRh from "../../features/dashboard/pages/DashboardRh";
+import Vision360 from "../../features/vision/pages/Vision360";
+import ProcessScreen from "../../features/processus/pages/ProcessScreen";
 import AssistantRh from "../../features/assistant/pages/AssistantRh";
 import Team from "../../features/misc/pages/Team";
-import Turnover from "../../features/analytics/pages/Turnover";
+import PredictiveAnalytics from "../../features/analytics/pages/PredictiveAnalytics";
 import Payroll from "../../features/analytics/pages/Payroll";
-import Absenteeism from "../../features/analytics/pages/Absenteeism";
 import Disengagement from "../../features/disengagement/pages/Disengagement";
 import OnboardingRh from "../../features/onboarding/pages/OnboardingRh";
 import Offboarding from "../../features/offboarding/pages/Offboarding";
@@ -54,16 +66,32 @@ export default function AppRoutes() {
         <Route path="/app/onboarding" element={<Onboarding />} />
         <Route path="/app/offboarding" element={<OffboardingPerso />} />
         <Route path="/app/demandes" element={<Requests />} />
+        <Route path="/app/competences" element={<MySkills />} />
+        <Route path="/app/objectifs" element={<MyObjectives />} />
+        <Route path="/app/humeur" element={<MyMood />} />
+        <Route path="/app/tickets" element={<Tickets />} />
+        <Route path="/app/actualites" element={<News />} />
+        <Route path="/app/confidentialite" element={<Privacy />} />
+        <Route path="/app/aide" element={<Help />} />
         <Route path="/app/profil" element={<Profile />} />
 
         {/* Espace RH / Manager / Direction / Médecine */}
         <Route path="/rh" element={<RoleGuard roles={RH_SPACE_ROLES}><DashboardRh /></RoleGuard>} />
+        <Route path="/rh/vision" element={<RoleGuard roles={[ROLES.MANAGER, ROLES.RH, ROLES.DIRECTION]}><Vision360 /></RoleGuard>} />
+        <Route path="/rh/processus/lifecycle" element={<RoleGuard roles={RH_SPACE_ROLES}><ProcessScreen pkey="lifecycle" titleKey="nav.lifecycle" icon="Route" /></RoleGuard>} />
+        <Route path="/rh/processus/carrieres" element={<RoleGuard roles={RH_SPACE_ROLES}><ProcessScreen pkey="carrieres" titleKey="nav.careers" icon="Award" /></RoleGuard>} />
+        <Route path="/rh/processus/happiness" element={<RoleGuard roles={RH_SPACE_ROLES}><ProcessScreen pkey="happiness" titleKey="nav.happiness" icon="HeartPulse" /></RoleGuard>} />
         <Route path="/rh/equipe" element={<RoleGuard roles={RH_SPACE_ROLES}><Team /></RoleGuard>} />
         <Route path="/rh/assistant" element={<RoleGuard roles={RH_SPACE_ROLES}><AssistantRh /></RoleGuard>} />
-        <Route path="/rh/analytique/turnover" element={<RoleGuard roles={RH_SPACE_ROLES}><Turnover /></RoleGuard>} />
+        <Route path="/rh/alertes" element={<RoleGuard roles={RH_SPACE_ROLES}><Alerts /></RoleGuard>} />
+        <Route path="/rh/analytique/predictif" element={<RoleGuard roles={RH_SPACE_ROLES}><PredictiveAnalytics /></RoleGuard>} />
         <Route path="/rh/analytique/masse-salariale" element={<RoleGuard roles={RH_SPACE_ROLES}><Payroll /></RoleGuard>} />
-        <Route path="/rh/analytique/absenteisme" element={<RoleGuard roles={RH_SPACE_ROLES}><Absenteeism /></RoleGuard>} />
         <Route path="/rh/desengagement" element={<RoleGuard roles={RH_SPACE_ROLES}><Disengagement /></RoleGuard>} />
+        <Route path="/rh/competences" element={<RoleGuard roles={RH_SPACE_ROLES}><SkillsRh /></RoleGuard>} />
+        <Route path="/rh/objectifs" element={<RoleGuard roles={RH_SPACE_ROLES}><ObjectivesRh /></RoleGuard>} />
+        <Route path="/rh/climat" element={<RoleGuard roles={RH_SPACE_ROLES}><Climate /></RoleGuard>} />
+        <Route path="/rh/tickets" element={<RoleGuard roles={RH_SPACE_ROLES}><Tickets /></RoleGuard>} />
+        <Route path="/rh/actualites" element={<RoleGuard roles={[ROLES.RH, ROLES.DIRECTION, ROLES.ADMIN]}><NewsRh /></RoleGuard>} />
         <Route path="/rh/onboarding" element={<RoleGuard roles={RH_SPACE_ROLES}><OnboardingRh /></RoleGuard>} />
         <Route path="/rh/offboarding" element={<RoleGuard roles={RH_SPACE_ROLES}><Offboarding /></RoleGuard>} />
         <Route path="/rh/collaborateurs" element={<RoleGuard roles={RH_SPACE_ROLES}><Employees /></RoleGuard>} />

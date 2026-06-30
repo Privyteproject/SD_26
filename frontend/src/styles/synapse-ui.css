@@ -1,0 +1,150 @@
+/* ============================================================
+   SYNAPSE DIGITAL — UI (drop-in)
+   Copiez ce fichier dans votre app, p.ex.
+     frontend/src/styles/synapse-ui.css
+   puis importez-le UNE fois (après vos resets) :
+     import './styles/synapse-ui.css';   // React/Vite
+   ou dans index.css :  @import './synapse-ui.css';
+
+   Police : ajoutez ce <link> dans public/index.html <head> :
+   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Hanken+Grotesk:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;1,9..144,400&display=swap" rel="stylesheet">
+
+   Ensuite, utilisez les classes ci-dessous dans votre JSX :
+     <button className="sd-btn sd-btn--gold">Valider</button>
+     <span className="sd-badge sd-badge--success">Validé</span>
+     <div className="sd-card"> … </div>
+   ============================================================ */
+
+/* ---------- 1. TOKENS ---------- */
+:root{
+  /* Fonds & surfaces */
+  --bg:#F4EEE3; --bg-alt:#EFE7D7; --surface:#FFFFFF;
+  /* Texte */
+  --ink:#241B10; --muted:#7C6C53; --faint:#AB9C81;
+  --line:#EDE3D1; --line-soft:#F3ECDD;
+  /* Or (marque) */
+  --gold:#B0802F; --gold-deep:#8A5F22; --gold-soft:#DCBE7E; --gold-tint:#F6EEDB;
+  --on-gold:#FFFFFF; --field:#FFFFFF;
+  /* Sémantique (texte / fond) */
+  --success:#4F6B27; --success-bg:#EEF2E2;
+  --info:#3E6E8E;    --info-bg:#E9EFF3;
+  --warning:#8A5E16; --warning-bg:#F6EDD9;
+  --danger:#A8402C;  --danger-bg:#F6E4DE;
+  /* Élévation */
+  --shadow-sm:0 2px 4px rgba(60,45,20,.04);
+  --shadow:0 18px 36px -28px rgba(60,45,20,.3);
+  --shadow-lg:0 28px 46px -26px rgba(60,45,20,.34);
+  /* Rayons */
+  --r-sm:9px; --r-md:12px; --r-lg:18px; --r-xl:20px; --r-pill:999px;
+}
+[data-theme="dark"]{
+  --bg:#191108; --bg-alt:#1F160C; --surface:#231910;
+  --ink:#F1E7D6; --muted:#AE9778; --faint:#7E6B4E;
+  --line:#3A2C1C; --line-soft:#2A2014;
+  --gold:#D7A954; --gold-deep:#E7C57F; --gold-soft:#6A4F26; --gold-tint:#2E2114;
+  --on-gold:#191108; --field:#1A1109;
+  --success:#9DBE5A; --success-bg:#23270F;
+  --info:#7FB0CE;    --info-bg:#15212A;
+  --warning:#E7C57F; --warning-bg:#2A2110;
+  --danger:#E0795F;  --danger-bg:#2A1611;
+  --shadow:0 22px 48px -26px rgba(0,0,0,.7);
+  --shadow-lg:0 30px 56px -26px rgba(0,0,0,.75);
+}
+
+/* ---------- 1b. LOGO ----------
+   Fichiers dans ./assets/ : synapse-logo.png (lockup), synapse-mark.png (icône).
+   <img class="sd-logo" src="assets/synapse-logo.png" alt="Synapse Digital">
+   <img class="sd-logo-mark" src="assets/synapse-mark.png" alt="Synapse Digital"> */
+.sd-logo{ height:40px; width:auto; display:block; }
+.sd-logo-mark{ height:32px; width:auto; display:block; }
+.sd-logo-chip{ width:48px; height:48px; border-radius:13px; background:#fff;
+  display:grid; place-items:center; overflow:hidden; box-shadow:var(--shadow-sm), var(--shadow); }
+.sd-logo-chip img{ width:32px; height:32px; object-fit:contain; }
+
+/* ---------- 2. BASE ---------- */
+.sd-app, body.sd{
+  background:var(--bg); color:var(--ink);
+  font-family:'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings:"tnum" 1; -webkit-font-smoothing:antialiased;
+}
+.sd-font-display{ font-family:'Bricolage Grotesque', sans-serif; letter-spacing:-.02em; }
+.sd-font-brand{ font-family:'Fraunces', serif; }
+.sd-h1{ font-family:'Bricolage Grotesque',sans-serif; font-size:28px; font-weight:700; letter-spacing:-.02em; }
+.sd-h2{ font-family:'Bricolage Grotesque',sans-serif; font-size:20px; font-weight:600; letter-spacing:-.01em; }
+.sd-eyebrow{ font-size:11px; text-transform:uppercase; letter-spacing:.2em; font-weight:700; color:var(--gold-deep); }
+.sd-muted{ color:var(--muted); }
+
+/* ---------- 3. CARTE ---------- */
+.sd-card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
+  padding:22px; box-shadow:var(--shadow-sm), var(--shadow);
+  transition:transform .24s cubic-bezier(.2,.7,.3,1), box-shadow .24s, border-color .24s;
+}
+.sd-card--hover:hover, a.sd-card:hover, .sd-card--interactive:hover{
+  transform:translateY(-3px); border-color:#E5D8BF; box-shadow:var(--shadow-sm), var(--shadow-lg);
+}
+
+/* ---------- 4. BOUTONS ---------- */
+.sd-btn{
+  font-family:inherit; cursor:pointer; border:none; font-weight:600;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  height:44px; padding:0 22px; font-size:14px; border-radius:var(--r-md);
+  transition:transform .18s cubic-bezier(.2,.7,.3,1), box-shadow .18s, background .18s, border-color .18s;
+}
+.sd-btn:active{ transform:translateY(1px); }
+.sd-btn--sm{ height:36px; padding:0 15px; font-size:13px; border-radius:var(--r-sm); }
+.sd-btn--lg{ height:50px; padding:0 26px; font-size:15px; border-radius:13px; }
+.sd-btn--gold{ background:linear-gradient(180deg,#C49A4E,#A9772F); color:var(--on-gold);
+  box-shadow:0 10px 22px -12px rgba(169,119,47,.7); }
+.sd-btn--gold:hover{ transform:translateY(-2px); box-shadow:0 16px 28px -14px rgba(169,119,47,.75); }
+.sd-btn--outline{ background:var(--surface); color:var(--ink); border:1px solid var(--line);
+  box-shadow:0 6px 16px -12px rgba(60,45,20,.35); }
+.sd-btn--outline:hover{ transform:translateY(-2px); border-color:#DDCDA9; }
+.sd-btn--ghost{ background:var(--gold-tint); color:var(--gold-deep); }
+.sd-btn--ghost:hover{ transform:translateY(-2px); background:#F0E5CC; }
+.sd-btn--danger{ background:var(--danger); color:#fff; box-shadow:0 10px 22px -12px rgba(168,64,44,.6); }
+.sd-btn--danger:hover{ transform:translateY(-2px); }
+.sd-btn:disabled, .sd-btn--disabled{ opacity:.45; cursor:not-allowed; box-shadow:none; transform:none; }
+
+/* ---------- 5. BADGES ---------- */
+.sd-badge{
+  display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 12px;
+  border-radius:var(--r-sm); font-size:12.5px; font-weight:600; white-space:nowrap;
+  transition:transform .18s cubic-bezier(.2,.7,.3,1);
+}
+.sd-badge--gold{ background:var(--gold-tint); color:var(--gold-deep); }
+.sd-badge--info{ background:var(--info-bg); color:var(--info); }
+.sd-badge--success{ background:var(--success-bg); color:var(--success); }
+.sd-badge--warning{ background:var(--warning-bg); color:var(--warning); }
+.sd-badge--danger{ background:var(--danger-bg); color:var(--danger); }
+.sd-badge__dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+/* ---------- 6. CHAMPS ---------- */
+.sd-field{
+  height:44px; width:100%; border:1px solid var(--line); background:var(--field); color:var(--ink);
+  border-radius:var(--r-md); padding:0 14px; font-size:14px; font-family:inherit; outline:none;
+  transition:border-color .15s, box-shadow .15s;
+}
+.sd-field:hover{ border-color:#DDCDA9; }
+.sd-field:focus{ border-color:var(--gold); box-shadow:0 0 0 4px rgba(176,128,47,.14); }
+textarea.sd-field{ height:auto; min-height:92px; padding:12px 14px; resize:vertical; }
+.sd-field--error{ border-color:var(--danger); }
+.sd-field--error:focus{ box-shadow:0 0 0 4px rgba(168,64,44,.13); }
+.sd-label{ font-size:12px; font-weight:600; color:var(--muted); display:block; margin-bottom:7px; }
+.sd-error-text{ color:var(--danger); font-size:12px; margin-top:6px; font-weight:500; }
+
+/* ---------- 7. DONNÉES ---------- */
+.sd-avatar{ width:46px; height:46px; border-radius:50%;
+  background:linear-gradient(160deg,#C49A4E,#A9772F); color:#fff;
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; }
+.sd-progress{ height:8px; background:var(--line); border-radius:var(--r-pill); overflow:hidden; }
+.sd-progress__fill{ height:100%; border-radius:var(--r-pill);
+  background:linear-gradient(90deg,var(--gold-soft),var(--gold)); }
+.sd-trend{ display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 10px;
+  border-radius:var(--r-sm); font-size:12px; font-weight:600;
+  background:var(--success-bg); color:var(--success); white-space:nowrap; }
+
+/* ---------- 8. ACCESSIBILITÉ ---------- */
+@media (prefers-reduced-motion:reduce){
+  .sd-btn, .sd-card, .sd-badge{ transition:none; }
+}

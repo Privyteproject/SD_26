@@ -1,0 +1,48 @@
+<!-- @dsCard group="Composants" -->
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Badges & statuts — Synapse Digital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#F4ECDC;--ink:#2D2114;--muted:#6E5C46;--line:#E6D8BF;
+    --gold:#B8893E;--gold-tint:#EFE2C6;--gold-deep:#946B2A;
+    --danger:#B4402E;--success:#5C7A2E;--warning:#B7791F;--info:#3E6E8E}
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px;background:var(--bg);color:var(--ink);font-family:'Hanken Grotesk',sans-serif}
+  h1{font-family:'Bricolage Grotesque',sans-serif;font-size:22px;font-weight:600;margin:0 0 18px}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:22px 0 10px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .badge{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid transparent}
+  .gold{background:var(--gold-tint);color:var(--gold-deep);border-color:#E0CFA3}
+  .info{background:#E2EAF0;color:#34607c;border-color:#CADAE6}
+  .success{background:#E7EFD7;color:#46632a;border-color:#D2E0B6}
+  .warning{background:#F3E6CB;color:#8a5e16;border-color:#E6D2A6}
+  .danger{background:#F2D9D3;color:#8e3526;border-color:#E6C0B6}
+</style></head>
+<body>
+  <h1 class="font-display">Badges & statuts</h1>
+
+  <h2>Tons</h2>
+  <div class="row">
+    <span class="badge gold">Or</span>
+    <span class="badge info">Info</span>
+    <span class="badge success">Succès</span>
+    <span class="badge warning">Attention</span>
+    <span class="badge danger">Danger</span>
+  </div>
+
+  <h2>Statuts compétence</h2>
+  <div class="row">
+    <span class="badge success">Validé 4/5</span>
+    <span class="badge warning">À valider</span>
+    <span class="badge success">Nouvelle compétence</span>
+  </div>
+
+  <h2>Statuts objectif / demande</h2>
+  <div class="row">
+    <span class="badge info">Partagé · 12 collaborateurs</span>
+    <span class="badge success">Clôturé</span>
+    <span class="badge warning">En attente</span>
+    <span class="badge gold">Projet</span>
+  </div>
+</body></html>

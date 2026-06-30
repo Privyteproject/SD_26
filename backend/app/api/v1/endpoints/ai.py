@@ -112,6 +112,21 @@ def ai_logs(
     return envelope(repo.list_ia_interactions(db, limit=limit), meta=repo.ia_interactions_stats(db))
 
 
+@router.get("/security-stats")
+def ai_security_stats(_: CurrentUser = Depends(_SUPERVISE), db: Session = Depends(get_db)):
+    """Indicateurs de sécurité IA : refus 24h/7j, alertes par gravité, taux sensibles. ADMIN."""
+    return envelope(repo.security_stats(db))
+
+
+@router.get("/logs/{interaction_id}")
+def ai_log_detail(interaction_id: int, user: CurrentUser = Depends(_SUPERVISE), db: Session = Depends(get_db)):
+    """Contenu complet d'un échange (accès ADMIN, TRACÉ dans le journal d'audit)."""
+    detail = repo.ia_interaction_detail(db, interaction_id, viewer_email=user.email)
+    if detail is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Interaction introuvable")
+    return envelope(detail)
+
+
 @router.post("/judge")
 def judge(payload: JudgeRequest, _: CurrentUser = Depends(get_current_user)):
     try:

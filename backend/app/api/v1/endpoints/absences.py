@@ -40,10 +40,12 @@ def list_absences(
     status_: str | None = Query(None, alias="status"),
     date_from: date | None = Query(None, alias="from"),
     date_to: date | None = Query(None, alias="to"),
+    mine: bool = Query(False),
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if user.role not in _ELEVATED:
+    # `mine` force le périmètre personnel même pour un rôle élevé (page « Mes demandes »).
+    if mine or user.role not in _ELEVATED:
         employee_id = _own_matricule(db, user)
     rows = repo.list_absences(db, employee_id=employee_id, status=status_,
                               date_from=date_from, date_to=date_to)
@@ -68,7 +70,25 @@ def create_absence(
         db, matricule=matricule, type_value=payload.type,
         start_date=payload.start_date, end_date=payload.end_date, reason=payload.reason,
     )
+    # Notification : prévenir le manager (ou, à défaut, diffusion RH).
+    try:
+        mgr_uid = repo.manager_utilisateur_id(db, matricule)
+        repo.create_alerte(
+            db, message=f"Nouvelle demande d'absence ({payload.type}) de {matricule}.",
+            categorie="absence", gravite="mid", id_destinataire=mgr_uid, matricule=matricule,
+        )
+    except Exception:
+        db.rollback()
     return envelope(ab.to_dict())
+
+
+@router.get("/balance")
+def leave_balance(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Solde de congés de l'utilisateur connecté (alloué / pris / restant)."""
+    mat = _own_matricule(db, user)
+    if mat is None:
+        return envelope({"annee": None, "alloue": 0, "pris": 0, "restant": 0})
+    return envelope(repo.leave_balance(db, mat))
 
 
 @router.get("/stats")

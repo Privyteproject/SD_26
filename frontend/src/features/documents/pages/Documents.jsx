@@ -45,8 +45,8 @@ export default function Documents() {
   };
 
   const download = async (d) => {
-    if (d.download_url) { window.open(d.download_url, "_blank"); return; }
-    try { await downloadDocument(d.id); } catch (e) { setMsg((e && (e.payload?.detail || e.message)) || t("common.error")); }
+    try { await downloadDocument(d.id); } 
+    catch (e) { setMsg((e && (e.payload?.detail || e.message)) || t("common.error")); }
   };
 
   const th = { padding: "12px 16px", fontSize: 12, color: "var(--muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, textAlign: "left" };
@@ -56,7 +56,7 @@ export default function Documents() {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{t("docs.title")}</h1>
-        <button onClick={() => setShowForm((v) => !v)} style={{ height: 42, padding: "0 16px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "inherit" }}>
+        <button onClick={() => setShowForm((v) => !v)} className="sd-btn sd-btn--gold">
           {showForm ? <X size={17} /> : <Plus size={17} />} {t("docs.newRequest")}
         </button>
       </div>

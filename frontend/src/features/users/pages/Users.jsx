@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Check, Minus, Plus, Trash2, X, Pencil } from "lucide-react";
+import { Check, Minus, Plus, Trash2, X, Pencil, Upload } from "lucide-react";
+import ImportModal from "./ImportModal";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useSession } from "../../../app/providers/SessionProvider";
 import { ROLES, ROLE_LABELS, STATUS, STATUS_LABELS } from "../../../lib/constants";
@@ -19,7 +20,6 @@ function Cell({ v }) {
   if (v === "R") return <span style={{ display: "inline-flex", width: 22, height: 22, borderRadius: 6, border: "1px solid var(--gold)", color: "var(--gold-deep)", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>R</span>;
   return <span style={{ color: "var(--muted)" }}><Minus size={14} /></span>;
 }
-const inputStyle = { height: 42, borderRadius: 9, border: "1px solid var(--line)", background: "var(--field)", color: "var(--ink)", padding: "0 12px", fontSize: 14, fontFamily: "inherit", outline: "none", width: "100%" };
 
 // Mappe un employé de l'API ({prenom, nom, ...}) vers la ligne plate affichée ici.
 function toRow(e) {
@@ -47,6 +47,7 @@ export default function Users() {
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const startCreate = () => { setEditingId(null); setForm(EMPTY); setErr(""); setOpen(true); };
@@ -108,34 +109,41 @@ export default function Users() {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <h1 className="font-display" style={{ fontSize: 28, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{t("usr.title")}</h1>
-        <button onClick={open ? close : startCreate} style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 42, padding: "0 18px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
-          {open ? <X size={17} /> : <Plus size={17} />} {open ? t("usr.cancel") : t("usr.new")}
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => setImportOpen(true)} className="sd-btn sd-btn--outline">
+            <Upload size={16} /> {t("imp.btn")}
+          </button>
+          <button onClick={open ? close : startCreate} className="sd-btn sd-btn--gold">
+            {open ? <X size={17} /> : <Plus size={17} />} {open ? t("usr.cancel") : t("usr.new")}
+          </button>
+        </div>
       </div>
+
+      {importOpen && <ImportModal onClose={() => setImportOpen(false)} onDone={reload} />}
 
       {open && (
         <Card style={{ marginTop: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 14 }}>{editingId ? t("usr.edit") : t("usr.create")}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div><label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("usr.name")}</label><input style={inputStyle} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Prénom Nom" /></div>
-            <div><label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("usr.email")}</label><input style={inputStyle} type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="prenom.nom@entreprise.com" /></div>
-            <div><label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("usr.password")}{editingId ? ` (${t("usr.pwdKeep")})` : ""}</label><input style={inputStyle} value={form.password} onChange={(e) => set("password", e.target.value)} placeholder={editingId ? "••••••" : ""} disabled={!!editingId} /></div>
-            <div><label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("usr.dept")}</label><input style={inputStyle} value={form.dept} onChange={(e) => set("dept", e.target.value)} placeholder="IT, RH, Ventes…" /></div>
+            <div><label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("usr.name")}</label><input className="sd-field" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Prénom Nom" /></div>
+            <div><label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("usr.email")}</label><input className="sd-field" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="prenom.nom@entreprise.com" /></div>
+            <div><label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("usr.password")}{editingId ? ` (${t("usr.pwdKeep")})` : ""}</label><input className="sd-field" value={form.password} onChange={(e) => set("password", e.target.value)} placeholder={editingId ? "••••••" : ""} disabled={!!editingId} /></div>
+            <div><label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("usr.dept")}</label><input className="sd-field" value={form.dept} onChange={(e) => set("dept", e.target.value)} placeholder="IT, RH, Ventes…" /></div>
             <div>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("emp.role")}</label>
-              <select style={inputStyle} value={form.role} onChange={(e) => set("role", e.target.value)}>
+              <select className="sd-field" value={form.role} onChange={(e) => set("role", e.target.value)}>
                 {Object.values(ROLES).map((r) => <option key={r} value={r}>{ROLE_LABELS[r][lang]}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: 12.5, color: "var(--muted)" }}>{t("emp.status")}</label>
-              <select style={inputStyle} value={form.status} onChange={(e) => set("status", e.target.value)}>
+              <select className="sd-field" value={form.status} onChange={(e) => set("status", e.target.value)}>
                 {Object.values(STATUS).map((s) => <option key={s} value={s}>{STATUS_LABELS[s][lang]}</option>)}
               </select>
             </div>
           </div>
           {err && <div style={{ marginTop: 10, fontSize: 13, color: "var(--danger)" }}>{err}</div>}
-          <button onClick={save} disabled={saving} style={{ marginTop: 16, height: 44, padding: "0 20px", borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.6 : 1, fontFamily: "inherit" }}>{saving ? t("common.loading") : (editingId ? t("usr.save") : t("usr.add"))}</button>
+          <button onClick={save} disabled={saving} className="sd-btn sd-btn--gold" style={{ marginTop: 16 }}>{saving ? t("common.loading") : (editingId ? t("usr.save") : t("usr.add"))}</button>
         </Card>
       )}
 

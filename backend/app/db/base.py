@@ -25,11 +25,41 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _run_migrations() -> None:
+    """Migrations légères idempotentes (create_all n'ajoute pas de colonne à une table existante).
+    Ajoute les colonnes neuves sur les tables déjà créées (ex. ticket_statut sur demande)."""
+    from sqlalchemy import text
+    stmts = [
+        "ALTER TABLE demande ADD COLUMN IF NOT EXISTS ticket_statut VARCHAR(20)",
+        "ALTER TABLE metier ADD COLUMN IF NOT EXISTS id_departement INTEGER",
+        "ALTER TABLE competence ADD COLUMN IF NOT EXISTS proposee BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE humeur ADD COLUMN IF NOT EXISTS anonyme BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE objectif ADD COLUMN IF NOT EXISTS groupe_id VARCHAR(40)",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS telephone VARCHAR(40)",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS bio TEXT",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS photo TEXT",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS date_naissance DATE",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS site VARCHAR(40)",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS type_contrat VARCHAR(20)",
+        "ALTER TABLE employe ADD COLUMN IF NOT EXISTS genre VARCHAR(10)",
+        "ALTER TABLE tache_parcours ADD COLUMN IF NOT EXISTS completed BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE historique_salaire ADD COLUMN IF NOT EXISTS motif VARCHAR(20)",
+        "ALTER TABLE modele_tache ADD COLUMN IF NOT EXISTS acteur VARCHAR(20) DEFAULT 'RH'",
+    ]
+    with engine.begin() as conn:
+        for s in stmts:
+            try:
+                conn.execute(text(s))
+            except Exception:
+                pass  # SQLite / colonne déjà présente : sans gravité
+
+
 def init_db() -> None:
     """Crée les tables (et sème les données de démo si demandé)."""
     from app.db import models  # noqa: F401  (enregistre les modèles sur Base)
 
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
 
     if settings.DB_SEED:
         from app.db.seed import seed_if_empty

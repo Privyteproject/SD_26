@@ -37,7 +37,7 @@ Carte des endpoints réellement consommés par le front intégré :
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import employees, absences, demandes, parcours, documents, rag, dashboard, ai, audit, search, chat
+from app.api.v1.endpoints import employees, absences, demandes, parcours, documents, rag, dashboard, ai, audit, search, chat, notifications, predict, rapports, alertes, integration, feedback, competences, okr, humeur, tickets, annonces, confidentialite, config, vision, me_taches
 
 # Routeur agrégateur de la v1 : monté sous /api/v1 dans main.py
 api_router = APIRouter()
@@ -49,9 +49,24 @@ api_router.include_router(parcours.router, prefix="/parcours", tags=["parcours"]
 api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 api_router.include_router(rag.router, prefix="/rag", tags=["rag"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(vision.router, prefix="/vision", tags=["vision"])
+api_router.include_router(me_taches.router, prefix="/me", tags=["me"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
 api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(predict.router, prefix="/predict", tags=["predict"])
+api_router.include_router(rapports.router, prefix="/rapports", tags=["rapports"])
+api_router.include_router(alertes.router, prefix="/alertes", tags=["alertes"])
+api_router.include_router(integration.router, prefix="/webhooks", tags=["integration"])
+api_router.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
+api_router.include_router(competences.router, prefix="/competences", tags=["competences"])
+api_router.include_router(okr.router, prefix="/okr", tags=["okr"])
+api_router.include_router(humeur.router, prefix="/humeur", tags=["humeur"])
+api_router.include_router(tickets.router, prefix="/tickets", tags=["tickets"])
+api_router.include_router(annonces.router, prefix="/annonces", tags=["annonces"])
+api_router.include_router(confidentialite.router, prefix="/confidentialite", tags=["confidentialite"])
+api_router.include_router(config.router, prefix="/config", tags=["config"])
 
 __all__ = ["api_router"]

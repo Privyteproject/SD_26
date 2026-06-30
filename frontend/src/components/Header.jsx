@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, LogOut, ChevronDown } from "lucide-react";
+import { LogOut, ChevronDown } from "lucide-react";
 import { useSession } from "../app/providers/SessionProvider";
 import { useI18n } from "../app/providers/I18nProvider";
 import { ROLE_LABELS } from "../lib/constants";
 import GlobalSearchBar from "./layout/GlobalSearchBar";
+import NotificationBell from "./layout/NotificationBell";
 import LanguageToggle from "./LanguageToggle";
 import ThemeToggle from "./ThemeToggle";
 
@@ -18,16 +19,14 @@ export default function Header() {
   const initial = currentUser ? currentUser.name.charAt(0) : "?";
 
   return (
-    <header style={{ height: 64, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--bg)", display: "flex", alignItems: "center", gap: 14, padding: "0 22px", position: "sticky", top: 0, zIndex: 20 }}>
+    <header style={{ height: 66, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "color-mix(in srgb, var(--surface) 80%, transparent)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", display: "flex", alignItems: "center", gap: 14, padding: "0 24px", position: "sticky", top: 0, zIndex: 20 }}>
       {/* Recherche globale (largeur fixe, ne s'étire pas) */}
       <GlobalSearchBar />
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
         <LanguageToggle />
         <ThemeToggle />
-        <button aria-label="Notifications" style={{ width: 38, height: 38, borderRadius: 9, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Bell size={18} />
-        </button>
+        <NotificationBell />
 
         <div style={{ position: "relative" }}>
           <button onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 8px 0 6px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--surface)", cursor: "pointer", fontFamily: "inherit" }}>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, MessageSquare, ShieldCheck, AlertCircle, Database, Zap, Plus, Trash2 } from "lucide-react";
+import { Send, MessageSquare, ShieldCheck, AlertCircle, Database, Zap, Plus, Trash2, LifeBuoy } from "lucide-react";
 import { useI18n } from "../../../app/providers/I18nProvider";
 import { useChat } from "../useChat";
 
@@ -66,12 +66,19 @@ export default function Assistant({ audience = "collaborateur" }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 64px - 110px)" }}>
-      <h1 className="font-display" style={{ fontSize: 24, fontWeight: 600, color: "var(--ink)", margin: "0 0 14px" }}>{title}</h1>
+      <h1 className="font-display" style={{ fontSize: 24, fontWeight: 600, color: "var(--ink)", margin: "0 0 10px" }}>{title}</h1>
+
+      {/* Transparence (§4.1) : information sur la journalisation des échanges. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--muted)",
+        background: "var(--field)", border: "1px solid var(--line)", borderRadius: 9, padding: "8px 12px", margin: "0 0 14px" }}>
+        <ShieldCheck size={14} style={{ color: "var(--gold-deep)", flexShrink: 0 }} />
+        <span>{t("chat.privacyNotice")}</span>
+      </div>
 
       <div style={{ display: "flex", gap: 14, flex: 1, minHeight: 0 }}>
         {/* Colonne gauche : historique */}
         <div style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", border: "1px solid var(--line)", borderRadius: 14, background: "var(--surface)", padding: 12, minHeight: 0 }}>
-          <button onClick={newSession} style={{ height: 40, borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", fontWeight: 600, fontSize: 13.5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, fontFamily: "inherit", flexShrink: 0 }}>
+          <button onClick={newSession} className="sd-btn sd-btn--gold" style={{ flexShrink: 0 }}>
             <Plus size={16} /> {t("chat.new")}
           </button>
           <div style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: "var(--muted)", fontWeight: 600, margin: "14px 4px 8px" }}>{t("chat.conversations")}</div>
@@ -118,11 +125,19 @@ export default function Assistant({ audience = "collaborateur" }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {messages.map((m, i) => {
                   const isUser = m.role === "user";
+                  const escalade = !isUser && m.meta?.escalade;
+                  const bg = isUser ? "var(--gold)" : escalade ? "rgba(180,120,20,.12)" : (m.error ? "rgba(180,64,46,.10)" : "var(--field)");
+                  const border = isUser ? "none" : escalade ? "1px solid #9a6b12" : "1px solid var(--line)";
                   return (
                     <div key={i} style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
-                      <div style={{ maxWidth: "80%", background: isUser ? "var(--gold)" : (m.error ? "rgba(180,64,46,.10)" : "var(--field)"), color: isUser ? "var(--on-gold)" : (m.error ? "var(--danger)" : "var(--ink)"), border: isUser ? "none" : "1px solid var(--line)", borderRadius: 14, padding: "10px 14px", fontSize: 14, lineHeight: 1.5 }}>
+                      <div style={{ maxWidth: "80%", background: bg, color: isUser ? "var(--on-gold)" : (m.error ? "var(--danger)" : "var(--ink)"), border, borderRadius: 14, padding: "10px 14px", fontSize: 14, lineHeight: 1.5 }}>
+                        {escalade && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, fontWeight: 700, color: "#9a6b12", marginBottom: 6 }}>
+                            <LifeBuoy size={15} /> {t("esc.title")}
+                          </div>
+                        )}
                         <div dir={isRtl(m.content) ? "rtl" : "ltr"} style={{ whiteSpace: "pre-wrap", textAlign: isRtl(m.content) ? "right" : "left" }}>{m.content}</div>
-                        {!isUser && !m.error && <AssistantMeta meta={m.meta} model={m.model} degraded={m.degraded} />}
+                        {!isUser && !m.error && !escalade && <AssistantMeta meta={m.meta} model={m.model} degraded={m.degraded} />}
                       </div>
                     </div>
                   );
@@ -138,9 +153,8 @@ export default function Assistant({ audience = "collaborateur" }) {
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, border: "1px solid var(--line)", borderRadius: 12, background: "var(--field)", padding: "0 8px 0 14px", height: 52, flexShrink: 0 }}>
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={onKeyDown} placeholder="Écrivez votre question…"
-              style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--ink)", fontSize: 14, fontFamily: "inherit" }} />
-            <button onClick={submit} disabled={isLoading || !input.trim()}
-              style={{ width: 38, height: 38, borderRadius: 9, border: "none", background: "var(--gold)", color: "var(--on-gold)", display: "flex", alignItems: "center", justifyContent: "center", cursor: isLoading || !input.trim() ? "not-allowed" : "pointer", opacity: isLoading || !input.trim() ? 0.6 : 1 }}>
+              className="sd-field" style={{ flex: 1, border: "none", background: "transparent" }} />
+            <button onClick={submit} disabled={isLoading || !input.trim()} className="sd-btn sd-btn--gold sd-btn--sm">
               <Send size={17} />
             </button>
           </div>

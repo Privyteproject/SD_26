@@ -1,0 +1,47 @@
+<!-- @dsCard group="Composants" -->
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Affichage de données — Synapse Digital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#F4ECDC;--surface:#FBF6EC;--ink:#2D2114;--muted:#6E5C46;--line:#E6D8BF;
+    --gold:#B8893E;--gold-deep:#946B2A;--gold-tint:#EFE2C6;--on-gold:#FFF}
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px;background:var(--bg);color:var(--ink);font-family:'Hanken Grotesk',sans-serif}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 10px}
+  .block{margin-bottom:26px}
+  .row{display:flex;align-items:center;gap:12px}
+  .avatar{width:48px;height:48px;border-radius:50%;background:var(--gold);color:var(--on-gold);
+    display:flex;align-items:center;justify-content:center;font-weight:600;font-size:20px}
+  .avatar.photo{background:linear-gradient(135deg,#DEC48A,#946B2A);border:2px solid var(--gold)}
+  .star{font-size:18px;color:var(--gold)}
+  .star.off{color:var(--line)}
+  .bar{flex:1;height:8px;background:var(--gold-tint);border-radius:6px;overflow:hidden}
+  .fill{height:100%;background:var(--gold)}
+  .empty{border:1px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--muted);background:var(--surface)}
+  .empty .ic{width:40px;height:40px;border-radius:50%;background:var(--gold-tint);margin:0 auto 10px}
+</style></head>
+<body>
+  <div class="block"><h2>Avatar</h2>
+    <div class="row">
+      <div class="avatar">M</div>
+      <div class="avatar photo"></div>
+      <span style="font-size:13px;color:var(--muted)">Initiale (défaut) · Photo de profil</span>
+    </div>
+  </div>
+
+  <div class="block"><h2>Étoiles (auto-évaluation 1–5)</h2>
+    <div class="row">
+      <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star off">★</span>
+      <span style="font-size:13px;color:var(--muted)">4/5</span>
+    </div>
+  </div>
+
+  <div class="block"><h2>Barre de progression</h2>
+    <div class="row"><div class="bar"><div class="fill" style="width:72%"></div></div><span style="font-size:13px;color:var(--muted)">72%</span></div>
+  </div>
+
+  <div class="block"><h2>État vide</h2>
+    <div class="empty"><div class="ic"></div>Aucune donnée à afficher.</div>
+  </div>
+</body></html>

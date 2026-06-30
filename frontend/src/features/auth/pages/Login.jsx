@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, KeyRound, AlertCircle, LogIn } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, LogIn } from "lucide-react";
 import Logo from "../../../components/Logo";
 import LanguageToggle from "../../../components/LanguageToggle";
 import ThemeToggle from "../../../components/ThemeToggle";
@@ -42,22 +42,20 @@ export default function Login() {
   const eyebrow = { fontSize: 11.5, letterSpacing: 2, textTransform: "uppercase", color: "var(--gold-deep)", fontWeight: 600 };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", padding: 24, background: "var(--bg)" }}>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", padding: 24, background: "radial-gradient(1100px 560px at 50% -8%, var(--gold-tint), transparent 60%), var(--bg)" }}>
       <div style={{ position: "absolute", top: 24, right: 24, display: "flex", gap: 10 }}>
         <LanguageToggle /><ThemeToggle />
       </div>
 
       <div style={{ width: "100%", maxWidth: 412 }}>
-        <form onSubmit={submit} style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 20, padding: 30, boxShadow: "var(--shadow)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Logo />
-            <span style={{ lineHeight: 1 }}>
-              <span style={{ fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>Synapse</span>
-              <span style={{ display: "block", fontSize: 9, letterSpacing: 3, color: "var(--gold-deep)", fontWeight: 600, marginTop: 2 }}>DIGITAL</span>
-            </span>
-          </div>
+        {/* Marque mise en avant */}
+        <div style={{ position: "relative", display: "flex", justifyContent: "center", marginBottom: 22 }}>
+          <div className="ds-glow" style={{ position: "absolute", width: 230, height: 230, borderRadius: "50%", background: "radial-gradient(circle, var(--gold-tint), transparent 68%)", filter: "blur(6px)" }} />
+          <div style={{ position: "relative" }}><Logo size={66} layout="stack" animated /></div>
+        </div>
 
-          <div style={{ marginTop: 22 }}>
+        <form onSubmit={submit} style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 20, padding: 30, boxShadow: "var(--shadow)" }}>
+          <div style={{ marginTop: 0 }}>
             <p style={eyebrow}>{t("login.eyebrow")}</p>
             <h2 className="font-display" style={{ fontSize: 25, fontWeight: 600, marginTop: 6, color: "var(--ink)" }}>{t("login.title")}</h2>
             <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>{t("login.sub")}</p>
@@ -91,12 +89,8 @@ export default function Login() {
               </div>
             )}
 
-            <button type="submit" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--gold)", color: "var(--on-gold)", height: 48, borderRadius: 9, fontSize: 15, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+            <button type="submit" className="sd-btn sd-btn--gold sd-btn--lg" style={{ width: "100%" }}>
               {loading ? "…" : t("login.submit")} <ArrowRight size={18} />
-            </button>
-
-            <button type="button" disabled title="Keycloak — à venir" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "transparent", color: "var(--muted)", height: 44, borderRadius: 9, fontSize: 13.5, fontWeight: 600, border: "1px solid var(--line)", cursor: "not-allowed", fontFamily: "inherit" }}>
-              <KeyRound size={16} /> {t("login.sso")}
             </button>
           </div>
 
@@ -120,7 +114,7 @@ export default function Login() {
                     <div style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ROLE_LABELS[a.role][lang]}</div>
                     <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{a.email}</div>
                   </div>
-                  <button type="button" onClick={() => useAccount(a)} style={{ flexShrink: 0, height: 32, padding: "0 12px", borderRadius: 8, border: "1px solid var(--gold)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>{t("login.use")}</button>
+                  <button type="button" onClick={() => useAccount(a)} className="sd-btn sd-btn--ghost sd-btn--sm" style={{ flexShrink: 0 }}>{t("login.use")}</button>
                 </div>
               ))}
             </div>
@@ -145,7 +139,7 @@ export default function Login() {
                     <div style={{ fontSize: 13, color: "var(--ink)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ROLE_LABELS[a.role][lang]}</div>
                     <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{a.email}</div>
                   </div>
-                  <button type="button" onClick={() => useAccount(a)} style={{ flexShrink: 0, height: 32, padding: "0 12px", borderRadius: 8, border: "1px solid var(--gold)", background: "transparent", color: "var(--gold-deep)", fontWeight: 600, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>{t("login.use")}</button>
+                  <button type="button" onClick={() => useAccount(a)} className="sd-btn sd-btn--ghost sd-btn--sm" style={{ flexShrink: 0 }}>{t("login.use")}</button>
                 </div>
               ))}
             </div>

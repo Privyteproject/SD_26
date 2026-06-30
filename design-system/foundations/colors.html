@@ -1,0 +1,53 @@
+<!-- @dsCard group="Fondations" -->
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Couleurs — Synapse Digital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F4ECDC;--bg-alt:#EEE4D0;--surface:#FBF6EC;--ink:#2D2114;--muted:#6E5C46;--line:#E6D8BF;
+    --gold:#B8893E;--gold-deep:#946B2A;--gold-soft:#DEC48A;--gold-tint:#EFE2C6;--on-gold:#FFF;--field:#FFF;
+    --danger:#B4402E;--success:#5C7A2E;--warning:#B7791F;--info:#3E6E8E;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px;background:var(--bg);color:var(--ink);font-family:'Hanken Grotesk',sans-serif}
+  h1{font-family:'Bricolage Grotesque',sans-serif;font-size:24px;font-weight:600;margin:0 0 4px}
+  p.sub{color:var(--muted);margin:0 0 22px;font-size:14px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:24px 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+  .sw{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+  .chip{height:72px}
+  .meta{padding:8px 10px}
+  .name{font-size:13px;font-weight:600}
+  .hex{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+</style></head>
+<body>
+  <h1 class="font-display">Couleurs</h1>
+  <p class="sub">Palette de marque « or » sur fonds crème — thème clair.</p>
+
+  <h2>Fonds & texte</h2>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#F4ECDC"></div><div class="meta"><div class="name">bg</div><div class="hex">#F4ECDC</div></div></div>
+    <div class="sw"><div class="chip" style="background:#EEE4D0"></div><div class="meta"><div class="name">bg-alt</div><div class="hex">#EEE4D0</div></div></div>
+    <div class="sw"><div class="chip" style="background:#FBF6EC"></div><div class="meta"><div class="name">surface</div><div class="hex">#FBF6EC</div></div></div>
+    <div class="sw"><div class="chip" style="background:#2D2114"></div><div class="meta"><div class="name">ink</div><div class="hex">#2D2114</div></div></div>
+    <div class="sw"><div class="chip" style="background:#6E5C46"></div><div class="meta"><div class="name">muted</div><div class="hex">#6E5C46</div></div></div>
+    <div class="sw"><div class="chip" style="background:#E6D8BF"></div><div class="meta"><div class="name">line</div><div class="hex">#E6D8BF</div></div></div>
+  </div>
+
+  <h2>Or (marque)</h2>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#B8893E"></div><div class="meta"><div class="name">gold</div><div class="hex">#B8893E</div></div></div>
+    <div class="sw"><div class="chip" style="background:#946B2A"></div><div class="meta"><div class="name">gold-deep</div><div class="hex">#946B2A</div></div></div>
+    <div class="sw"><div class="chip" style="background:#DEC48A"></div><div class="meta"><div class="name">gold-soft</div><div class="hex">#DEC48A</div></div></div>
+    <div class="sw"><div class="chip" style="background:#EFE2C6"></div><div class="meta"><div class="name">gold-tint</div><div class="hex">#EFE2C6</div></div></div>
+  </div>
+
+  <h2>Sémantique</h2>
+  <div class="grid">
+    <div class="sw"><div class="chip" style="background:#5C7A2E"></div><div class="meta"><div class="name">success</div><div class="hex">#5C7A2E</div></div></div>
+    <div class="sw"><div class="chip" style="background:#B7791F"></div><div class="meta"><div class="name">warning</div><div class="hex">#B7791F</div></div></div>
+    <div class="sw"><div class="chip" style="background:#B4402E"></div><div class="meta"><div class="name">danger</div><div class="hex">#B4402E</div></div></div>
+    <div class="sw"><div class="chip" style="background:#3E6E8E"></div><div class="meta"><div class="name">info</div><div class="hex">#3E6E8E</div></div></div>
+  </div>
+</body></html>

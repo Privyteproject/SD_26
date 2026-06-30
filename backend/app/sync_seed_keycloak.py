@@ -1,8 +1,8 @@
 import sys
 import os
 
-# Add the /app directory to the Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/app")
+# Add the parent directory to the Python path so that "app" module can be imported
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.keycloak_service import create_user_in_keycloak, _find_kc_user_id, get_keycloak_admin
 
@@ -17,7 +17,7 @@ users = [
     ("yasmine.haddad@entreprise.com", "Yasmine", "Haddad", "COLLABORATEUR"),
 ]
 
-password = "demo"
+password = "demo1234"
 
 kc_admin = get_keycloak_admin()
 

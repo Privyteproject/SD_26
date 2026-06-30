@@ -18,9 +18,29 @@ from app.db.base import init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()  # create_all + seed si vide
+    # Charge les règles de supervision configurables (mots-clés sensibles supplémentaires).
+    try:
+        from app.db.base import SessionLocal
+        from app.db import repository as _repo
+        from app.services import classifier as _cls
+        with SessionLocal() as _db:
+            _cls.set_extra_sensible(_repo.get_parametre(_db, "mots_sensibles_extra", []))
+    except Exception:
+        pass
+    # Préchargement du scanner anti-injection (hors chemin requête -> pas de timeout/502).
+    try:
+        from app.services import security_filter as _sf
+        _sf.warmup_llmguard()
+    except Exception:
+        pass
     # Branché APRÈS le seed pour ne pas auditer les données de démo initiales.
     register_audit_listeners()
-    yield
+    from app.services import scheduler
+    scheduler.start()  # jobs périodiques : onboarding en retard + scoring ML
+    try:
+        yield
+    finally:
+        scheduler.shutdown()
 
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION, lifespan=lifespan)

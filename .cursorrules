@@ -1,0 +1,67 @@
+# AI Agent Development Rules - Synapse Digital (SD_26)
+# Senior Full-Stack developer guidelines
+
+## 1. Project Context & Domain
+* **App Name**: Synapse Digital (AI-augmented HR Solution)
+* **Goal**: Provide standard HR features (onboarding, absences, employee records, document management) augmented with AI assistant capabilities (RAG, automated document draft generation, predictive indicators).
+* **Architecture**: Dual-module architecture with a **FastAPI backend** (Python) and a **React/Vite frontend** (JavaScript), orchestrated using **Docker Compose**.
+
+---
+
+## 2. Technology Stack Constraints
+
+### Backend (FastAPI / Python)
+* **Framework**: FastAPI (v0.100+)
+* **ORM**: SQLAlchemy 2.0 using Type Annotations (`Mapped[T]` and `mapped_column()`).
+* **Database**: PostgreSQL (main storage), ChromaDB (vector database for RAG & semantic search).
+* **Caching & Queue**: Redis.
+* **Storage**: MinIO (S3 API equivalent) for documents.
+* **Auth**: JWT via Keycloak (RBAC validation using `require_roles`).
+* **Migrations**: Alembic. All DB schema modifications must be applied via Alembic migrations. Do not run raw SQL or custom scripts for migrations.
+
+### Frontend (React / Vite)
+* **Styling**: Vanilla CSS utilizing custom design tokens / variables defined in `src/styles/index.css` paired with Tailwind CSS v4.
+* **Icons**: `lucide-react`.
+* **State & Data Fetching**: Custom async utility `useAsync` (from `src/lib/useAsync.js`) and stores (like `authStore.js`).
+* **Internationalization**: Local translation provider via `useI18n()` hook. Text translation keys are stored in `src/app/providers/I18nProvider.jsx` (or `src/i18n`).
+* **Auth Storage**: Access tokens are stored in `sessionStorage` (stored under the key `sd-access-token`), managed by Keycloak.
+
+---
+
+## 3. Architecture Rules & Guidelines
+
+### Database & Repository Patterns
+* **Strict Schema Adherence**: Refer to `backend/app/db/models.py` for table definitions and relations.
+* **Decimals vs Floats**: Use SQLAlchemy `Numeric(12,2)` (corresponds to `decimal.Decimal` in Python) for monetary/salary values. Never use floats.
+* **Repository Pattern**: All database access queries (reads/writes) must reside in `backend/app/db/repository.py`. Endpoints must call repository functions instead of querying models directly.
+* **Audit & Logging**:
+  * Mutations must trigger audit logs either automatically via SQLAlchemy events (`app/db/audit.py`) or by manually calling `repo.log_audit(db, ...)`.
+  * AI interactions must be logged using `repo.log_ia_interaction(db, ...)`.
+
+### Interactive Chat vs. AI Auditing Tables (IMPORTANT)
+* Note the existence of two parallel structures:
+  1. **`ChatSession` & `ChatMessage` tables**: Used in `backend/app/api/v1/endpoints/chat.py` and the frontend UI (`useChat.js`) to display and manage interactive conversations with the Assistant.
+  2. **`ConversationIA` & `InteractionIA` tables**: Used in `backend/app/api/v1/endpoints/ai.py` for audit, analytics, and admin supervision logging.
+* Ensure both tables are updated correctly when implementing features like chat history saving.
+
+### FastAPI Route & Response Pattern
+* **Envelope Pattern**: All FastAPI endpoints must return responses wrapped in the standard envelope. Import it from `app.schemas.common` and use `envelope(data, meta=...)`.
+* **Security & Auth**: Always secure endpoints using dependencies:
+  * `CurrentUser = Depends(get_current_user)` for authentication.
+  * `Depends(require_roles(ROLE_ADMIN, ROLE_RH))` for role-based authorization.
+* **Error Handling**: Use standard FastAPI `HTTPException` with appropriate status codes (`status.HTTP_404_NOT_FOUND`, `status.HTTP_403_FORBIDDEN`, etc.).
+
+### Frontend Development Rules
+* **UI Themes**: Ensure components respect the design system tokens (`--bg`, `--surface`, `--ink`, `--gold`, etc.) and support both light/dark modes.
+* **Inline Styles vs. CSS Classes**: Use inline styles for layout spacing variations and structural elements, but leverage Tailwind utility classes where appropriate. Keep typography and display fonts consistent with `.font-display` (`Bricolage Grotesque`) and standard body font (`Hanken Grotesk`).
+* **Translations**: Never hardcode user-facing strings in the UI. Always use `t("key.path")` via `useI18n`.
+* **Form Submissions**: Always implement manual safety actions. E.g., generated documents are stored as `draft` in the database, requiring the user to explicitly click "Submit" (`pending` status) before they reach the RH validation workflow.
+
+---
+
+## 4. Troubleshooting & Testing Rules
+* **Local environment**: Verify changes within Docker container logs:
+  `docker compose logs -f backend` / `docker compose logs -f frontend`
+* **Automated Tests**: Write tests under `backend/tests/` using `pytest`. Run using the container or target python environment.
+* **Manual Verification**: Follow scenarios from `GUIDE_TEST_MANUEL.md` to validate features (e.g. SF-20 for document generation, SF-18 for assistant questions).
+* **Zero Placeholders**: Do not write mock responses or temporary `TODO` stubs. Code must be production-ready and fully implemented.
