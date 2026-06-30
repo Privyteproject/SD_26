@@ -1,0 +1,72 @@
+"""
+Routeur API v1 — agrégateur.
+
+Ce module rassemble TOUS les sous-routeurs de l'API sous un unique
+`APIRouter` (`api_router`). C'est ce routeur que `app/main.py` monte
+derrière le préfixe `/api/v1`, qui correspond exactement au `BASE`
+attendu par le front (`frontend/src/lib/api.js` → `/api/v1`).
+
+Pour ajouter un nouveau domaine fonctionnel :
+  1. créer un module dans `app/api/v1/endpoints/` exposant un `router`;
+  2. l'inclure ci-dessous avec son préfixe et son tag.
+
+Carte des endpoints réellement consommés par le front intégré :
+
+    GET    /employees/me                 -> profil de l'utilisateur connecté
+    GET    /employees                    -> liste (filtrable, paginée)
+    POST   /employees                    -> création
+    GET    /employees/{id}               -> détail
+    PUT    /employees/{id}               -> mise à jour
+    DELETE /employees/{id}               -> suppression
+    GET    /absences                     -> liste (filtrable)
+    POST   /absences                     -> création
+    PATCH  /absences/{id}/status         -> changement de statut
+    GET    /absences/stats               -> agrégats
+    GET    /demandes/types               -> référentiel des types
+    GET    /demandes                     -> toutes les demandes (filtrable)
+    POST   /demandes                     -> dépôt d'une demande (tout type)
+    GET    /demandes/{id}                -> détail
+    PATCH  /demandes/{id}/status         -> décision (statut + commentaire)
+    GET    /parcours/modeles             -> gabarits de tâches (on/offboarding)
+    POST   /parcours/{matricule}/init    -> instancie un parcours
+    GET    /parcours/{matricule}         -> tâches d'un employé
+    PATCH  /parcours/taches/{id}         -> mise à jour d'une tâche
+    GET    /dashboard/kpis               -> indicateurs du tableau de bord
+    POST   /ai/chat                      -> assistant conversationnel
+"""
+
+from fastapi import APIRouter
+
+from app.api.v1.endpoints import employees, absences, demandes, parcours, documents, rag, dashboard, ai, audit, search, chat, notifications, predict, rapports, alertes, integration, feedback, competences, okr, humeur, tickets, annonces, confidentialite, config, vision, me_taches
+
+# Routeur agrégateur de la v1 : monté sous /api/v1 dans main.py
+api_router = APIRouter()
+
+api_router.include_router(employees.router, prefix="/employees", tags=["employees"])
+api_router.include_router(absences.router, prefix="/absences", tags=["absences"])
+api_router.include_router(demandes.router, prefix="/demandes", tags=["demandes"])
+api_router.include_router(parcours.router, prefix="/parcours", tags=["parcours"])
+api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+api_router.include_router(rag.router, prefix="/rag", tags=["rag"])
+api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(vision.router, prefix="/vision", tags=["vision"])
+api_router.include_router(me_taches.router, prefix="/me", tags=["me"])
+api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
+api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
+api_router.include_router(search.router, prefix="/search", tags=["search"])
+api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(predict.router, prefix="/predict", tags=["predict"])
+api_router.include_router(rapports.router, prefix="/rapports", tags=["rapports"])
+api_router.include_router(alertes.router, prefix="/alertes", tags=["alertes"])
+api_router.include_router(integration.router, prefix="/webhooks", tags=["integration"])
+api_router.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
+api_router.include_router(competences.router, prefix="/competences", tags=["competences"])
+api_router.include_router(okr.router, prefix="/okr", tags=["okr"])
+api_router.include_router(humeur.router, prefix="/humeur", tags=["humeur"])
+api_router.include_router(tickets.router, prefix="/tickets", tags=["tickets"])
+api_router.include_router(annonces.router, prefix="/annonces", tags=["annonces"])
+api_router.include_router(confidentialite.router, prefix="/confidentialite", tags=["confidentialite"])
+api_router.include_router(config.router, prefix="/config", tags=["config"])
+
+__all__ = ["api_router"]

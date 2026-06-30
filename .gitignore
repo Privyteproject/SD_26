@@ -1,0 +1,62 @@
+# Environments
+.env
+.env.local
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Alembic
+alembic.ini
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documents and Design
+*.docx
+*.pdf
+*.md.backup
+
+# Runtime data
+backend/data/chroma/
+backend/data/chroma_recovered/
+backend/logs/*.jsonl
+# Modèle ML entraîné : artefact régénéré au démarrage (base vide) ou via /predict/train.
+backend/data/ml_models.joblib

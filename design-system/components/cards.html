@@ -1,0 +1,45 @@
+<!-- @dsCard group="Composants" -->
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartes — Synapse Digital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#F4ECDC;--surface:#FBF6EC;--ink:#2D2114;--muted:#6E5C46;--line:#E6D8BF;
+    --gold:#B8893E;--gold-deep:#946B2A;--gold-tint:#EFE2C6;--on-gold:#FFF;
+    --shadow:0 18px 40px -24px rgba(120,86,30,.45)}
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px;background:var(--bg);color:var(--ink);font-family:'Hanken Grotesk',sans-serif}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:760px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .dot{width:18px;height:18px;border-radius:5px;background:var(--gold-deep)}
+  .title{font-size:14px;font-weight:600}
+  .kpi{font-family:'Bricolage Grotesque',sans-serif;font-size:42px;font-weight:700}
+  .muted{color:var(--muted);font-size:13px}
+  .accent{border-left:3px solid var(--gold)}
+  .pill{display:inline-block;background:var(--gold-tint);color:var(--gold-deep);border:1px solid #E0CFA3;border-radius:999px;font-size:12px;font-weight:600;padding:2px 10px}
+  .bar{height:8px;background:var(--gold-tint);border-radius:6px;overflow:hidden;margin-top:8px}
+  .fill{height:100%;width:72%;background:var(--gold)}
+</style></head>
+<body>
+  <div class="grid">
+    <div class="card">
+      <div class="head"><span class="dot"></span><span class="title">Score de satisfaction</span></div>
+      <div class="kpi">78<span class="muted" style="font-size:20px">/100</span></div>
+      <div class="muted">2026-W26 · 62 réponses</div>
+    </div>
+
+    <div class="card accent">
+      <div class="head"><span class="dot"></span><span class="title">Postes à compléter</span> <span class="pill">3</span></div>
+      <div class="muted">Data Analyst, Chargé SAV, Comptable…</div>
+      <div class="bar"><div class="fill"></div></div>
+    </div>
+
+    <div class="card" style="grid-column:1 / -1">
+      <div class="head"><span class="dot"></span><span class="title">Objectif de l'équipe</span> <span class="pill">Partagé · 12</span></div>
+      <div style="font-size:14px;margin-bottom:6px">Migrer la plateforme vers le cloud</div>
+      <div class="bar"><div class="fill" style="width:60%"></div></div>
+      <div class="muted" style="margin-top:6px">Avancement défini par le manager</div>
+    </div>
+  </div>
+</body></html>

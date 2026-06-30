@@ -1,0 +1,13 @@
+{% extends "_base.html.j2" %}
+{% block body %}
+<p>Fiche d'intégration de <b>{{ employee.prenom }} {{ employee.nom }}</b>.</p>
+<p class="doc-meta">
+  Poste : <b>{{ poste or employee.poste or "—" }}</b><br/>
+  Département : {{ employee.department.nom or "—" }}<br/>
+  Date de début : <b>{{ date_debut | format_date }}</b><br/>
+  Manager : {{ manager_nom or "—" }}
+</p>
+{% if objectifs_30j %}<p><b>Objectifs des 30 premiers jours :</b><br/>{{ objectifs_30j }}</p>{% endif %}
+{% if formations_prevues %}<p><b>Formations prévues :</b><br/>{{ formations_prevues }}</p>{% endif %}
+<p>Document de suivi du parcours d'onboarding.</p>
+{% endblock %}

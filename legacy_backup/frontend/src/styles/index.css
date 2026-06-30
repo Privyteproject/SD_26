@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --bg:#F4ECDC; --bg-alt:#EEE4D0; --surface:#FBF6EC;
+  --ink:#2D2114; --muted:#6E5C46; --line:#E6D8BF;
+  --gold:#B8893E; --gold-deep:#946B2A; --gold-soft:#DEC48A; --gold-tint:#EFE2C6;
+  --on-gold:#FFFFFF; --field:#FFFFFF;
+  --panel:#271B10; --panel-2:#34261A; --panel-line:#4A3826; --panel-text:#F3E9D6; --panel-muted:#B49E80;
+  --danger:#B4402E; --success:#5C7A2E; --warning:#B7791F; --info:#3E6E8E;
+  --shadow:0 18px 40px -24px rgba(120,86,30,.45);
+}
+[data-theme="dark"] {
+  --bg:#191108; --bg-alt:#1F160C; --surface:#241A10;
+  --ink:#F1E7D6; --muted:#AE9778; --line:#3A2C1C;
+  --gold:#D7A954; --gold-deep:#E7C57F; --gold-soft:#6A4F26; --gold-tint:#2E2114;
+  --on-gold:#191108; --field:#1A1109;
+  --panel:#120C06; --panel-2:#241910; --panel-line:#3A2C1C; --panel-text:#F3E9D6; --panel-muted:#B49E80;
+  --danger:#E0795F; --success:#9DBE5A; --warning:#E7C57F; --info:#7FB0CE;
+  --shadow:0 22px 48px -26px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background .4s ease, color .4s ease;
+}
+a { text-decoration: none; color: inherit; }
+h1, h2, h3 { font-family: 'Bricolage Grotesque', sans-serif; }
+.font-display { font-family: 'Bricolage Grotesque', sans-serif; }
+.font-serif-brand { font-family: 'Fraunces', serif; }
+::selection { background: var(--gold-tint); }

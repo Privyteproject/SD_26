@@ -1,0 +1,11 @@
+{% extends "_base.html.j2" %}
+{% block body %}
+<p>À l'attention de : <b>{{ destinataire or "—" }}</b></p>
+<p>Objet : {{ objet_recommandation or "Recommandation" }}</p>
+<p>Par la présente, {{ company.nom }} recommande <b>{{ employee.prenom }} {{ employee.nom }}</b>,
+{{ employee.poste or "—" }} au sein du département {{ employee.department.nom or "—" }}{% if employee.date_entree %}, en poste depuis le {{ employee.date_entree | format_date }}{% endif %}.</p>
+{% if competences_a_mettre_en_avant %}
+<p>Compétences notables : {{ competences_a_mettre_en_avant }}.</p>
+{% endif %}
+<p>Nous recommandons sans réserve cette personne et restons disponibles pour tout complément d'information.</p>
+{% endblock %}

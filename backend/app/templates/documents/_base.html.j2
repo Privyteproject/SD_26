@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<style>
+  @page { margin: 24mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; line-height: 1.6; font-size: 14px; margin: 0; padding: 24px; }
+  .doc-header { display: flex; align-items: center; gap: 16px; border-bottom: 2px solid #b8860b; padding-bottom: 14px; margin-bottom: 26px; }
+  .doc-logo { width: 54px; height: 54px; border: 1px dashed #b8860b; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #b8860b; font-size: 11px; text-align: center; }
+  .doc-company { font-size: 13px; color: #444; }
+  .doc-company b { font-size: 16px; color: #1a1a1a; }
+  .doc-title { text-align: center; font-weight: bold; font-size: 20px; margin: 0 0 24px; text-transform: uppercase; letter-spacing: 1px; }
+  .doc-body p { margin: 0 0 12px; }
+  .doc-meta { color: #555; }
+  .doc-signature { margin-top: 48px; text-align: right; color: #333; }
+  .doc-signature .line { display: inline-block; width: 220px; border-top: 1px solid #333; margin-top: 40px; padding-top: 4px; font-size: 12px; }
+  .doc-footer { margin-top: 40px; border-top: 1px solid #ddd; padding-top: 10px; color: #888; font-size: 12px; }
+  @media print { body { padding: 0; } .doc-header { -webkit-print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+  <div class="doc-header">
+    <div class="doc-logo">LOGO</div>
+    <div class="doc-company"><b>{{ company.nom }}</b><br/>{{ company.adresse }}</div>
+  </div>
+
+  <h1 class="doc-title">{% block title %}{{ label }}{% endblock %}</h1>
+
+  <div class="doc-body">
+    {% block body %}{% endblock %}
+  </div>
+
+  {% if requires_rh_validation %}
+  <div class="doc-signature"><span class="line">Signature &amp; cachet RH</span></div>
+  {% endif %}
+
+  <div class="doc-footer">
+    Fait le {{ date_generation }}. Document généré par la plateforme RH {{ company.nom }}.
+  </div>
+</body>
+</html>

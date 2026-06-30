@@ -1,0 +1,21 @@
+steps:
+  lint:
+    image: python:3.11-slim
+    commands:
+      - pip install flake8 black
+      - cd backend
+      - black --check app
+      - flake8 app
+
+  test:
+    image: python:3.11-slim
+    commands:
+      # requirements-test.txt = sous-ensemble suffisant (sans torch/llm-guard) + pytest/httpx.
+      - pip install -r backend/requirements-test.txt
+      - cd backend
+      - python -m pytest -p no:cacheprovider
+
+  security:
+    image: aquasec/trivy:latest
+    commands:
+      - trivy fs --exit-code 1 --severity HIGH,CRITICAL .

@@ -1,0 +1,4 @@
+# Dépendances OPTIONNELLES pour le RAG en production.
+# Sans elles, le backend tourne avec le vector store mémoire + embeddings hashing.
+chromadb>=0.5            # vector store persistant
+sentence-transformers>=2.7   # vrais embeddings locaux (modèle all-MiniLM-L6-v2)

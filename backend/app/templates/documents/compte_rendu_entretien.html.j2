@@ -1,0 +1,13 @@
+{% extends "_base.html.j2" %}
+{% block body %}
+<p>Compte-rendu de l'entretien annuel de <b>{{ employee.prenom }} {{ employee.nom }}</b>
+({{ employee.poste or "—" }}, {{ employee.department.nom or "—" }}).</p>
+<p class="doc-meta">
+  Date de l'entretien : <b>{{ date_entretien | format_date }}</b><br/>
+  Évaluateur : {{ evaluateur_nom or "—" }}<br/>
+  Période évaluée : {{ periode_evaluee or "—" }}
+</p>
+{% if points_forts %}<p><b>Points forts :</b><br/>{{ points_forts }}</p>{% endif %}
+{% if axes_amelioration %}<p><b>Axes d'amélioration :</b><br/>{{ axes_amelioration }}</p>{% endif %}
+{% if objectifs_annee_suivante %}<p><b>Objectifs pour l'année suivante :</b><br/>{{ objectifs_annee_suivante }}</p>{% endif %}
+{% endblock %}

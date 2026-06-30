@@ -1,0 +1,42 @@
+[
+  {
+    "id": "rh_conges_001",
+    "title": "Politique des conges",
+    "type": "policy",
+    "allowed_roles": "all,collaborateur,manager,rh,direction",
+    "department": "all",
+    "confidentiality": "internal",
+    "version": "1.0",
+    "text": "Les demandes de conges doivent etre deposees dans l'outil RH au moins 7 jours avant la date souhaitee, sauf urgence validee par le manager."
+  },
+  {
+    "id": "rh_absence_001",
+    "title": "Procedure d'absence",
+    "type": "procedure",
+    "allowed_roles": "all,collaborateur,manager,rh,direction",
+    "department": "all",
+    "confidentiality": "internal",
+    "version": "1.0",
+    "text": "Toute absence imprevue doit etre signalee au manager des que possible puis regularisee avec un justificatif dans les 48 heures."
+  },
+  {
+    "id": "rh_teletravail_001",
+    "title": "Regles de teletravail",
+    "type": "policy",
+    "allowed_roles": "all,collaborateur,manager,rh,direction",
+    "department": "all",
+    "confidentiality": "internal",
+    "version": "1.0",
+    "text": "Le teletravail est autorise jusqu'a deux jours par semaine selon l'accord du manager et les contraintes du poste."
+  },
+  {
+    "id": "rh_attestation_001",
+    "title": "Generation d'attestation",
+    "type": "procedure",
+    "allowed_roles": "all,collaborateur,rh",
+    "department": "all",
+    "confidentiality": "internal",
+    "version": "1.0",
+    "text": "Les attestations standards peuvent etre demandees par le collaborateur depuis le portail RH. Les attestations specifiques necessitent validation RH."
+  }
+]
