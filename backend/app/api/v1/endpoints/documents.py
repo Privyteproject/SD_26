@@ -51,8 +51,9 @@ _TO_INTERNAL = {"valide": "validated", "refuse": "refused", "en_attente": "pendi
 def validate_jinja_template(html_content: str):
     """Dry-run compiles and renders the template code with a mock context to prevent broken dynamic templates."""
     from jinja2 import Environment, TemplateSyntaxError
+    from app.services.doc_preview import SilentUndefined
     try:
-        env = Environment()
+        env = Environment(undefined=SilentUndefined)
         # Mock dry-run context matching base and specific templates
         mock_ctx = {
             "employee": {
