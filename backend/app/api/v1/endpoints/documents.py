@@ -34,7 +34,7 @@ from app.schemas.hr import (
     ModeleDocumentCreate,
     ModeleDocumentUpdate,
 )
-from app.services import doc_preview, document_types as dtypes, pdf_service, redis_cache, storage
+from app.services import doc_preview, document_types as dtypes, redis_cache, storage
 
 router = APIRouter()
 
@@ -140,7 +140,6 @@ def update_modele(code: str, payload: ModeleDocumentUpdate, _: CurrentUser = Dep
     return envelope(m.to_dict())
 
 
-<<<<<<< HEAD
 @router.post("/modeles/{code}/upload")
 def upload_modele_file(
     code: str,
@@ -287,40 +286,6 @@ def preview_modele_template(
 
 
 
-=======
-from fastapi import UploadFile, File
-import json
-import base64
-
-@router.post("/modeles/{code}/upload")
-async def upload_modele(code: str, file: UploadFile = File(...), _: CurrentUser = Depends(_VALIDATE), db: Session = Depends(get_db)):
-    from app.db.models import ModeleDocument
-    m = db.get(ModeleDocument, code)
-    if not m:
-        raise HTTPException(404, detail="Modèle introuvable")
-    
-    content = await file.read()
-    ext = file.filename.split(".")[-1].lower()
-    if ext not in ("docx", "pdf"):
-        raise HTTPException(400, detail="Format non supporté (.docx, .pdf)")
-        
-    minio_key = f"templates/{code}.{ext}"
-    if storage.available():
-        storage.put_bytes(minio_key, content)
-    
-    gabarit_data = {
-        "is_binary": True,
-        "format": ext,
-        "filename": file.filename,
-        "minio_key": minio_key,
-        "content_b64": base64.b64encode(content).decode("utf-8")
-    }
-    m.gabarit = json.dumps(gabarit_data)
-    db.commit()
-    return envelope(m.to_dict())
-
-
->>>>>>> Ghost_Work
 @router.delete("/modeles/{code}")
 def delete_modele(code: str, _: CurrentUser = Depends(_VALIDATE), db: Session = Depends(get_db)):
     res = repo.delete_modele_document(db, code)
@@ -420,14 +385,11 @@ def preview_document(
     payload: DocumentPreviewRequest, user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    from app.db.models import ModeleDocument
-    import json
-    
-    # Allow custom models from DB or static types
-    modele = db.get(ModeleDocument, payload.type)
-    if not modele and not dtypes.can_generate(user.role, payload.type):
+    """Génère un APERÇU (rien n'est sauvegardé). Les données minimales sont mises en
+    cache Redis (TTL court) sous un jeton signé HMAC. Aucune donnée perso en clair :
+    on ne stocke que le type, le matricule et les champs additionnels."""
+    if not dtypes.can_generate(user.role, payload.type):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Type de document non autorisé pour votre rôle")
-        
     matricule = payload.employee_id
     if user.role not in _ELEVATED or not matricule:
         matricule = _own_matricule(db, user)
@@ -437,41 +399,7 @@ def preview_document(
     if emp is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
 
-<<<<<<< HEAD
     document_name, html_preview, _ = doc_preview.render(db, payload.type, _emp_dict(emp), payload.additional_data)
-=======
-    # Check if binary template
-    is_binary = False
-    gabarit_data = {}
-    if modele and modele.gabarit and modele.gabarit.strip().startswith("{"):
-        try:
-            parsed = json.loads(modele.gabarit)
-            if parsed.get("is_binary"):
-                is_binary = True
-                gabarit_data = parsed
-        except Exception:
-            pass
-
-    document_name = None
-    html_preview = None
-    
-    if is_binary:
-        document_name = gabarit_data.get("filename", f"document.{gabarit_data.get('format', 'pdf')}")
-        html_preview = ""
-        # If it's docx, we can still generate an HTML preview from it
-        if gabarit_data.get("format") == "docx":
-            import base64
-            bin_content = base64.b64decode(gabarit_data.get("content_b64", ""))
-            try:
-                # Pre-fill template in memory to show html preview with values
-                filled_docx = doc_preview.fill_docx_template(bin_content, {"employee": _emp_dict(emp), **payload.additional_data})
-                html_preview = doc_preview.docx_to_html_preview(filled_docx, document_name)
-            except Exception as e:
-                html_preview = f"<p>Aperçu indisponible : {str(e)}</p>"
-    else:
-        document_name, html_preview, _ = doc_preview.render(payload.type, _emp_dict(emp), payload.additional_data)
-        
->>>>>>> Ghost_Work
     token, nonce = doc_preview.make_token()
     
     if "TOKEN_PLACEHOLDER" in html_preview:
@@ -480,12 +408,10 @@ def preview_document(
     redis_cache.set(f"docpreview:{nonce}", {
         "type": payload.type, "matricule": matricule,
         "additional_data": payload.additional_data, "user_email": user.email,
-        "is_binary": is_binary, "gabarit_data": gabarit_data, "document_name": document_name
     }, ttl=settings.DOC_PREVIEW_TTL)
     expires_at = (datetime.now(timezone.utc) + timedelta(seconds=settings.DOC_PREVIEW_TTL)).isoformat()
     requires_val = _requires_validation(payload.type)
     return envelope({"preview_token": token, "html_preview": html_preview,
-<<<<<<< HEAD
                      "document_name": document_name, "expires_at": expires_at,
                      "requires_rh_validation": requires_val})
 
@@ -593,33 +519,7 @@ def download_preview_file(
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Échec de la génération du PDF : {exc}",
             )
-=======
-                     "document_name": document_name, "expires_at": expires_at, "is_binary": is_binary, "format": gabarit_data.get("format")})
->>>>>>> Ghost_Work
 
-@router.get("/preview/pdf")
-def preview_pdf(token: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    nonce = doc_preview.verify_token(token)
-    if nonce is None:
-        raise HTTPException(400, detail="Jeton de prévisualisation invalide")
-    data = redis_cache.get(f"docpreview:{nonce}")
-    if not data or not data.get("is_binary"):
-        raise HTTPException(400, detail="Aperçu expiré ou type incorrect")
-        
-    emp = repo.get_employee(db, data["matricule"])
-    ctx = {"employee": _emp_dict(emp), **data.get("additional_data", {})}
-    gabarit_data = data["gabarit_data"]
-    
-    import base64
-    bin_content = base64.b64decode(gabarit_data.get("content_b64", ""))
-    
-    if gabarit_data.get("format") == "pdf":
-        filled = doc_preview.fill_pdf_template(bin_content, ctx)
-        return Response(content=filled, media_type="application/pdf")
-    else:
-        # For docx, we just return the filled docx file
-        filled = doc_preview.fill_docx_template(bin_content, ctx)
-        return Response(content=filled, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
 @router.post("/submit", status_code=status.HTTP_201_CREATED)
 def submit_preview(
@@ -642,6 +542,7 @@ def submit_preview(
     emp = repo.get_employee(db, data["matricule"])
     if emp is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
+
     type_key = data.get("type")
     
     # Check if binary template exists
@@ -744,29 +645,33 @@ def download_document(
     # Repli text/plain (compatibilité ou si MinIO indisponible)
     emp = repo.get_employee(db, doc.matricule)
     nom_complet = f"{emp.prenom} {emp.nom}" if emp else doc.matricule
-    libelle = doc.code_modele or (dtypes.label_of(doc.type_doc) if doc.type_doc else "Document")
+    libelle = doc.code_modele or "Document"
     if doc.code_modele:
         from app.db.models import ModeleDocument
         m = db.get(ModeleDocument, doc.code_modele)
         if m:
             libelle = m.libelle
 
-
     if doc.contenu:
-        body = doc.contenu
+        content = (
+            f"SYNAPSE DIGITAL — {libelle}\n{'=' * 48}\n\n"
+            f"{doc.contenu}\n"
+        )
     else:
-        body = (f"Matricule : {doc.matricule}\n"
-                f"Collaborateur : {nom_complet}\n"
-                f"Document : {doc.nom_fichier}\n"
-                f"Statut : {doc.statut}")
-    subtitle = f"{nom_complet} · {doc.matricule}"
-    content, content_type = pdf_service.build_pdf(libelle, body, subtitle=subtitle)
-
-    ext = "pdf" if content_type.startswith("application/pdf") else "txt"
-    filename = (doc.nom_fichier or f"document_{document_id}").rsplit(".", 1)[0] + f".{ext}"
+        content = (
+            f"SYNAPSE DIGITAL — {libelle}\n"
+            f"{'=' * 48}\n\n"
+            f"Matricule   : {doc.matricule}\n"
+            f"Collaborateur : {nom_complet}\n"
+            f"Document    : {doc.nom_fichier}\n"
+            f"Statut      : {doc.statut}\n"
+            f"Émis le     : {date.today().isoformat()}\n\n"
+            f"Ce document a été généré par la plateforme RH Synapse Digital.\n"
+        )
+    filename = (doc.nom_fichier or f"document_{document_id}").rsplit(".", 1)[0] + ".txt"
     return Response(
-        content=content,
-        media_type=content_type,
+        content=content.encode("utf-8"),
+        media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
