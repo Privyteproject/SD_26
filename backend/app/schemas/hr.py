@@ -81,6 +81,7 @@ class TacheCreate(BaseModel):
     libelle: str = Field(..., min_length=1)
     type_parcours: ParcoursType
     date_echeance: Optional[date] = None
+    acteur: Optional[str] = "RH"
 
 
 class ModeleTacheCreate(BaseModel):
@@ -89,12 +90,14 @@ class ModeleTacheCreate(BaseModel):
     type_parcours: ParcoursType
     ordre: Optional[int] = 0
     delai_jours: Optional[int] = None
+    acteur: Optional[str] = "RH"
 
 
 class ModeleTacheUpdate(BaseModel):
     libelle: Optional[str] = Field(None, min_length=1)
     ordre: Optional[int] = None
     delai_jours: Optional[int] = None
+    acteur: Optional[str] = None
 
 
 # --- Documents ---

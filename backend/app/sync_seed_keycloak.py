@@ -17,7 +17,7 @@ users = [
     ("yasmine.haddad@entreprise.com", "Yasmine", "Haddad", "COLLABORATEUR"),
 ]
 
-password = "demo"
+password = "demo1234"
 
 kc_admin = get_keycloak_admin()
 

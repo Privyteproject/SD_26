@@ -88,6 +88,7 @@ class ModeleTache(Base):
     type_parcours: Mapped[str] = mapped_column(String(20))  # ONBOARDING / OFFBOARDING
     ordre: Mapped[int] = mapped_column(Integer, default=0)
     delai_jours: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    acteur: Mapped[str] = mapped_column(String(20), server_default="RH", default="RH")
     __table_args__ = (
         CheckConstraint(
             "type_parcours IN ('ONBOARDING','OFFBOARDING')", name="ck_modele_tache_parcours"
@@ -719,6 +720,7 @@ def _modele_tache_to_dict(self: ModeleTache) -> dict:
         "code": self.code_tache, "libelle": self.libelle,
         "type_parcours": self.type_parcours, "ordre": self.ordre,
         "delai_jours": self.delai_jours,
+        "acteur": self.acteur,
     }
 
 
@@ -735,6 +737,7 @@ def _tache_to_dict(self: TacheParcours) -> dict:
         "completed": bool(self.completed),
         "date_echeance": self.date_echeance.isoformat() if self.date_echeance else None,
         "date_realisation": self.date_realisation.isoformat() if self.date_realisation else None,
+        "acteur": m.acteur if m else "RH",
     }
 
 

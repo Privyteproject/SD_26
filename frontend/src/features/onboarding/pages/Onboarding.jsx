@@ -50,23 +50,48 @@ export default function Onboarding() {
 
         <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 16, marginTop: 16 }}>
           <Card style={{ alignSelf: "flex-start" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>{t("parc.tasks")}</div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>{t("parc.checkHint")}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {tasks.map((tk) => {
-                const isDone = tk.status === "done";
-                const busy = busyId === tk.id;
-                return (
-                  <button key={tk.id} onClick={() => toggle(tk)} disabled={busy}
-                    style={{ display: "flex", alignItems: "center", gap: 11, fontSize: 14, color: isDone ? "var(--muted)" : "var(--ink)", background: "transparent", border: "none", textAlign: "left", cursor: busy ? "wait" : "pointer", padding: "7px 4px", borderRadius: 8, fontFamily: "inherit", opacity: busy ? 0.6 : 1 }}>
-                    <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: `1px solid ${isDone ? "var(--gold)" : "var(--line)"}`, background: isDone ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {isDone && <Check size={13} color="var(--on-gold)" strokeWidth={3} />}
-                    </span>
-                    <span style={{ flex: 1, textDecoration: isDone ? "line-through" : "none" }}>{tk.libelle || tk.code_tache}</span>
-                    {tk.date_echeance && <span style={{ fontSize: 11.5, color: "var(--muted)", flexShrink: 0 }}>{tk.date_echeance}</span>}
-                  </button>
-                );
-              })}
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>Mes tâches (À faire par vous)</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>Cochez les tâches que vous avez terminées.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 20 }}>
+              {tasks.filter((tk) => tk.acteur === "EMPLOYE").length > 0 ? (
+                tasks.filter((tk) => tk.acteur === "EMPLOYE").map((tk) => {
+                  const isDone = tk.status === "done";
+                  const busy = busyId === tk.id;
+                  return (
+                    <button key={tk.id} onClick={() => toggle(tk)} disabled={busy}
+                      style={{ display: "flex", alignItems: "center", gap: 11, fontSize: 14, color: isDone ? "var(--muted)" : "var(--ink)", background: "transparent", border: "none", textAlign: "left", cursor: busy ? "wait" : "pointer", padding: "7px 4px", borderRadius: 8, fontFamily: "inherit", opacity: busy ? 0.6 : 1 }}>
+                      <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: `1px solid ${isDone ? "var(--gold)" : "var(--line)"}`, background: isDone ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {isDone && <Check size={13} color="var(--on-gold)" strokeWidth={3} />}
+                      </span>
+                      <span style={{ flex: 1, textDecoration: isDone ? "line-through" : "none" }}>{tk.libelle || tk.code_tache}</span>
+                      {tk.date_echeance && <span style={{ fontSize: 11.5, color: "var(--muted)", flexShrink: 0 }}>{tk.date_echeance}</span>}
+                    </button>
+                  );
+                })
+              ) : (
+                <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic", padding: "6px 4px" }}>Aucune tâche à votre charge.</div>
+              )}
+            </div>
+
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4, borderTop: "1px solid var(--line)", paddingTop: 16 }}>Tâches RH / Manager</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>Ces tâches sont gérées et validées par l'équipe RH ou votre manager.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {tasks.filter((tk) => tk.acteur !== "EMPLOYE").length > 0 ? (
+                tasks.filter((tk) => tk.acteur !== "EMPLOYE").map((tk) => {
+                  const isDone = tk.status === "done";
+                  return (
+                    <div key={tk.id} style={{ display: "flex", alignItems: "center", gap: 11, fontSize: 14, color: isDone ? "var(--muted)" : "var(--ink)", padding: "4px 4px" }}>
+                      <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, border: `1px solid ${isDone ? "var(--gold)" : "var(--line)"}`, background: isDone ? "var(--gold)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {isDone && <Check size={13} color="var(--on-gold)" strokeWidth={3} />}
+                      </span>
+                      <span style={{ textDecoration: isDone ? "line-through" : "none" }}>{tk.libelle || tk.code_tache}</span>
+                      {tk.date_echeance && <span style={{ fontSize: 11.5, color: "var(--muted)", marginLeft: "auto", flexShrink: 0 }}>{tk.date_echeance}</span>}
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ fontSize: 13, color: "var(--muted)", fontStyle: "italic", padding: "6px 4px" }}>Aucune tâche RH.</div>
+              )}
             </div>
           </Card>
 

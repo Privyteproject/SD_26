@@ -112,6 +112,20 @@ function DocTypesManager() {
     catch (e) { setMsg((e && (e.payload?.detail || e.message)) || t("common.error")); }
     finally { setBusy(false); }
   };
+  const handleUploadFile = async (code, e) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const uploadFile = e.target.files[0];
+    setBusy(true); setMsg("");
+    try {
+      await uploadDocumentModeleFile(code, uploadFile);
+      reload();
+    } catch (err) {
+      setMsg((err && (err.payload?.detail || err.message)) || t("common.error"));
+    } finally {
+      setBusy(false);
+      e.target.value = ""; // Réinitialise l'input
+    }
+  };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) setFile(e.target.files[0]);
@@ -180,7 +194,24 @@ function DocTypesManager() {
                 <div style={{ fontSize: 12, color: "var(--muted)" }}>{m.code}{m.categorie ? ` · ${m.categorie}` : ""} {m.is_binary ? ` · (${m.format.toUpperCase()})` : ""}</div>
               </div>
               {m.actif === false && <Badge tone="warning">{t("docs.inactive")}</Badge>}
-              <button onClick={() => remove(m.code)} disabled={busy} title={t("common.delete") || "Supprimer"} style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Trash2 size={15} /></button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button 
+                  onClick={() => document.getElementById(`upload-template-${m.code}`).click()} 
+                  disabled={busy} 
+                  title="Modifier le modèle (Upload)" 
+                  style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--gold-deep)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <UploadCloud size={15} />
+                </button>
+                <input 
+                  id={`upload-template-${m.code}`} 
+                  type="file" 
+                  onChange={(e) => handleUploadFile(m.code, e)} 
+                  accept=".docx,.pdf" 
+                  style={{ display: "none" }} 
+                />
+                <button onClick={() => remove(m.code)} disabled={busy} title={t("common.delete") || "Supprimer"} style={{ width: 34, height: 34, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--danger)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Trash2 size={15} /></button>
+              </div>
             </div>
           ))}
         </Card>

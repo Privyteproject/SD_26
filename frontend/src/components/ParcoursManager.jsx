@@ -40,6 +40,7 @@ function TaskPanel({ matricule, type }) {
   const tasks = ((data && data.data) || []).slice().sort((a, b) => (a.ordre ?? 0) - (b.ordre ?? 0));
   const [busy, setBusy] = useState(false);
   const [newTask, setNewTask] = useState("");
+  const [taskActeur, setTaskActeur] = useState("RH");
   const [summary, setSummary] = useState("");
   const [reco, setReco] = useState(null);
 
@@ -83,7 +84,7 @@ function TaskPanel({ matricule, type }) {
   const addTask = async () => {
     if (!newTask.trim()) return;
     setBusy(true);
-    try { await addParcoursTache(matricule, { libelle: newTask.trim(), type_parcours: type }); setNewTask(""); reload(); }
+    try { await addParcoursTache(matricule, { libelle: newTask.trim(), type_parcours: type, acteur: taskActeur }); setNewTask(""); setTaskActeur("RH"); reload(); }
     catch (e) { fail(t, e); } finally { setBusy(false); }
   };
   const removeTask = async (id) => {
@@ -116,6 +117,9 @@ function TaskPanel({ matricule, type }) {
                         {isDone && <Check size={13} color="var(--on-gold)" strokeWidth={3} />}
                       </span>
                       <span style={{ textDecoration: isDone ? "line-through" : "none" }}>{tk.libelle || tk.code_tache}</span>
+                      <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: tk.acteur === "EMPLOYE" ? "rgba(180,140,40,0.15)" : "var(--field)", color: tk.acteur === "EMPLOYE" ? "var(--gold-deep)" : "var(--muted)", marginLeft: 6 }}>
+                        {tk.acteur === "EMPLOYE" ? "Collaborateur" : "RH"}
+                      </span>
                     </button>
                     <button onClick={() => removeTask(tk.id)} disabled={busy} title={t("parc.del")} style={smallBtn("var(--danger)")}><Trash2 size={15} /></button>
                   </div>
@@ -134,17 +138,27 @@ function TaskPanel({ matricule, type }) {
         )}
 
         {/* Ajout d'une tâche personnalisée — toujours disponible */}
-        <div style={{ display: "flex", gap: 8, marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-          <input
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") addTask(); }}
-            placeholder={t("parc.taskName")}
-            style={{ ...inputStyle, flex: 1 }}
-          />
-          <button onClick={addTask} disabled={busy || !newTask.trim()} style={{ ...goldBtn, opacity: busy || !newTask.trim() ? 0.6 : 1 }}>
-            <Plus size={16} /> {t("parc.add")}
-          </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={newTask}
+              onChange={(e) => setNewTask(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addTask(); }}
+              placeholder={t("parc.taskName")}
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <select
+              value={taskActeur}
+              onChange={(e) => setTaskActeur(e.target.value)}
+              style={{ ...inputStyle, width: 140 }}
+            >
+              <option value="RH">RH / Manager</option>
+              <option value="EMPLOYE">Collaborateur</option>
+            </select>
+            <button onClick={addTask} disabled={busy || !newTask.trim()} style={{ ...goldBtn, opacity: busy || !newTask.trim() ? 0.6 : 1 }}>
+              <Plus size={16} /> {t("parc.add")}
+            </button>
+          </div>
         </div>
 
         {/* IA : synthèse (transfert pour offboarding, intégration pour onboarding) + recommandations onboarding */}
@@ -186,11 +200,12 @@ function ModeleManager({ type }) {
   const [busy, setBusy] = useState(false);
   const [lib, setLib] = useState("");
   const [delay, setDelay] = useState("");
+  const [modelActeur, setModelActeur] = useState("RH");
 
   const add = async () => {
     if (!lib.trim()) return;
     setBusy(true);
-    try { await createModele({ libelle: lib.trim(), type_parcours: type, delai_jours: delay ? Number(delay) : null }); setLib(""); setDelay(""); reload(); }
+    try { await createModele({ libelle: lib.trim(), type_parcours: type, delai_jours: delay ? Number(delay) : null, acteur: modelActeur }); setLib(""); setDelay(""); setModelActeur("RH"); reload(); }
     catch (e) { fail(t, e); } finally { setBusy(false); }
   };
   const edit = async (m) => {
@@ -216,6 +231,9 @@ function ModeleManager({ type }) {
           {modeles.map((m) => (
             <div key={m.code} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
               <span style={{ flex: 1, fontSize: 14, color: "var(--ink)" }}>{m.libelle}</span>
+              <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: m.acteur === "EMPLOYE" ? "rgba(180,140,40,0.15)" : "var(--field)", color: m.acteur === "EMPLOYE" ? "var(--gold-deep)" : "var(--muted)" }}>
+                {m.acteur === "EMPLOYE" ? "Collaborateur" : "RH"}
+              </span>
               {m.delai_jours != null && <span style={{ fontSize: 12, color: "var(--muted)" }}>{m.delai_jours} j</span>}
               <button onClick={() => edit(m)} disabled={busy} title={t("parc.edit")} style={smallBtn("var(--gold-deep)")}><Pencil size={14} /></button>
               <button onClick={() => remove(m)} disabled={busy} title={t("parc.del")} style={smallBtn("var(--danger)")}><Trash2 size={14} /></button>
@@ -224,7 +242,11 @@ function ModeleManager({ type }) {
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
           <input value={lib} onChange={(e) => setLib(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("parc.taskName")} style={{ ...inputStyle, flex: 1 }} />
-          <input value={delay} onChange={(e) => setDelay(e.target.value.replace(/\D/g, ""))} placeholder={t("parc.delay")} style={{ ...inputStyle, width: 110 }} />
+          <input value={delay} onChange={(e) => setDelay(e.target.value.replace(/\D/g, ""))} placeholder={t("parc.delay")} style={{ ...inputStyle, width: 90 }} />
+          <select value={modelActeur} onChange={(e) => setModelActeur(e.target.value)} style={{ ...inputStyle, width: 140 }}>
+            <option value="RH">RH / Manager</option>
+            <option value="EMPLOYE">Collaborateur</option>
+          </select>
           <button onClick={add} disabled={busy || !lib.trim()} style={{ ...goldBtn, opacity: busy || !lib.trim() ? 0.6 : 1 }}><Plus size={16} /> {t("parc.add")}</button>
         </div>
       </AsyncBoundary>

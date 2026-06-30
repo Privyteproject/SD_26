@@ -55,7 +55,7 @@ def list_modeles(
 @router.post("/modeles", status_code=status.HTTP_201_CREATED)
 def create_modele(payload: ModeleTacheCreate, _: CurrentUser = Depends(_MANAGE), db: Session = Depends(get_db)):
     m = repo.create_modele_tache(db, libelle=payload.libelle, type_parcours=payload.type_parcours,
-                                 ordre=payload.ordre, delai_jours=payload.delai_jours)
+                                 ordre=payload.ordre, delai_jours=payload.delai_jours, acteur=payload.acteur)
     return envelope(m.to_dict())
 
 
@@ -83,7 +83,7 @@ def add_tache(matricule: str, payload: TacheCreate, _: CurrentUser = Depends(_MA
     if repo.get_employee(db, matricule) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
     t = repo.add_tache(db, matricule=matricule, libelle=payload.libelle,
-                       type_parcours=payload.type_parcours, date_echeance=payload.date_echeance)
+                       type_parcours=payload.type_parcours, date_echeance=payload.date_echeance, acteur=payload.acteur)
     return envelope(t.to_dict())
 
 
@@ -288,5 +288,8 @@ def update_tache(
         emp = repo.find_employee_by_email(db, user.email)
         if not emp or emp.matricule != t.matricule:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Accès non autorisé")
+        actor = t.modele.acteur if t.modele else "RH"
+        if actor != "EMPLOYE":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez pas valider une tâche réservée aux RH/Managers")
     t = repo.set_tache_status(db, id_tache, payload.status, payload.date_realisation)
     return envelope(t.to_dict())

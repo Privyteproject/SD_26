@@ -1636,14 +1636,14 @@ def list_modele_taches(db, type_parcours=None):
     return list(db.scalars(stmt.order_by(ModeleTache.ordre)))
 
 
-def create_modele_tache(db, *, libelle, type_parcours, ordre=0, delai_jours=None, code=None):
+def create_modele_tache(db, *, libelle, type_parcours, ordre=0, delai_jours=None, code=None, acteur="RH"):
     """Crée un modèle de tâche par défaut (appliqué aux nouveaux parcours)."""
     import uuid
 
     from app.db.models import ModeleTache
     code = code or ("M_" + uuid.uuid4().hex[:6].upper())
     m = ModeleTache(code_tache=code, libelle=libelle, type_parcours=type_parcours,
-                    ordre=ordre or 0, delai_jours=delai_jours)
+                    ordre=ordre or 0, delai_jours=delai_jours, acteur=acteur)
     db.add(m)
     db.commit()
     db.refresh(m)
@@ -1661,6 +1661,8 @@ def update_modele_tache(db, code, patch: dict):
         m.ordre = patch["ordre"]
     if "delai_jours" in patch:
         m.delai_jours = patch["delai_jours"]
+    if "acteur" in patch and patch["acteur"] is not None:
+        m.acteur = patch["acteur"]
     db.commit()
     db.refresh(m)
     return m
@@ -1680,13 +1682,13 @@ def delete_modele_tache(db, code) -> str:
     return "ok"
 
 
-def add_tache(db, *, matricule, libelle, type_parcours, date_echeance=None):
+def add_tache(db, *, matricule, libelle, type_parcours, date_echeance=None, acteur="RH"):
     """Ajoute une tâche PERSONNALISÉE au parcours d'un employé (crée un modèle CUSTOM dédié)."""
     import uuid
 
     from app.db.models import ModeleTache, TacheParcours
     code = "CUSTOM_" + uuid.uuid4().hex[:8]
-    db.add(ModeleTache(code_tache=code, libelle=libelle, type_parcours=type_parcours, ordre=99, delai_jours=None))
+    db.add(ModeleTache(code_tache=code, libelle=libelle, type_parcours=type_parcours, ordre=99, delai_jours=None, acteur=acteur))
     db.flush()
     t = TacheParcours(matricule=matricule, code_tache=code, statut="todo", date_echeance=date_echeance)
     db.add(t)
