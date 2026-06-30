@@ -114,20 +114,34 @@ def _ensure_referentiels(db):
 
 
 # ───────────────────────── Génération ─────────────────────────
-def _new_identity(genre, used_emails):
-    """Identité marocaine UNIQUE (déterministe car random est seedé)."""
+def _new_identity(genre, used_emails, used_names):
+    """Identité marocaine UNIQUE (déterministe car random est seedé).
+
+    Déduplique sur le NOM COMPLET (prénom + nom), pas seulement sur l'e-mail : sans cela, deux
+    employés distincts pouvaient porter le même nom (« Nawal Bargach ») avec des e-mails suffixés,
+    ce qui rendait l'assistant ambigu (« plusieurs collaborateurs correspondent »). Avec 30×40 = 1200
+    combinaisons possibles pour ~60 employés par genre, l'unicité est largement atteignable."""
     pool = PRENOMS_M if genre == "M" else PRENOMS_F
-    for _ in range(200):
+    prenom = nom = None
+    for _ in range(400):
         prenom, nom = random.choice(pool), random.choice(NOMS)
-        base = f"{slugify(prenom)}.{slugify(nom)}"
-        email, k = f"{base}@waminey.ma", 1
-        while email in used_emails:
-            k += 1
-            email = f"{base}{k}@waminey.ma"
-        if k <= 3:  # privilégie les e-mails « propres »
-            used_emails.add(email)
-            return prenom, nom, email
+        key = (slugify(prenom), slugify(nom))
+        if key in used_names:
+            continue  # nom complet déjà attribué -> on évite l'homonyme
+        email = f"{slugify(prenom)}.{slugify(nom)}@waminey.ma"
+        if email in used_emails:
+            continue
+        used_names.add(key)
+        used_emails.add(email)
+        return prenom, nom, email
+    # Filet de sécurité (pool épuisé — inatteignable à 120 employés) : suffixe e-mail déterministe.
+    base = f"{slugify(prenom)}.{slugify(nom)}"
+    email, k = f"{base}@waminey.ma", 1
+    while email in used_emails:
+        k += 1
+        email = f"{base}{k}@waminey.ma"
     used_emails.add(email)
+    used_names.add((slugify(prenom), slugify(nom)))
     return prenom, nom, email
 
 
@@ -243,6 +257,9 @@ def _make_employee(db, matricule, *, prenom, nom, email, genre, role, poste, sta
 
 def _generate(db, depts):
     used_emails = set()
+    # Noms complets déjà pris : pré-rempli avec les comptes démo (Sofia Alami = manager…) pour
+    # qu'aucun employé généré ne devienne leur homonyme. Garantit l'unicité des noms en base.
+    used_names = {(slugify(d["prenom"]), slugify(d["nom"])) for d in DEMO.values()}
     histories = []
     chefs = {}  # id_departement -> matricule du chef (appliqué après commit, évite un FK transitoire)
     next_emp = [1000]  # compteur de matricules auto (EMP1000..)
@@ -268,7 +285,7 @@ def _generate(db, depts):
                            used_emails=used_emails, histories=histories)
         else:
             genre = random.choice(["M", "F"])
-            prenom, nom, email = _new_identity(genre, used_emails)
+            prenom, nom, email = _new_identity(genre, used_emails, used_names)
             mgr_mat = auto_mat()
             _make_employee(db, mgr_mat, prenom=prenom, nom=nom, email=email, genre=genre,
                            role=role_mgr, poste=poste_mgr, statut="ACTIVE",
@@ -291,7 +308,7 @@ def _generate(db, depts):
             else:
                 genre = random.choices(["M", "F", "Autre"], weights=[48, 48, 4])[0]
                 gg = genre if genre in ("M", "F") else random.choice(["M", "F"])
-                prenom, nom, email = _new_identity(gg, used_emails)
+                prenom, nom, email = _new_identity(gg, used_emails, used_names)
                 profile = random.choices(["stable", "desengage", "turnover"], weights=[70, 20, 10])[0]
                 statut = "LEAVING" if profile == "turnover" else "ACTIVE"
                 _make_employee(db, auto_mat(), prenom=prenom, nom=nom, email=email, genre=genre,

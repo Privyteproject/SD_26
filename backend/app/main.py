@@ -70,6 +70,27 @@ async def _audit_context(request: Request, call_next):
     return await call_next(request)
 
 
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    """En-têtes de sécurité HTTP (cahier §3.3 « Sécurité applicative ») : anti-clickjacking,
+    anti-MIME-sniffing, politique de contenu stricte, réduction des fuites de référent.
+    CSP permissive uniquement pour Swagger/Redoc (qui chargent leurs assets) ; stricte ailleurs."""
+    resp = await call_next(request)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    resp.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    path = request.url.path
+    if path.startswith(("/docs", "/redoc", "/openapi")):
+        resp.headers.setdefault("Content-Security-Policy", "default-src 'self' https: data: 'unsafe-inline'")
+    else:  # API JSON : aucune ressource active autorisée.
+        resp.headers.setdefault("Content-Security-Policy",
+                                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+    if settings.IS_PRODUCTION:  # HSTS uniquement en production (HTTPS).
+        resp.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+    return resp
+
+
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 

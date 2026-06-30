@@ -10,12 +10,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser, get_current_user
+from app.core.security import ROLE_ADMIN, ROLE_RH, CurrentUser, get_current_user, require_roles
 from app.db import repository as repo
 from app.db.base import get_db
 from app.schemas.common import envelope
 
 router = APIRouter()
+
+# L'exécution effective de l'effacement (anonymisation) reste sous responsabilité humaine (RH/Admin).
+_ERASE = require_roles(ROLE_ADMIN, ROLE_RH)
 
 # Registre documenté des finalités de traitement (transparence — affiché au collaborateur).
 FINALITES = [
@@ -90,3 +93,15 @@ def request_erasure(user: CurrentUser = Depends(get_current_user), db: Session =
     except Exception:
         db.rollback()
     return envelope({"matricule": mat, "demande": "effacement", "statut": "transmise au RH"})
+
+
+@router.post("/{matricule}/anonymiser")
+def anonymize(matricule: str, user: CurrentUser = Depends(_ERASE), db: Session = Depends(get_db)):
+    """Exécute l'effacement par ANONYMISATION (RH/Admin) : retire les identifiants directs du
+    collaborateur tout en conservant la ligne pseudonymisée pour l'intégrité des agrégats.
+    Réservé RH/Admin (responsabilité humaine) ; action journalisée."""
+    if repo.get_employee(db, matricule) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Employé introuvable")
+    if not repo.anonymize_employee(db, matricule):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Anonymisation impossible")
+    return envelope({"matricule": matricule, "statut": "anonymise"})

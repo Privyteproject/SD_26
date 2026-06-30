@@ -33,7 +33,13 @@ class Settings:
     # Accepte KEYCLOAK_ADMIN_USER ou l'alias KEYCLOAK_ADMIN (nom utilisé par l'image Keycloak).
     KEYCLOAK_ADMIN_USER: str = os.getenv("KEYCLOAK_ADMIN_USER") or os.getenv("KEYCLOAK_ADMIN", "admin")
     KEYCLOAK_ADMIN_PASSWORD: str = os.getenv("KEYCLOAK_ADMIN_PASSWORD", "admin")
-    AUTH_VERIFY_SIGNATURE: bool = os.getenv("AUTH_VERIFY_SIGNATURE", "false").lower() == "true"
+    # Vérification de signature : les jetons Keycloak (RS256) sont TOUJOURS vérifiés via le JWKS
+    # (cf. core/security._decode). Ce drapeau reste pour compat ; le repli dev-login est géré par
+    # ALLOW_DEV_LOGIN (autorisé hors production uniquement).
+    AUTH_VERIFY_SIGNATURE: bool = os.getenv("AUTH_VERIFY_SIGNATURE", "true").lower() == "true"
+    # Repli « dev-login » : accepte des jetons de démo NON signés par Keycloak (comptes @waminey.ma).
+    # Autorisé hors production par défaut ; INTERDIT en production (bloque le démarrage si actif).
+    _ALLOW_DEV_LOGIN_ENV: str = os.getenv("ALLOW_DEV_LOGIN", "")
 
     @property
     def JWKS_URL(self) -> str:
@@ -123,6 +129,13 @@ class Settings:
     def IS_PRODUCTION(self) -> bool:
         return self.APP_ENV in ("production", "prod")
 
+    @property
+    def ALLOW_DEV_LOGIN(self) -> bool:
+        """Repli dev-login autorisé ? Override par ALLOW_DEV_LOGIN, sinon vrai hors production."""
+        if self._ALLOW_DEV_LOGIN_ENV:
+            return self._ALLOW_DEV_LOGIN_ENV.lower() == "true"
+        return not self.IS_PRODUCTION
+
     def security_issues(self) -> list[tuple[str, str]]:
         """Garde-fous de configuration (loi 09-08 / RGPD). Renvoie (sévérité, message).
 
@@ -145,6 +158,10 @@ class Settings:
             out.append(("prod", "DOC_PREVIEW_SECRET utilise le secret par défaut : définissez un secret fort."))
         if not self.AUTH_VERIFY_SIGNATURE:
             out.append(("prod", "AUTH_VERIFY_SIGNATURE désactivé : la signature des JWT n'est pas vérifiée."))
+        # Le repli dev-login (jetons non signés) ne doit JAMAIS être actif en production.
+        if self.IS_PRODUCTION and self.ALLOW_DEV_LOGIN:
+            out.append(("fatal", "ALLOW_DEV_LOGIN actif en production : désactivez le repli dev-login "
+                                 "(ALLOW_DEV_LOGIN=false) — sinon des jetons non signés seraient acceptés."))
         if self.SIRH_API_KEY == "dev-sirh-key-change-me":
             out.append(("prod", "SIRH_API_KEY utilise la valeur par défaut : définissez une clé forte."))
         if "minioadmin" in (self.MINIO_ACCESS_KEY, self.MINIO_SECRET_KEY):

@@ -28,11 +28,12 @@ def chat(
     db: Session = Depends(get_db),
 ):
     # 1) Session : on poursuit celle fournie (après contrôle de propriété) ou on en crée une.
+    # Un id de session inconnu/périmé (base ré-ensemencée, localStorage obsolète) NE doit PAS
+    # rendre l'assistant « indisponible » : on repart simplement sur une nouvelle session.
+    # La propriété reste vérifiée (chat_session_owned) -> jamais la session d'un autre utilisateur.
     session = None
     if payload.session_id:
         session = repo.chat_session_owned(db, payload.session_id, user.email)
-        if session is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Session introuvable")
     if session is None:
         session = repo.chat_create_session(db, user_email=user.email, title=payload.message[:50])
     sid = session.id if session else None

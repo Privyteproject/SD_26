@@ -156,12 +156,27 @@ def delete_employee(db, matricule: str) -> bool:
     if inter_ids:
         run(sa_delete(SourceIA).where(SourceIA.id_interaction.in_(inter_ids)))
 
-    # 2) Enregistrements possédés par l'employé -> suppression
+    # 2) Enregistrements possédés par l'employé -> suppression (enfants AVANT parents).
+    from app.db.models import (AnnonceDestinataire, Bilan, Consentement, EnqueteEngagement,
+                               EntretienAnnuel, EvaluationCompetence, Feedback, Humeur,
+                               KeyResult, Objectif)
+    obj_ids = list(db.scalars(select(Objectif.id_objectif).where(Objectif.matricule == matricule)))
+    if obj_ids:  # résultats clés rattachés aux objectifs de l'employé (FK objectif)
+        run(sa_delete(KeyResult).where(KeyResult.id_objectif.in_(obj_ids)))
     run(sa_delete(Document).where(Document.matricule == matricule))
     run(sa_delete(Demande).where(Demande.matricule == matricule))
     run(sa_delete(TacheParcours).where(TacheParcours.matricule == matricule))
     run(sa_delete(ScoreRisque).where(ScoreRisque.matricule == matricule))
     run(sa_delete(HistoriqueSalaire).where(HistoriqueSalaire.matricule == matricule))
+    run(sa_delete(EnqueteEngagement).where(EnqueteEngagement.matricule == matricule))
+    run(sa_delete(EntretienAnnuel).where(EntretienAnnuel.matricule == matricule))
+    run(sa_delete(Feedback).where(Feedback.matricule == matricule))
+    run(sa_delete(EvaluationCompetence).where(EvaluationCompetence.matricule == matricule))
+    run(sa_delete(Objectif).where(Objectif.matricule == matricule))
+    run(sa_delete(Bilan).where(Bilan.matricule == matricule))
+    run(sa_delete(Humeur).where(Humeur.matricule == matricule))
+    run(sa_delete(AnnonceDestinataire).where(AnnonceDestinataire.matricule == matricule))
+    run(sa_delete(Consentement).where(Consentement.matricule == matricule))
     run(sa_delete(DossierConfidentiel).where(DossierConfidentiel.matricule == matricule))
 
     # 3) Références tierces -> on annule le lien (sans détruire les données d'autrui)
@@ -182,6 +197,52 @@ def delete_employee(db, matricule: str) -> bool:
         run(sa_delete(Utilisateur).where(Utilisateur.id_utilisateur == uid))
 
     db.commit()
+    return True
+
+
+def anonymize_employee(db, matricule: str) -> bool:
+    """Droit à l'effacement (RGPD / loi 09-08) — ALTERNATIVE NON DESTRUCTIVE au hard-delete.
+
+    Retire les IDENTIFIANTS DIRECTS tout en conservant la ligne PSEUDONYMISÉE pour l'intégrité
+    des agrégats statistiques (effectifs, climat…) :
+    - Employe : nom/prénom neutralisés, téléphone/bio/photo/date de naissance effacés, flag `anonymise` ;
+    - compte Utilisateur : e-mail neutralisé (login Keycloak réel impossible) ;
+    - dossier confidentiel (CIN/adresse chiffrés) supprimé ;
+    - documents : contenu + nom de fichier effacés (lignes conservées pour les FK) ;
+    - interactions IA et messages de chat : contenu effacé.
+    Action journalisée (audit). Renvoie False si l'employé est introuvable.
+    """
+    from app.db.models import ChatMessage, ChatSession
+    emp = db.get(Employe, matricule)
+    if emp is None:
+        return False
+    uid = emp.id_utilisateur
+
+    emp.nom, emp.prenom = "Anonymisé", "Collaborateur"
+    emp.telephone = emp.bio = emp.photo = None
+    emp.date_naissance = None
+    emp.anonymise = True
+
+    def run(stmt):
+        db.execute(stmt.execution_options(synchronize_session=False))
+
+    if uid is not None:
+        u = db.get(Utilisateur, uid)
+        if u is not None:
+            u.email = f"anonymise+{matricule}@waminey.ma"
+
+    run(sa_delete(DossierConfidentiel).where(DossierConfidentiel.matricule == matricule))
+    run(sa_update(Document).where(Document.matricule == matricule)
+        .values(contenu=None, nom_fichier="(anonymisé)"))
+    if uid is not None:
+        run(sa_update(InteractionIA).where(InteractionIA.id_utilisateur == uid)
+            .values(prompt="(anonymisé)", reponse="(anonymisé)"))
+        sess_ids = list(db.scalars(select(ChatSession.id).where(ChatSession.id_utilisateur == uid)))
+        if sess_ids:
+            run(sa_update(ChatMessage).where(ChatMessage.session_id.in_(sess_ids)).values(content="(anonymisé)"))
+
+    db.commit()
+    log_audit(db, action="ANONYMISATION", type_entite="employe", id_entite=matricule)
     return True
 
 
@@ -434,11 +495,13 @@ def chat_list_sessions(db, *, user_email):
 
 def chat_get_messages(db, *, session_id):
     from app.db.models import ChatMessage
+    from app.services import crypto
     rows = list(db.scalars(
         select(ChatMessage).where(ChatMessage.session_id == session_id)
         .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
     ))
-    return [{"id": m.id, "role": m.role, "content": m.content, "mode": m.mode,
+    # Contenu chiffré au repos (cf. chat_add_message) -> déchiffré à la volée (no-op si déjà en clair).
+    return [{"id": m.id, "role": m.role, "content": crypto.decrypt(m.content), "mode": m.mode,
              "sources": m.sources, "created_at": m.created_at.isoformat() if m.created_at else None}
             for m in rows]
 
@@ -451,9 +514,11 @@ def chat_history_for_llm(db, session_id, limit=20):
 
 def chat_add_message(db, *, session_id, role, content, mode=None, sources=None):
     from app.db.models import ChatMessage, ChatSession
+    from app.services import crypto
     # Horodatage Python (microseconde) pour un ordre fiable, même sur SQLite (func.now()
     # n'a qu'une résolution à la seconde et le PK UUID n'est pas triable).
-    m = ChatMessage(session_id=session_id, role=role, content=content, mode=mode,
+    # Contenu CHIFFRÉ au repos (loi 09-08 / §3.3 « historiques de conversation chiffrés »).
+    m = ChatMessage(session_id=session_id, role=role, content=crypto.encrypt(content), mode=mode,
                     sources=sources, created_at=datetime.now())
     db.add(m)
     s = db.get(ChatSession, session_id)

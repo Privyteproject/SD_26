@@ -228,17 +228,108 @@ def _sensible_aggregate(db) -> dict:
                                        "title": "Base des rémunérations", "score": 1.0}])
 
 
+def _sensible_self(db, user, message: str) -> dict:
+    """E5 self-service : un COLLABORATEUR consulte SES PROPRES données sensibles (sa paie,
+    son contrat). Réponse DÉTERMINISTE — la donnée personnelle ne quitte jamais le serveur
+    (loi 09-08) — et STRICTEMENT limitée au matricule du demandeur : aucun accès à autrui.
+    C'est ce moteur qui répond aux questions « ma fiche de paie », « les clauses de mon contrat ».
+    """
+    emp = _employe(db, user)
+    if not emp:
+        return _direct_e5("Je ne retrouve pas votre fiche employé dans la plateforme. "
+                          "Contactez votre référent RH pour mettre à jour votre profil.")
+
+    from app.services.text_utils import normalize
+    nt = normalize(message)
+    want_paie = _has(nt, ["paie", "salaire", "bulletin", "remuneration", "net", "brut",
+                          "prime", "fiche de paie"])
+    want_contrat = _has(nt, ["contrat", "clause", "cdi", "cdd", "avenant", "preavis",
+                             "periode d'essai", "engagement"])
+    if not (want_paie or want_contrat):  # intention non explicite -> résumé personnel complet
+        want_paie = want_contrat = True
+
+    docs = repo.get_employee_documents(db, emp.matricule)
+    parts = [f"Voici vos informations personnelles, {emp.prenom} {emp.nom} "
+             f"({emp.matricule}) — poste : {emp.poste or '—'}."]
+
+    if want_paie:
+        sal = repo.get_latest_salary(db, emp.matricule)
+        if sal:
+            parts.append("**Rémunération** — dernier salaire annuel brut enregistré : "
+                         f"{_fmt_eur(sal.montant)} (effet "
+                         f"{sal.date_effet.isoformat() if sal.date_effet else '—'}, "
+                         f"motif {sal.motif or '—'}).")
+        bulletins = [d for d in docs if (d.type_doc or "").upper() == "FICHE_PAIE"]
+        if bulletins:
+            latest = bulletins[0]
+            block = "**Votre dernière fiche de paie**"
+            if latest.contenu:
+                block += " :\n" + latest.contenu
+            if len(bulletins) > 1:
+                autres = ", ".join(d.nom_fichier for d in bulletins[1:6])
+                block += f"\n\nAutres bulletins disponibles : {autres}."
+            block += "\n(Tous vos bulletins sont téléchargeables dans le module « Ma paie ».)"
+            parts.append(block)
+        elif not sal:
+            parts.append("Aucune information de paie n'est encore enregistrée à votre nom. "
+                         "Pour toute question, contactez le service RH.")
+
+    if want_contrat:
+        contrats = [d for d in docs if (d.type_doc or "").upper() == "CONTRAT"]
+        if contrats:
+            cl = []
+            for d in contrats:
+                datec = d.date_creation.strftime("%d/%m/%Y") if d.date_creation else "—"
+                if d.contenu:
+                    cl.append(f"• {d.nom_fichier} ({datec}) :\n{d.contenu}")
+                else:
+                    cl.append(f"• {d.nom_fichier} ({datec}) — à télécharger via le module Documents")
+            parts.append("**Votre contrat** :\n" + "\n".join(cl))
+        else:
+            parts.append("Aucun contrat n'est enregistré sous votre profil. Votre exemplaire "
+                         "signé fait foi ; contactez le service RH pour en obtenir une copie.")
+
+    # Journalisation de l'accès à ses propres données (traçabilité loi 09-08).
+    try:
+        repo.log_audit(db, action="SELF_DATA_VIEW", type_entite="employe",
+                       id_entite=emp.matricule, user_email=user.email)
+    except Exception:
+        db.rollback()
+
+    return _direct_e5("\n\n".join(parts),
+                      sources=[{"id": emp.matricule, "title": "Mes informations", "score": 1.0}])
+
+
 def _sensible(db, user, message: str) -> dict:
     """E5 — données sensibles individuelles avec contrôle d'accès attributaire (ABAC).
 
     Conformité loi 09-08 :
     - la donnée personnelle (salaire, CIN, adresse, documents) n'est JAMAIS envoyée au LLM
       externe : la réponse est construite de façon DÉTERMINISTE côté serveur ;
+    - le COLLABORATEUR n'accède QU'À ses propres données (self-service, ci-dessous) ;
     - RH/Direction/Admin : accès à tout employé ; Manager : uniquement ses collaborateurs directs ;
     - chaque accès autorisé est journalisé (audit), chaque refus génère une alerte ;
     - sans employé nommé : repli sur la masse salariale agrégée.
     """
     role = (user.role or "").upper()
+    # Self-service : un collaborateur ne peut consulter QUE sa propre situation (jamais autrui).
+    # S'il NOMME un autre employé (« salaire de mon collègue X »), on refuse et on trace —
+    # on ne sert pas non plus ses propres données (la demande visait quelqu'un d'autre).
+    if role == "COLLABORATEUR":
+        actor = _employe(db, user)
+        actor_mat = actor.matricule if actor else None
+        if any(t.matricule != actor_mat for t in repo.find_employees_in_text(db, message)):
+            try:
+                repo.create_alerte(
+                    db, message=(f"Accès refusé (IA) : {user.email} (collaborateur) a tenté de "
+                                 f"consulter les données sensibles d'un autre employé."),
+                    categorie="acces_refuse", gravite="mid", id_destinataire=None, matricule=actor_mat)
+            except Exception:
+                db.rollback()
+            return _direct_e5("Accès refusé : vous ne pouvez consulter que VOS propres informations "
+                              "(paie, contrat). Pour les données d'un collègue, adressez-vous au "
+                              "service RH.")
+        return _sensible_self(db, user, message)
     actor = _employe(db, user)
     # L'agrégat entreprise (masse salariale globale) est réservé à RH/Direction/Admin.
     # Le manager n'accède qu'aux fiches individuelles de SON équipe (ABAC ci-dessous).

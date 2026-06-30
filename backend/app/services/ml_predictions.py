@@ -318,6 +318,12 @@ def batch_score(db) -> dict:
     rows = _build_dataset(db)
     active = set(db.scalars(select(Employe.matricule).where(Employe.statut == "ACTIVE")))
     rows = [r for r in rows if r["matricule"] in active]
+    # Consentement (RGPD / loi 09-08) : on exclut les collaborateurs ayant RETIRÉ leur consentement
+    # à la détection du désengagement — traitement analytique avancé soumis à consentement révocable.
+    from app.db import repository as _repo
+    refus = _repo.matricules_refusant(db, "detection_desengagement")
+    if refus:
+        rows = [r for r in rows if r["matricule"] not in refus]
     if not rows:
         return {"scored": 0, "employes": 0}
 

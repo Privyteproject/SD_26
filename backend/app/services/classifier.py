@@ -144,14 +144,20 @@ def _type_rh(t: str) -> str:
 
 
 def classify(text: str) -> dict:
-    """Renvoie {"perimetre", "type_rh", "confidence"} (confidence = interne)."""
+    """Renvoie {"perimetre", "type_rh", "is_personal", "confidence"} (confidence = interne).
+
+    `is_personal` = la question porte sur SA propre situation (« ma paie », « mon contrat »).
+    Le pipeline s'en sert pour le self-service collaborateur : une question PERSONNELLE sur un
+    sujet RH sensible reste légitime (§3.1) et part au RAG documentaire plutôt qu'au refus.
+    """
     t = normalize(text)
+    personal = _is_personal(t)
 
     # 1) Garde-fous déterministes (sécurité + bruit), prioritaires.
     if _has(t, _DANGEREUX):
-        return {"perimetre": PERIMETRE_DANGEREUX, "type_rh": None, "confidence": 0.99}
+        return {"perimetre": PERIMETRE_DANGEREUX, "type_rh": None, "is_personal": personal, "confidence": 0.99}
     if len(t) < 4 or t in _SALUTATIONS:
-        return {"perimetre": PERIMETRE_HORS_SUJET, "type_rh": None, "confidence": 0.9}
+        return {"perimetre": PERIMETRE_HORS_SUJET, "type_rh": None, "is_personal": personal, "confidence": 0.9}
 
     # 2) Classifieur LLM (catégorie + confiance) si activé.
     if settings.CLS_LLM_ENABLED:
@@ -159,10 +165,10 @@ def classify(text: str) -> dict:
         if llm and llm["confidence"] >= settings.CLS_MIN_CONFIDENCE:
             perimetre = _CATEGORY_TO_PERIMETRE[llm["category"]]
             type_rh = _type_rh(t) if perimetre == PERIMETRE_RH else None
-            return {"perimetre": perimetre, "type_rh": type_rh, "confidence": llm["confidence"]}
+            return {"perimetre": perimetre, "type_rh": type_rh, "is_personal": personal, "confidence": llm["confidence"]}
 
     # 3) Repli mots-clés déterministe.
     if _has(t, _RH):
-        return {"perimetre": PERIMETRE_RH, "type_rh": _type_rh(t), "confidence": 0.6}
+        return {"perimetre": PERIMETRE_RH, "type_rh": _type_rh(t), "is_personal": personal, "confidence": 0.6}
     # Par défaut : culture générale (et non « hors sujet »).
-    return {"perimetre": PERIMETRE_CULTURE, "type_rh": None, "confidence": 0.5}
+    return {"perimetre": PERIMETRE_CULTURE, "type_rh": None, "is_personal": personal, "confidence": 0.5}

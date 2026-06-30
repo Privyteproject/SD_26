@@ -144,6 +144,9 @@ class Employe(Base):
     type_contrat: Mapped[str | None] = mapped_column(String(20), nullable=True)       # CDI/CDD/Alternance
     genre: Mapped[str | None] = mapped_column(String(10), nullable=True)              # M/F/Autre
     statut: Mapped[str] = mapped_column(String(10), default="ACTIVE", index=True)
+    # Droit à l'effacement (RGPD / loi 09-08) : ligne pseudonymisée (identifiants directs retirés),
+    # conservée pour l'intégrité statistique des agrégats. Cf. repository.anonymize_employee.
+    anonymise: Mapped[bool] = mapped_column(Boolean, default=False)
     # Informations personnelles modifiables par le collaborateur lui-même
     telephone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     bio: Mapped[str | None] = mapped_column(Text, nullable=True)

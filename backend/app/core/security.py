@@ -60,19 +60,29 @@ def _jwks() -> dict:
 
 
 def _decode(token: str) -> dict:
-    if not settings.AUTH_VERIFY_SIGNATURE:
-        return jwt.get_unverified_claims(token)
+    """Décode un JWT.
+
+    - Jeton Keycloak réel (asymétrique RS/ES, avec `kid`) : signature TOUJOURS vérifiée via le
+      JWKS (issuer contrôlé). C'est le chemin de production — aucune dérogation possible.
+    - Jeton de démo « dev-login » (non signé par Keycloak, sans `kid`) : accepté UNIQUEMENT hors
+      production ET si ALLOW_DEV_LOGIN — permet la démo locale sans serveur Keycloak. En production
+      ce repli est refusé (et le démarrage est bloqué si ALLOW_DEV_LOGIN reste actif, cf. config)."""
     header = jwt.get_unverified_header(token)
+    alg = (header.get("alg") or "").upper()
     kid = header.get("kid")
-    key = next((k for k in _jwks().get("keys", []) if k.get("kid") == kid), None)
-    if key is None:
-        raise JWTError("clé de signature introuvable dans le JWKS")
-    return jwt.decode(
-        token, key,
-        algorithms=[key.get("alg", "RS256")],
-        issuer=settings.ISSUER,
-        options={"verify_aud": False},
-    )
+    if kid or alg.startswith(("RS", "ES", "PS")):
+        key = next((k for k in _jwks().get("keys", []) if k.get("kid") == kid), None)
+        if key is None:
+            raise JWTError("clé de signature introuvable dans le JWKS")
+        return jwt.decode(
+            token, key,
+            algorithms=[key.get("alg", "RS256")],
+            issuer=settings.ISSUER,
+            options={"verify_aud": False},
+        )
+    if settings.ALLOW_DEV_LOGIN and not settings.IS_PRODUCTION:
+        return jwt.get_unverified_claims(token)
+    raise JWTError("jeton non signé refusé (dev-login désactivé ou production)")
 
 
 def _build_user(claims: dict) -> CurrentUser:

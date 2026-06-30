@@ -262,6 +262,21 @@ def _handle_ticket(db, user: CurrentUser, message: str, history: list, meta: dic
     return res
 
 
+def _names_other_employee(db, user, message: str) -> bool:
+    """Vrai si le message NOMME un employé autre que l'utilisateur courant (nom complet/matricule).
+
+    Sert à distinguer le self-service légitime (« ma fiche de paie ») d'une tentative d'accès
+    aux données d'autrui (« salaire de mon collègue X ») : seul le premier est autorisé pour un
+    collaborateur ; le second est refusé et tracé."""
+    try:
+        actor = repo.find_employee_by_email(db, user.email)
+        actor_mat = actor.matricule if actor else None
+        return any(t.matricule != actor_mat for t in repo.find_employees_in_text(db, message))
+    except Exception:
+        db.rollback()
+        return False
+
+
 def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: bool,
              conversation_id: int | None = None, audience: str = "collaborateur") -> dict:
     # L'assistant RH n'est « copilote » que pour un rôle réellement habilité (RBAC inchangé).
@@ -333,9 +348,12 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
             db.rollback()
     meta["perimetre"], meta["type_rh"] = cls["perimetre"], cls["type_rh"]
 
-    # 4) Cache sémantique (clé incluant le rôle -> pas de fuite inter-rôles via le cache)
+    # 4) Cache sémantique (clé incluant le rôle -> pas de fuite inter-rôles via le cache).
+    # JAMAIS de cache pour les données SENSIBLES/personnelles : la réponse (paie, contrat…)
+    # est toujours recalculée de façon déterministe — on ne sert ni un résultat obsolète ni
+    # une donnée personnelle mise en cache.
     ck = cache.key(message, cls["perimetre"], user.role)
-    cached = cache.get(ck)
+    cached = cache.get(ck) if cls.get("type_rh") != "sensible" else None
     if cached:
         # On conserve le rattachement au fil courant et on journalise l'échange
         # (sinon un message servi par le cache n'apparaîtrait pas dans l'historique).
@@ -371,10 +389,34 @@ def run_chat(db, user: CurrentUser, message: str, history: list, want_judge: boo
     # ── Branche RH : RBAC/ABAC avant le RAG ──
     # Autorisation par type : un type restreint exige un rôle explicitement habilité POUR CE TYPE
     # (la médecine est exclue de l'analytique/paie/supervision ; cf. _TYPE_ROLES).
+    role_up = (user.role or "").upper()
     allowed_roles = _TYPE_ROLES.get(cls["type_rh"])
-    authorized = (allowed_roles is None) or ((user.role or "").upper() in allowed_roles)
+    authorized = (allowed_roles is None) or (role_up in allowed_roles)
     meta["authorized"] = authorized
     if not authorized:
+        # Self-service collaborateur : une question PERSONNELLE sur SA propre situation RH
+        # (« vers qui me tourner pour ma paie », « les clauses de mon contrat », mon parcours…)
+        # est légitime (§3.1) et ne doit PAS être refusée. On répond via le RAG documentaire
+        # (politiques internes filtrées par rôle + orientation vers ses modules « Ma paie » /
+        # « Mes documents »), SANS le moteur de données sensibles E5 : aucun accès aux données
+        # d'autrui ni à un score individuel. Une demande NON personnelle (agrégats, données
+        # nominatives d'un tiers) reste refusée et tracée plus bas.
+        # Self-service AUTORISÉ uniquement si la question porte sur SA propre situation ET ne
+        # nomme PAS un autre employé. « salaire de mon collègue X » -> on ne sert PAS ses données :
+        # on laisse le refus + traçage ci-dessous s'appliquer (tentative d'accès aux données d'autrui).
+        if role_up == "COLLABORATEUR" and cls.get("is_personal") and not _names_other_employee(db, user, message):
+            meta["authorized"] = True
+            meta["self_service"] = True
+            if cls["type_rh"] == "sensible":
+                # Ses PROPRES données (sa paie, son contrat) -> moteur E5 en mode self-service :
+                # réponse déterministe sur SES SEULES données (aucune PII vers le LLM, aucun
+                # accès à autrui). Répond réellement à « ma fiche de paie », « mon contrat ».
+                return generate(db, user, message, history, mode="rag", meta=meta,
+                                want_judge=want_judge, ck=ck, type_rh="sensible")
+            # Autres types restreints (prédictif individuel, supervision) : aucune donnée
+            # individuelle restituée -> RAG documentaire (information générale + orientation).
+            return generate(db, user, message, history, mode="rag", meta=meta,
+                            want_judge=want_judge, ck=ck, type_rh=None)
         # Sécurité IA : tracer la tentative d'accès non autorisé + classer si répétée.
         try:
             emp = repo.find_employee_by_email(db, user.email)
