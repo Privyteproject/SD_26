@@ -69,6 +69,27 @@ def test_consent_revocation_excludes_from_ml_scoring(db):
     db.expire_all()
 
 
+def test_e4_who_at_risk_is_named_and_deterministic(db):
+    """« Qui risque de partir ? » (RH) -> réponse DÉTERMINISTE nominative (E4, sans LLM)."""
+    pytest.importorskip("sklearn")
+    from app.core.security import CurrentUser
+    from app.services import ml_predictions as ml, rh_engines
+    ml.batch_score(db)
+    u = CurrentUser(sub="x", email="rh@waminey.ma", name="Karim", role="RH")
+    out = rh_engines._analytics(db, u, "Qui risque de partir ?")
+    assert out.get("direct_answer") is True            # réponse déterministe (pas d'appel LLM)
+    assert "risque élevé" in out["reply"].lower() and "EMP" in out["reply"]  # noms + matricules
+
+
+def test_e2_generation_prefills_named_employee(db):
+    """E2 : une attestation pour un employé nommé est préremplie avec SES données (pas le demandeur)."""
+    from app.core.security import CurrentUser
+    from app.services import rh_engines
+    u = CurrentUser(sub="x", email="rh@waminey.ma", name="Karim", role="RH")
+    ctx = rh_engines._generation(db, u, "Génère une attestation de travail pour Hamza Cherkaoui")["context"]
+    assert "Hamza Cherkaoui" in ctx and "Développeur" in ctx  # profil de la CIBLE
+
+
 def test_chat_messages_encrypted_at_rest(client, chat, collab, db):
     """Les messages de chat sont chiffrés au repos (lecture déchiffrée à la volée)."""
     chat(collab, "ma fiche de paie")  # crée des messages

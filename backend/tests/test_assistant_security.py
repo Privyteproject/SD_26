@@ -61,3 +61,21 @@ def test_rh_can_access_named_salary(chat, rh):
     code, d = chat(rh, "Quel est le salaire de Nawal Bargach")
     assert code == 200
     assert d["meta"].get("authorized") is True
+
+
+def test_manager_e5_same_department_allowed(chat, manager):
+    """ABAC manager (E5) cohérent avec /employees : accès à un employé de SON département.
+
+    Nabil Haddad (EMP1003) est dans le département du manager (Systèmes d'information) sans en
+    être un report direct -> doit être accessible (régression : avant, E5 exigeait le report direct)."""
+    code, d = chat(manager, "Donne-moi la fiche de Nabil Haddad")
+    assert code == 200
+    assert "Accès refusé" not in d["reply"]
+    assert "Nabil" in d["reply"] or "EMP1003" in d["reply"]
+
+
+def test_manager_e5_other_department_refused(chat, manager):
+    """ABAC manager (E5) : un employé HORS du département reste refusé."""
+    code, d = chat(manager, "Donne-moi la fiche de Aicha El Khattabi")
+    assert code == 200
+    assert "Accès refusé" in d["reply"]

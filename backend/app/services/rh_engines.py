@@ -51,7 +51,11 @@ SYSTEM_PROMPT_ANALYTICS = (
     "donnée connexe l'est (valeur globale, ou ventilation par département des scores de "
     "risque), présente-la comme l'information disponible la plus proche — NE REFUSE PAS "
     "tant qu'une donnée pertinente est présente. Précise simplement le périmètre réel "
-    "de la donnée (ex. « turnover global » + « risque par département »)."
+    "de la donnée (ex. « turnover global » + « risque par département »). "
+    "Lorsqu'une LISTE NOMINATIVE des collaborateurs les plus à risque est fournie ci-dessous "
+    "(réservée RH/Direction/manager pour le suivi), tu PEUX la communiquer : nomme les personnes "
+    "concernées avec leur niveau de risque, pour orienter les actions de rétention. Présente-la "
+    "comme une AIDE À LA DÉCISION (pas un verdict définitif), sous responsabilité humaine."
 )
 SYSTEM_PROMPT_SENSIBLE = (
     "Tu es l'assistant RH de « Synapse Digital » habilité à consulter les données "
@@ -83,11 +87,11 @@ def build(db, user, message: str, type_rh: str) -> dict:
     """Construit le contexte du moteur spécialisé : {engine, system, context, sources}."""
     engine = select(type_rh)
     if engine == "E2":
-        return _generation(db, user)
+        return _generation(db, user, message)
     if engine == "E3":
         return _parcours(db, user)
     if engine == "E4":
-        return _analytics(db, user)
+        return _analytics(db, user, message)
     if engine == "E5":
         return _sensible(db, user, message)
     if engine == "E6":
@@ -102,17 +106,83 @@ def _employe(db, user):
         return None
 
 
+def _top_risque_block(rs: dict) -> str:
+    """Bloc NOMINATIF des collaborateurs les plus à risque (RH/Direction/manager — pour suivi).
+    Vide si la synthèse est anonymisée (médecine) ou sans données."""
+    top = rs.get("top") or []
+    if not top:
+        return ""
+    lines = []
+    for t in top:
+        nom = t.get("employee_name") or t.get("matricule") or "—"
+        lines.append(f"- {nom} ({t.get('matricule', '—')}) : risque {t.get('type', '—')} — "
+                     f"score {t.get('valeur', '—')}, niveau {t.get('niveau', '—')}")
+    return ("\n\nCollaborateurs les plus à risque (à traiter en priorité pour la rétention — "
+            "aide à la décision, pas un verdict) :\n" + "\n".join(lines))
+
+
+def _who_at_risk_answer(db, dept, is_exec) -> dict:
+    """Réponse DÉTERMINISTE à « qui risque de partir ? » : liste NOMINATIVE des collaborateurs en
+    risque élevé (dédupliquée par personne, score max), bornée au périmètre. La donnée personnelle
+    n'est JAMAIS envoyée au LLM externe (loi 09-08) ; l'accès est journalisé par le pipeline."""
+    from app.db.models import Employe
+    rows = repo.list_scores(db, niveau="high", department_id=dept)  # triés par score décroissant
+    seen = {}
+    for r in rows:
+        seen.setdefault(r.matricule, r)  # conserve le score le plus élevé par personne
+    top = list(seen.values())[:15]
+    lines = []
+    for r in top:
+        e = db.get(Employe, r.matricule)
+        nm = f"{e.prenom} {e.nom}" if e else r.matricule
+        lines.append(f"- {nm} ({r.matricule}) : risque {r.type}, niveau {r.niveau} "
+                     f"(score {float(r.valeur):.2f})")
+    perim = "votre département" if dept is not None else "l'organisation"
+    if not lines:
+        reply = f"Aucun collaborateur en risque élevé sur {perim} actuellement."
+    else:
+        reply = (f"**Collaborateurs en risque élevé sur {perim}** "
+                 f"({len(seen)} personne(s) ; {len(lines)} affichée(s)) — aide à la décision, "
+                 f"à traiter avec discernement et suivi humain :\n" + "\n".join(lines))
+        if is_exec:
+            tn = repo.latest_indicateurs(db).get("turnover", {})
+            if tn:
+                reply += f"\n\nTurnover global : {tn.get('valeur')} % (période {tn.get('periode')})."
+        reply += ("\n\nCes scores sont prédictifs (pas un verdict) : prévoir un entretien de suivi "
+                  "ou un plan d'action. Détail par personne via « plan d'action pour [nom] ».")
+    return {"engine": "E4", "direct_answer": True, "reply": reply,
+            "sources": [{"id": "scores_risque", "title": "Scores de risque", "score": 1.0}]}
+
+
 # ── E2 · Agent génération documentaire ──
-def _generation(db, user) -> dict:
+def _generation(db, user, message: str = "") -> dict:
+    """Prépare un document. Le profil utilisé pour le PRÉREMPLISSAGE est celui de l'employé
+    NOMMÉ dans la demande s'il est dans le périmètre du demandeur (RH/Direction/Admin : tous ;
+    manager : son département) ; sinon le profil du demandeur (self-service collaborateur)."""
+    from app.core import scope
     modeles = repo.list_modele_document(db)
-    emp = _employe(db, user)
+    role = (user.role or "").upper()
+    emp = None
+    # Cible nommée (« attestation pour X ») : autorisée si dans le périmètre du demandeur.
+    if message and role in ("RH", "DIRECTION", "ADMIN", "MANAGER"):
+        try:
+            named = repo.find_employees_in_text(db, message)
+            if named and scope.is_in_scope(db, user, named[0].matricule):
+                emp = named[0]
+        except Exception:
+            emp = None
+    if emp is None:  # repli : le demandeur lui-même (collaborateur -> ses propres documents)
+        emp = _employe(db, user)
+
     lines = [f"- {m.code_modele} : {m.libelle}" for m in modeles] or ["(aucun modèle disponible)"]
     profil = "(profil employé introuvable)"
     if emp:
         profil = (f"matricule={emp.matricule}, nom={emp.prenom} {emp.nom}, "
-                  f"poste={emp.poste or '—'}, statut={emp.statut}")
+                  f"poste={emp.poste or '—'}, statut={emp.statut}, "
+                  f"date_embauche={emp.date_embauche.isoformat() if emp.date_embauche else '—'}, "
+                  f"type_contrat={emp.type_contrat or '—'}, site={emp.site or '—'}")
     context = ("Modèles de documents disponibles :\n" + "\n".join(lines) +
-               f"\n\nProfil de l'employé : {profil}")
+               f"\n\nProfil de l'employé concerné (pour préremplissage) : {profil}")
     sources = [{"id": m.code_modele, "title": m.libelle, "score": 1.0} for m in modeles]
     return {"engine": "E2", "system": SYSTEM_PROMPT_GENERATION, "context": context, "sources": sources}
 
@@ -141,30 +211,41 @@ def _parcours(db, user) -> dict:
 
 
 # ── E4 · Module prédictif analytics ──
-def _analytics(db, user=None) -> dict:
+def _analytics(db, user=None, message: str = "") -> dict:
     role = (getattr(user, "role", "") or "").upper()
     is_exec = role in ("RH", "DIRECTION", "ADMIN")
+
+    # Intention « QUI est à risque ? » -> réponse DÉTERMINISTE nominative (fiable, sans LLM ni PII
+    # externe). Réservée RH/Direction (organisation) et manager (son département). La liste
+    # nominative reste interne (jamais transmise au LLM), conformément à la loi 09-08.
+    from app.services.text_utils import normalize
+    nt = normalize(message or "")
+    _who = ("qui ", "liste", "nominati", "noms", "lesquels", "quels collaborateurs", "quels employes")
+    _risk = ("risque", "partir", "depart", "desengag", "burnout", "turnover", "quitter")
+    if (is_exec or role == "MANAGER") and any(k in nt for k in _who) and any(k in nt for k in _risk):
+        dept = None if is_exec else getattr(_employe(db, user), "id_departement", None)
+        return _who_at_risk_answer(db, dept, is_exec)
 
     # Périmètre MANAGER : restreint à SON département (jamais les indicateurs entreprise
     # ni les autres départements). RH/Direction/Admin : vue entreprise complète.
     if not is_exec and role == "MANAGER":
         actor = _employe(db, user)
         dept = getattr(actor, "id_departement", None)
-        rs = repo.risk_summary(db, dept=dept) if dept is not None else {"total": 0, "by_niveau": {}}
+        rs = repo.risk_summary(db, top=10, dept=dept) if dept is not None else {"total": 0, "by_niveau": {}}
         context = ("Périmètre : VOTRE ÉQUIPE (département) uniquement.\n"
                    f"Scores de risque de l'équipe : {rs.get('total', 0)} collaborateurs analysés, "
-                   f"répartition par niveau {rs.get('by_niveau', {})}.\n"
-                   "Les indicateurs globaux de l'entreprise (turnover, masse salariale…) ne sont "
+                   f"répartition par niveau {rs.get('by_niveau', {})}." + _top_risque_block(rs) +
+                   "\nLes indicateurs globaux de l'entreprise (turnover, masse salariale…) ne sont "
                    "pas accessibles à ce niveau.")
         sources = [{"id": "risk_team", "title": "Risque (équipe)", "score": 1.0}]
         return {"engine": "E4", "system": SYSTEM_PROMPT_ANALYTICS, "context": context, "sources": sources}
 
     indic = repo.latest_indicateurs(db)
-    risk = repo.risk_summary(db)
+    risk = repo.risk_summary(db, top=12)
     ind_lines = [f"- {k} : {v.get('valeur')} (période {v.get('periode')})"
                  for k, v in indic.items()] or ["(aucun indicateur)"]
     risk_line = (f"Scores de risque : {risk.get('total', 0)} au total, "
-                 f"répartition par niveau {risk.get('by_niveau', {})}")
+                 f"répartition par niveau {risk.get('by_niveau', {})}" + _top_risque_block(risk))
 
     # Ventilation PAR DÉPARTEMENT (agrégée, sans nommer d'employé) pour répondre aux
     # questions « par département / par service » (climat, risque).
@@ -307,7 +388,7 @@ def _sensible(db, user, message: str) -> dict:
     - la donnée personnelle (salaire, CIN, adresse, documents) n'est JAMAIS envoyée au LLM
       externe : la réponse est construite de façon DÉTERMINISTE côté serveur ;
     - le COLLABORATEUR n'accède QU'À ses propres données (self-service, ci-dessous) ;
-    - RH/Direction/Admin : accès à tout employé ; Manager : uniquement ses collaborateurs directs ;
+    - RH/Direction/Admin : accès à tout employé ; Manager : les employés de SON département ;
     - chaque accès autorisé est journalisé (audit), chaque refus génère une alerte ;
     - sans employé nommé : repli sur la masse salariale agrégée.
     """
@@ -364,10 +445,10 @@ def _sensible(db, user, message: str) -> dict:
 
     emp = targets[0]
 
-    # ── ABAC : périmètre d'accès ──
-    allowed = role in ("RH", "DIRECTION", "ADMIN")
-    if not allowed and role == "MANAGER":
-        allowed = bool(actor and emp.matricule_manager == actor.matricule)
+    # ── ABAC : périmètre d'accès (source unique = scope.is_in_scope, cohérent avec /employees,
+    # demandes, absences…). RH/Direction/Admin : organisation ; Manager : SON DÉPARTEMENT. ──
+    from app.core import scope
+    allowed = scope.is_in_scope(db, user, emp.matricule)
 
     if not allowed:
         try:
@@ -380,7 +461,8 @@ def _sensible(db, user, message: str) -> dict:
             db.rollback()
         return _direct_e5(
             f"Accès refusé : {emp.prenom} {emp.nom} ne fait pas partie de votre périmètre. "
-            f"Seules les données de vos collaborateurs directs sont accessibles (ou via un compte RH).")
+            f"Seules les données des collaborateurs de votre département sont accessibles "
+            f"(ou via un compte RH).")
 
     # ── Accès autorisé : réponse déterministe (aucune PII vers le LLM) ──
     sal = repo.get_latest_salary(db, emp.matricule)
